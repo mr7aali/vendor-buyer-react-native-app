@@ -1,6 +1,19 @@
-
 import { apiSlice } from './apiSlice';
 
+const normalizeUpdateProfilePayload = (data: any) => {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+
+    // Send only role-based profile objects and never send user/email for this route.
+    const payload: any = {};
+    if (data.buyer && typeof data.buyer === 'object' && !Array.isArray(data.buyer)) {
+        payload.buyer = { ...data.buyer };
+    }
+    if (data.vendor && typeof data.vendor === 'object' && !Array.isArray(data.vendor)) {
+        payload.vendor = { ...data.vendor };
+    }
+
+    return payload;
+};
 
 export const authApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
@@ -69,7 +82,7 @@ export const authApiSlice = apiSlice.injectEndpoints({
             query: (data) => ({
                 url: '/auth/me',
                 method: 'PATCH',
-                body: data,
+                body: normalizeUpdateProfilePayload(data),
             }),
             invalidatesTags: ['User'],
         }),

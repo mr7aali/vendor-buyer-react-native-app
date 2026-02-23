@@ -1,5 +1,8 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "@/hooks/use-translation";
+import { setCredentials } from "@/store/slices/authSlice";
+import { RootState } from "@/store/store";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -16,12 +19,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 const BusinessInfoForm = () => {
   const { language, t } = useTranslation();
-  const { data: profileData } = useGetProfileQuery({});
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery({});
   const [updateProfile] = useUpdateProfileMutation();
   const userData = profileData?.data;
+  const dispatch = useDispatch();
+  const authState = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -256,15 +262,43 @@ const BusinessInfoForm = () => {
 
     // Submit logic here
     try {
-      const updateData: any = {};
-
-      // Send only vendor table fields without nesting
-      if (formData.fullName) updateData.fullName = formData.fullName;
-      if (formData.phoneNumber) updateData.phone = formData.phoneNumber;
-      if (formData.address) updateData.address = formData.address;
-      if (formData.businessName) updateData.storename = formData.businessName;
+      const updateData: any = {
+        vendor: {
+          fullName: formData.fullName,
+          phone: formData.phoneNumber,
+          address: formData.address,
+          storename: formData.businessName,
+        },
+      };
 
       await updateProfile(updateData).unwrap();
+      await refetchProfile();
+
+        if (authState?.accessToken) {
+          const mergedUser = {
+            ...(authState.user || {}),
+            vendor: {
+              ...((authState.user as any)?.vendor || {}),
+              fullName: formData.fullName,
+            phone: formData.phoneNumber,
+            address: formData.address,
+            storename: formData.businessName,
+          },
+          fullName: formData.fullName || (authState.user as any)?.fullName,
+          phone: formData.phoneNumber || (authState.user as any)?.phone,
+          address: formData.address || (authState.user as any)?.address,
+          storename: formData.businessName || (authState.user as any)?.storename,
+        };
+
+        dispatch(
+          setCredentials({
+            user: mergedUser as any,
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken || "",
+          })
+        );
+        await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
+      }
 
       Alert.alert(t("success", "Success"), ui.successBusinessSaved, [
         { text: t("ok", "OK"), onPress: () => router.back() },

@@ -48,7 +48,7 @@ export default function RootLayout() {
   const [isReady, setIsReady] = React.useState(false);
   const stripePublishableKey = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
 
-  // Auto-login logic
+  // Startup auth routing logic
   React.useEffect(() => {
     const checkLogin = async () => {
       let shouldRedirect = false;
@@ -60,8 +60,42 @@ export default function RootLayout() {
           store.dispatch(setLanguage(savedLanguage));
         }
 
-        // Force startup flow to always begin from onboarding.
-        targetPath = "/(onboarding)";
+        const accessToken = await AsyncStorage.getItem("accessToken");
+        const refreshToken = await AsyncStorage.getItem("refreshToken");
+        const rawUser = await AsyncStorage.getItem("user");
+        const storedRole = (await AsyncStorage.getItem("userRole")) || "";
+
+        let parsedUser: any = null;
+        if (rawUser) {
+          try {
+            parsedUser = JSON.parse(rawUser);
+          } catch {
+            parsedUser = null;
+          }
+        }
+
+        if (accessToken && parsedUser) {
+          store.dispatch(
+            setCredentials({
+              user: parsedUser,
+              accessToken,
+              refreshToken: refreshToken || "",
+            })
+          );
+
+          const detectedRole = String(
+            parsedUser?.userType ||
+            parsedUser?.role ||
+            storedRole ||
+            (parsedUser?.vendor ? "vendor" : parsedUser?.buyer ? "buyer" : "")
+          ).toLowerCase();
+
+          targetPath = detectedRole === "vendor" ? "/(tabs)" : "/(users)";
+        } else {
+          // Not logged in -> onboarding/auth flow
+          targetPath = "/(onboarding)";
+        }
+
         shouldRedirect = true;
       } catch (e) {
         console.error('Auto-login failed:', e);

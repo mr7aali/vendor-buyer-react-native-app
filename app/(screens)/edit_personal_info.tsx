@@ -1,5 +1,8 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTranslation } from "@/hooks/use-translation";
+import { setCredentials } from "@/store/slices/authSlice";
+import { RootState } from "@/store/store";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -14,12 +17,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 const EditPersonalInfoScreen = () => {
   const { language, t } = useTranslation();
-  const { data: profileData } = useGetProfileQuery({});
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery({});
   const [updateProfile, { isLoading }] = useUpdateProfileMutation();
   const userData = profileData?.data;
+  const dispatch = useDispatch();
+  const authState = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -141,18 +147,40 @@ const EditPersonalInfoScreen = () => {
 
     // Success - Save data and navigate back
     try {
-      const updateData: any = {};
-
-      // Send only vendor table fields without nesting
-      if (formData.fullName) updateData.fullName = formData.fullName;
-      if (formData.phone) updateData.phone = formData.phone;
-      if (formData.address) updateData.address = formData.address;
-
-      // Clean up empty objects if necessary, but backend might handle partials.
-      // If user provided no email change, we might not want to send user object with just empty fields if backend validates.
-      // But typically sending what we have is okay.
+      const updateData: any = {
+        vendor: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          address: formData.address,
+        },
+      };
 
       await updateProfile(updateData).unwrap();
+      await refetchProfile();
+
+        if (authState?.accessToken) {
+          const mergedUser = {
+            ...(authState.user || {}),
+            vendor: {
+              ...((authState.user as any)?.vendor || {}),
+              fullName: formData.fullName,
+            phone: formData.phone,
+            address: formData.address,
+          },
+          fullName: formData.fullName || (authState.user as any)?.fullName,
+          phone: formData.phone || (authState.user as any)?.phone,
+          address: formData.address || (authState.user as any)?.address,
+        };
+
+        dispatch(
+          setCredentials({
+            user: mergedUser as any,
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken || "",
+          })
+        );
+        await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
+      }
 
       Alert.alert(
         t("success", "Success"),

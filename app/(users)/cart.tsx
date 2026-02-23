@@ -1,20 +1,11 @@
-﻿import { useGetCartQuery, useRemoveFromCartMutation, useUpdateCartItemMutation } from "@/store/api/cartApiSlice";
+import { useGetCartQuery, useRemoveFromCartMutation, useUpdateCartItemMutation } from "@/store/api/cartApiSlice";
+import { useGetCouponsByVendorQuery } from "@/store/api/couponApiSlice";
 import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-}
-
-const { width } = Dimensions.get("window");
 
 const MyCart: React.FC = () => {
   const { t } = useTranslation();
@@ -23,9 +14,43 @@ const MyCart: React.FC = () => {
   const [updateCartItem] = useUpdateCartItemMutation();
   const [removeFromCart] = useRemoveFromCartMutation();
 
-  const cartItems = useMemo(() => {
-    const rawItems = cartData?.data?.items || cartData?.items || (Array.isArray(cartData) ? cartData : []);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoError, setPromoError] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
 
+  const rawItems = useMemo(() => {
+    return cartData?.data?.items || cartData?.items || (Array.isArray(cartData) ? cartData : []);
+  }, [cartData]);
+
+  const activeVendorId = useMemo(() => {
+    const vendorIds = rawItems
+      .map((item: any) =>
+        item?.vendorId?.id ||
+        item?.vendorId?._id ||
+        item?.vendorId ||
+        item?.product?.vendorId?.id ||
+        item?.product?.vendorId?._id ||
+        item?.product?.vendorId ||
+        item?.product?.vendor?.id ||
+        item?.product?.vendor?._id ||
+        item?.productId?.vendorId?.id ||
+        item?.productId?.vendorId?._id ||
+        item?.productId?.vendorId ||
+        item?.productId?.vendor?.id ||
+        item?.productId?.vendor?._id
+      )
+      .filter(Boolean)
+      .map((id: any) => String(id));
+
+    return vendorIds.length ? vendorIds[0] : "";
+  }, [rawItems]);
+
+  const { data: vendorCoupons = [] } = useGetCouponsByVendorQuery(activeVendorId, {
+    skip: !activeVendorId,
+  });
+
+  const cartItems = useMemo(() => {
     return rawItems.map((item: any) => ({
       id: item.id || item._id,
       name: item.product?.name || item.product?.title || item.productId?.title || item.productId?.name || item.title || item.name || t("cart_unknown_product", "Unknown Product"),
@@ -33,7 +58,7 @@ const MyCart: React.FC = () => {
       quantity: item.quantity,
       image: item.product?.images?.[0] || item.product?.imageUrl || item.productId?.images?.[0] || item.productId?.image || item.image || "https://via.placeholder.com/150",
     }));
-  }, [cartData, t]);
+  }, [rawItems, t]);
 
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -72,8 +97,76 @@ const MyCart: React.FC = () => {
     (acc: number, item: any) => acc + item.price * item.quantity,
     0
   );
+
+  const handleApplyPromo = () => {
+    const code = promoCode.trim();
+    setPromoError("");
+
+    if (!code) {
+      setPromoError(t("cart_enter_promo_code", "Please enter a promo code"));
+      return;
+    }
+
+    if (!activeVendorId) {
+      setPromoError(t("cart_promo_vendor_missing", "Promo cannot be applied for this cart"));
+      return;
+    }
+
+    const coupons = Array.isArray(vendorCoupons) ? vendorCoupons : [];
+    const match = coupons.find(
+      (coupon: any) => String(coupon?.code || "").trim().toLowerCase() === code.toLowerCase()
+    );
+
+    if (!match) {
+      setPromoError(t("cart_promo_invalid", "Invalid promo code"));
+      return;
+    }
+
+    if (match.isActive === false) {
+      setPromoError(t("cart_promo_inactive", "This promo code is inactive"));
+      return;
+    }
+
+    const now = new Date();
+    const validFromRaw = match.validFrom || match.startDate || match.fromDate;
+    const validUntilRaw = match.validUntil || match.endDate || match.toDate;
+    const validFrom = validFromRaw ? new Date(validFromRaw) : null;
+    const validUntil = validUntilRaw ? new Date(validUntilRaw) : null;
+
+    if ((validFrom && !Number.isNaN(validFrom.getTime()) && now < validFrom) || (validUntil && !Number.isNaN(validUntil.getTime()) && now > validUntil)) {
+      setPromoError(t("cart_promo_expired", "This promo code is expired"));
+      return;
+    }
+
+    const minPurchase = Number(match.minPurchaseAmount || match.minimumPurchase || 0);
+    if (subtotal < minPurchase) {
+      setPromoError(t("cart_promo_min_purchase", `Minimum purchase amount is $${minPurchase.toFixed(2)}`));
+      return;
+    }
+
+    const discountType = String(match.discountType || match.type || "").toLowerCase();
+    const discountValue = Number(match.discountValue || match.value || 0);
+    const rawDiscount =
+      discountType === "percentage" || discountType === "%"
+        ? (subtotal * discountValue) / 100
+        : discountValue;
+
+    const discount = Math.max(0, Math.min(rawDiscount, subtotal));
+
+    setAppliedPromoCode(match.code);
+    setAppliedDiscount(discount);
+    setPromoError("");
+  };
+
+  const clearAppliedPromo = () => {
+    setAppliedPromoCode("");
+    setAppliedDiscount(0);
+    setPromoCode("");
+    setPromoError("");
+  };
+
   const tax: number = subtotal * TAX_RATE;
-  const total: number = subtotal + tax + SHIPPING_FEE;
+  const total: number = Math.max(0, subtotal + tax + SHIPPING_FEE - appliedDiscount);
 
   const handleConfirmPurchase = () => {
     setIsModalVisible(false);
@@ -134,7 +227,12 @@ const MyCart: React.FC = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
+        {isError ? (
+          <Text style={styles.errorText}>{t("cart_failed_load", "Failed to load cart")}</Text>
+        ) : null}
+
         {cartItems.map((item: any) => (
           <View key={item.id} style={styles.cartCard}>
             <View style={styles.itemMainRow}>
@@ -182,12 +280,38 @@ const MyCart: React.FC = () => {
 
         <View style={styles.summaryCard}>
           <View style={styles.promoBox}>
-            <Text style={styles.promoText}>YYt34uri</Text>
-            <View style={styles.promoApplied}>
-              <Text style={styles.appliedText}>{t("cart_promo_applied", "Promo code applied")}</Text>
-              <Ionicons name="checkmark-circle" size={18} color="#349488" />
-            </View>
+            <TextInput
+              style={styles.promoInput}
+              value={promoCode}
+              onChangeText={setPromoCode}
+              placeholder={t("cart_enter_promo", "Enter promo code")}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isLoading}
+              selectTextOnFocus
+              onFocus={() => setPromoError("")}
+              returnKeyType="done"
+              placeholderTextColor="#94A3B8"
+            />
+            <TouchableOpacity style={styles.applyBtn} onPress={handleApplyPromo}>
+              <Text style={styles.applyBtnText}>{t("product_details_apply", "Apply")}</Text>
+            </TouchableOpacity>
           </View>
+
+          {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
+
+          {appliedPromoCode ? (
+            <View style={styles.promoAppliedRow}>
+              <View style={styles.promoApplied}>
+                <Text style={styles.promoText}>{appliedPromoCode}</Text>
+                <Ionicons name="checkmark-circle" size={18} color="#349488" />
+                <Text style={styles.appliedText}>{t("cart_promo_applied", "Promo code applied")}</Text>
+              </View>
+              <TouchableOpacity onPress={clearAppliedPromo}>
+                <Text style={styles.clearPromoText}>{t("cart_remove_promo", "Remove")}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <Text style={styles.sectionTitle}>{t("order_details_payment_details", "Payment details")}</Text>
 
@@ -205,6 +329,13 @@ const MyCart: React.FC = () => {
             <Text style={styles.detailLabel}>{t("order_details_shipping", "Shipping")}</Text>
             <Text style={styles.detailValue}>${SHIPPING_FEE.toFixed(2)}</Text>
           </View>
+
+          {appliedDiscount > 0 ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t("order_details_discount", "Discount")}</Text>
+              <Text style={[styles.detailValue, { color: "#349488" }]}>-${appliedDiscount.toFixed(2)}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.divider} />
 
@@ -239,6 +370,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: "center" },
   headerTitle: { fontSize: 20, fontWeight: "bold", color: "#333" },
   scrollContent: { padding: 16 },
+  errorText: { color: "#EF4444", marginBottom: 10, textAlign: "center" },
   cartCard: {
     backgroundColor: "#FFF",
     borderRadius: 15,
@@ -302,12 +434,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEE",
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 25,
+    padding: 10,
+    marginBottom: 8,
   },
-  promoText: { fontSize: 16, color: "#333", fontWeight: "500" },
+  promoInput: {
+    flex: 1,
+    height: 42,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#0F172A",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  applyBtn: {
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: "#349488",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 14,
+  },
+  applyBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
+  promoText: { fontSize: 16, color: "#333", fontWeight: "500", marginRight: 6 },
   promoApplied: { flexDirection: "row", alignItems: "center" },
-  appliedText: { color: "#349488", fontSize: 13, marginRight: 6 },
+  appliedText: { color: "#349488", fontSize: 13, marginLeft: 6 },
+  promoAppliedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  promoErrorText: { color: "#EF4444", fontSize: 12, marginBottom: 10 },
+  clearPromoText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
