@@ -21,7 +21,7 @@ import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Apple, Chrome, Facebook } from "lucide-react-native";
+import { Apple, Chrome } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const SignUpScreen: React.FC = () => {
@@ -267,9 +267,6 @@ const SignUpScreen: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialIcon}>
               <Apple color="#000" size={24} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialIcon}>
-              <Facebook color="#1877F2" size={24} />
             </TouchableOpacity>
           </View>
         </ScrollView>

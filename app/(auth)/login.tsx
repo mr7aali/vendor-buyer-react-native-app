@@ -218,7 +218,7 @@ export default function LoginScreen() {
           <View style={styles.socialIconsRow}>
             <TouchableOpacity style={styles.socialIconCircle}><FontAwesome name="google" size={24} color="#DB4437" /></TouchableOpacity>
             <TouchableOpacity style={styles.socialIconCircle}><FontAwesome name="apple" size={24} color="black" /></TouchableOpacity>
-            <TouchableOpacity style={styles.socialIconCircle}><FontAwesome name="facebook" size={24} color="#4267B2" /></TouchableOpacity>
+            
           </View>
 
           <View style={styles.footerRow}>

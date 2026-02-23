@@ -30,7 +30,11 @@ interface FormData {
   gender: string;
 }
 
-const GENDER_OPTIONS = ["male", "female", "other"] as const;
+const GENDER_OPTIONS = ["male", "female"] as const;
+const normalizeGender = (value?: string) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "male" || normalized === "female" ? normalized : "";
+};
 
 const EditProfileScreen = () => {
   const { t } = useTranslation();
@@ -59,7 +63,7 @@ const EditProfileScreen = () => {
       fullName: userData?.buyer?.fullName || userData?.name || "",
       email: userData?.email || "",
       phone: userData?.buyer?.phone || userData?.phoneNumber || "",
-      gender: userData?.buyer?.gender || "",
+      gender: normalizeGender(userData?.buyer?.gender),
       dob: userData?.buyer?.dob ? new Date(userData.buyer.dob) : prev.dob,
     }));
   }, [userData]);
@@ -92,11 +96,12 @@ const EditProfileScreen = () => {
 
   const handleSave = async () => {
     try {
+      const normalizedGender = normalizeGender(formData.gender);
       const updateData: any = {
         buyer: {
           fullName: formData.fullName,
           phone: formData.phone,
-          ...(formData.gender ? { gender: formData.gender } : {}),
+          ...(normalizedGender ? { gender: normalizedGender } : {}),
         },
       };
 
@@ -110,7 +115,7 @@ const EditProfileScreen = () => {
             ...((authState.user as any)?.buyer || {}),
             fullName: formData.fullName,
             phone: formData.phone,
-            ...(formData.gender ? { gender: formData.gender } : {}),
+            ...(normalizedGender ? { gender: normalizedGender } : {}),
           },
           fullName: formData.fullName || (authState.user as any)?.fullName,
           phone: formData.phone || (authState.user as any)?.phone,

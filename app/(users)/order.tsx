@@ -110,9 +110,18 @@ const getBottomLabel = (
 };
 
 const normalizeStatus = (status?: string) => {
-  if (!status) return "";
-  if (status === "Cancelled") return "Canceled";
-  return status;
+  const raw = String(status || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  // Unify backend variants to UI filter buckets
+  if (raw === "delivered" || raw === "complete" || raw === "completed") return "Delivered";
+  if (raw === "processing" || raw === "in_progress" || raw === "in progress") return "Processing";
+  if (raw === "shipped" || raw === "shipping" || raw === "out_for_delivery" || raw === "out for delivery") return "Shipped";
+  if (raw === "canceled" || raw === "cancelled") return "Canceled";
+  if (raw === "pending") return "Pending";
+
+  // Fallback: title case
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
 const getDisplayStatus = (item: any) => {
@@ -135,7 +144,7 @@ export default function OrdersScreen() {
   const filteredOrders =
     activeFilter === "All"
       ? orders
-      : orders.filter((o: any) => getDisplayStatus(o) === activeFilter);
+      : orders.filter((o: any) => normalizeStatus(getDisplayStatus(o)) === activeFilter);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
