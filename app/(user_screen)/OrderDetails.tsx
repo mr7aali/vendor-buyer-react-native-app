@@ -106,6 +106,7 @@ const OrderDetails = () => {
               router.push({
                 pathname: '/(screens)/chat_box',
                 params: {
+                  role: 'buyer',
                   partnerId: order?.vendor?.userId || order?.vendor?.id,
                   fullname: order?.vendor?.fullName || order?.vendor?.storename || t('order_details_vendor_fallback', 'Vendor'),
                 },

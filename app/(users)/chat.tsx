@@ -104,6 +104,7 @@ export default function ChatScreen() {
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {
+                          role: 'buyer',
                           partnerId,
                           conversationId: normalizeId(conversation?.id || conversation?._id || partnerId),
                           fullname: displayName,

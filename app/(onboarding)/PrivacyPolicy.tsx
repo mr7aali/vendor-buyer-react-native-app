@@ -50,7 +50,9 @@ export default function PrivacyPolicy() {
             <View style={[styles.checkbox, accepted && styles.checked]}>
               {accepted && <Ionicons name="checkmark" size={14} color="#FFF" />}
             </View>
-            <Text style={styles.checkboxText}>{`${t("confirm", "Confirm")} ${t("privacy_heading", "Privacy & Policy")}`}</Text>
+            <Text style={styles.termsLinkText}>
+              {t("accept_terms_and_conditions", "Accept terms & conditions")}
+            </Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -105,7 +107,11 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   checked: { backgroundColor: "#2D8C8C" },
-  checkboxText: { color: "#2D8C8C", fontWeight: "600" },
+  termsLinkText: {
+    color: "#2D8C8C",
+    fontSize: 16,
+    textDecorationLine: "underline",
+  },
   nextButton: {
     backgroundColor: "#2D8C8C",
     padding: 15,

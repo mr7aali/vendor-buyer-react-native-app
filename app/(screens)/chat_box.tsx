@@ -147,10 +147,12 @@ const ChatBox: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = user?.userId || user?.id || (user as any)?._id;
   const router = useRouter();
-  const { conversationId, name, fullname, partnerId: partnerIdParam } = useLocalSearchParams();
+  const { conversationId, name, fullname, partnerId: partnerIdParam, role: roleParam } = useLocalSearchParams();
+  const paramConversationId = (conversationId as string) || "";
+  const paramPartnerId = (partnerIdParam as string) || "";
 
-  // Use partnerIdParam if available, as everything (messages, coupons, etc.) depends on the User ID
-  const [activePartnerId, setActivePartnerId] = useState((partnerIdParam || conversationId) as string);
+  // Resolve partner ID first; don't use conversation ID as receiver ID.
+  const [activePartnerId, setActivePartnerId] = useState(paramPartnerId);
 
   const { data: conversationsData } = useGetConversationsQuery(currentUserId, {
     skip: !currentUserId,
@@ -159,30 +161,30 @@ const ChatBox: React.FC = () => {
 
   // If we only have a conversationId, try to find the partner ID from conversations
   React.useEffect(() => {
-    if (conversationId && !partnerIdParam && conversationsData) {
-      const conv = conversationsData.find((c: any) => (c._id || c.id) === conversationId);
-      const p = conv?.participant || conv?.participants?.find((p: any) => (p.userId || p._id || p.id) !== user?.id);
+    if (paramConversationId && !paramPartnerId && conversationsData) {
+      const conv = conversationsData.find((c: any) => (c._id || c.id) === paramConversationId);
+      const p = conv?.participant || conv?.participants?.find((p: any) => (p.userId || p._id || p.id) !== currentUserId);
       const pId = p?.userId || p?._id || p?.id;
       if (pId && pId !== activePartnerId) {
         console.log('ChatBox - Resolved partner ID from conversation:', pId);
         setActivePartnerId(pId);
       }
     }
-  }, [conversationId, partnerIdParam, conversationsData, user?.id, activePartnerId]);
+  }, [paramConversationId, paramPartnerId, conversationsData, currentUserId, activePartnerId]);
 
   const partnerData = useMemo(() => {
     const fromParams = {
       name: (fullname || name) as string,
-      id: activePartnerId,
+      id: activePartnerId || paramPartnerId,
       avatar: "https://via.placeholder.com/44"
     };
 
     if (conversationsData) {
       const conv = conversationsData.find((c: any) => {
         const p = c.participant || c.participants?.find((p: any) => (p._id || p.id || p.userId) === activePartnerId);
-        return p || (c._id || c.id) === conversationId;
+        return p || (c._id || c.id) === paramConversationId;
       });
-      const p = conv?.participant || conv?.participants?.find((p: any) => (p._id || p.id || p.userId) !== user?.id);
+      const p = conv?.participant || conv?.participants?.find((p: any) => (p._id || p.id || p.userId) !== currentUserId);
       if (p) {
         return {
           name: p.storename || p.name || p.fullName || p.fulllName || fromParams.name,
@@ -192,7 +194,7 @@ const ChatBox: React.FC = () => {
       }
     }
     return fromParams;
-  }, [conversationsData, activePartnerId, fullname, name, conversationId, user?.id]);
+  }, [conversationsData, activePartnerId, paramPartnerId, fullname, name, paramConversationId, currentUserId]);
 
   const displayName = partnerData.name || t("chat_partner_fallback", "Partner");
   const partnerAvatar = partnerData.avatar;
@@ -221,8 +223,19 @@ const ChatBox: React.FC = () => {
     loadRole();
   }, []);
 
-  // 1. Detect role from global state & storage
-  const role = user?.userType?.toLowerCase() || storedRole?.toLowerCase() || "buyer";
+  // 1. Detect role from global state & storage (strictly vendor/buyer only)
+  const normalizedRoleParam = String(roleParam || "").toLowerCase();
+  const normalizedUserType = String(user?.userType || "").toLowerCase();
+  const normalizedStoredRole = String(storedRole || "").toLowerCase();
+  // Priority: current authenticated user role > stored fallback role
+  const role: "vendor" | "buyer" =
+    normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
+      ? (normalizedRoleParam as "vendor" | "buyer")
+      : normalizedUserType === "vendor" || normalizedUserType === "buyer"
+      ? (normalizedUserType as "vendor" | "buyer")
+      : normalizedStoredRole === "vendor"
+        ? "vendor"
+        : "buyer";
   const isVendorSide = role === "vendor";
   const couponPrefix = t("chat_coupon_message_prefix", "Sent a coupon");
   const legacyCouponPrefix = "Sent a coupon";
@@ -230,30 +243,26 @@ const ChatBox: React.FC = () => {
   // 2. Define Tab Configuration dynamically - SWAPPED as per user request
   const tabs = isVendorSide
     ? [
-      { key: "chat" as const, label: t("chat_tab_chat", "Chat"), action: () => setActiveTab("chat") },
-      // {
-      //   name: "Categories",
-      //   action: () => router.push("/(users)/categoriesScreen")
-      // },
-      {
-        key: "order_history" as const,
-        label: t("chat_tab_order_history", "Order History"),
-        action: () => setActiveTab("order_history")
-      },
-    ]
+        { key: "chat" as const, label: t("chat_tab_chat", "Chat"), action: () => setActiveTab("chat") },
+        {
+          key: "order_history" as const,
+          label: t("chat_tab_order_history", "Order History"),
+          action: () => setActiveTab("order_history")
+        },
+      ]
     : [
-      { key: "chat" as const, label: t("chat_tab_chat", "Chat"), action: () => setActiveTab("chat") },
-      {
-        key: "categories" as const,
-        label: t("chat_tab_categories", "Categories"),
-        action: () => router.push("/(users)/categoriesScreen")
-      },
-      {
-        key: "order_history" as const,
-        label: t("chat_tab_order_history", "Order History"),
-        action: () => setActiveTab("order_history")
-      },
-    ];
+        { key: "chat" as const, label: t("chat_tab_chat", "Chat"), action: () => setActiveTab("chat") },
+        {
+          key: "categories" as const,
+          label: t("chat_tab_categories", "Categories"),
+          action: () => router.push("/(users)/categoriesScreen")
+        },
+        {
+          key: "order_history" as const,
+          label: t("chat_tab_order_history", "Order History"),
+          action: () => router.push("/(user_screen)/OrderHistoryScreen")
+        },
+      ];
 
   // API Queries
   const { data: messagesData, isLoading: messagesLoading } = useGetMessagesQuery(activePartnerId, {
@@ -340,6 +349,10 @@ const ChatBox: React.FC = () => {
 
   const handleSendMessage = async (text: string, type: string = "text", coupon?: CouponData) => {
     if (!text.trim() && type === "text") return;
+    if (!activePartnerId) return;
+    if (type === "coupon" && !isVendorSide) {
+      return;
+    }
     try {
       // If sending a coupon, assign it to the buyer first
       if (type === "coupon" && coupon) {
@@ -352,7 +365,7 @@ const ChatBox: React.FC = () => {
         console.log('ChatBox.handleSendMessage - Target Buyer ID:', targetBuyerId);
 
         // Validation: Ensure we don't send conversationId as buyerId
-        if (targetBuyerId === conversationId) {
+        if (targetBuyerId === paramConversationId) {
           console.error('ChatBox.handleSendMessage - ERROR: Target Buyer ID is same as Conversation ID! Aborting assignment.');
           alert(t("chat_coupon_assign_error", "Error: Cannot assign coupon. Buyer ID not resolved."));
           return;
@@ -476,7 +489,7 @@ const ChatBox: React.FC = () => {
             <Text style={styles.headerName}>{displayName}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               {isVendorSide && (
-                <Text style={styles.headerId}>{t("chat_id_fallback", "ID")}: #{(activePartnerId || "").slice(-6).toUpperCase()} • </Text>
+                <Text style={styles.headerId}>{t("chat_id_fallback", "ID")}: #{(activePartnerId || "").slice(-6).toUpperCase()} - </Text>
               )}
               <Text style={styles.headerStatus}>{t("chat_online", "Online")}</Text>
             </View>
@@ -511,7 +524,7 @@ const ChatBox: React.FC = () => {
           <View style={{ flex: 1, padding: 16 }}>
             {categoriesLoading ? <ActivityIndicator color="#2A8383" /> : (
               <FlatList
-                data={categoriesData}
+                data={Array.isArray(categoriesData) ? categoriesData : []}
                 numColumns={2}
                 keyExtractor={(item) => item._id || item.id}
                 renderItem={({ item }) => (
@@ -850,3 +863,5 @@ const styles = StyleSheet.create({
 });
 
 export default ChatBox;
+
+

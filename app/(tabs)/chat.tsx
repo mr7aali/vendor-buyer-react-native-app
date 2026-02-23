@@ -121,6 +121,7 @@ export default function ChatTabs() {
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {
+                          role: 'vendor',
                           partnerId,
                           conversationId: normalizeId(conversation?.id || conversation?._id || partnerId),
                           fullname: displayName,

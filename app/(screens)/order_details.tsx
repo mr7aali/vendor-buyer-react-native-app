@@ -127,6 +127,7 @@ export default function OrderDetails() {
               router.push({
                 pathname: '/(screens)/chat_box',
                 params: {
+                  role: 'vendor',
                   partnerId: order?.buyer?.userId || order?.buyer?.id,
                   fullname: order?.buyer?.fullName || t('orders_customer_fallback', 'Customer'),
                 },

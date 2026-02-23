@@ -65,6 +65,7 @@ export default function ScanQRScreen() {
         router.push({
           pathname: "/(screens)/chat_box",
           params: {
+            role: "buyer",
             partnerId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
             conversationId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
             name: res.data.vendorId?.storename || res.data.vendorId?.businessName || t("scan_vendor", "Vendor")
