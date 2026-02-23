@@ -47,22 +47,6 @@ const AuthSync = () => {
 export default function RootLayout() {
   const [isReady, setIsReady] = React.useState(false);
   const stripePublishableKey = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
-  const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '').trim();
-
-  React.useEffect(() => {
-    if (!googleWebClientId) {
-      return;
-    }
-
-    try {
-      const { GoogleSignin } = require("@react-native-google-signin/google-signin") as typeof import("@react-native-google-signin/google-signin");
-      GoogleSignin.configure({
-        webClientId: googleWebClientId,
-      });
-    } catch {
-      console.warn('Google Sign-In native module is unavailable in this build.');
-    }
-  }, [googleWebClientId]);
 
   // Startup auth routing logic
   React.useEffect(() => {
