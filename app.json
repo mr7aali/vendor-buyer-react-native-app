@@ -13,7 +13,8 @@
       "silentLaunch": true
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soriful420.yozietranceapp"
     },
     "android": {
       "adaptiveIcon": {

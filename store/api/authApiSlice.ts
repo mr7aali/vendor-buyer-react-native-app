@@ -49,6 +49,20 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 };
             },
         }),
+        googleAuth: builder.mutation({
+            query: (data) => ({
+                url: '/auth/google',
+                method: 'POST',
+                body: data,
+            }),
+        }),
+        appleAuth: builder.mutation({
+            query: (data) => ({
+                url: '/auth/apple',
+                method: 'POST',
+                body: data,
+            }),
+        }),
         ForgotPasswordScreen: builder.mutation({
             query: (data) => ({
                 url: '/auth/forgot-password',
@@ -102,6 +116,8 @@ export const {
     useRegisterBuyerMutation,
     useRegisterVendorMutation,
     useLoginMutation,
+    useGoogleAuthMutation,
+    useAppleAuthMutation,
     useForgotPasswordScreenMutation,
     useOTPVerificationMutation,
     useSetNewPasswordScreenMutation,

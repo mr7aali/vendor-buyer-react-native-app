@@ -1,11 +1,14 @@
 
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { useTranslation } from "@/hooks/use-translation";
+import AppleAuth, { AppleRequestOperation, AppleRequestScope } from "@invertase/react-native-apple-authentication";
 
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
+  Alert,
   Platform,
   ScrollView,
   StatusBar,
@@ -16,7 +19,8 @@ import {
   View,
 } from "react-native";
 
-import { useRegisterMutation } from "@/store/api/authApiSlice";
+import { useAppleAuthMutation, useGoogleAuthMutation, useRegisterMutation } from "@/store/api/authApiSlice";
+import { apiSlice } from "@/store/api/apiSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,8 +35,19 @@ const SignUpScreen: React.FC = () => {
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
+  const [isSocialLoading, setIsSocialLoading] = useState<boolean>(false);
+  const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").trim();
 
   const [register, { isLoading }] = useRegisterMutation();
+  const [googleAuthMutation] = useGoogleAuthMutation();
+  const [appleAuthMutation] = useAppleAuthMutation();
+  const getGoogleModule = () => {
+    try {
+      return require("@react-native-google-signin/google-signin") as typeof import("@react-native-google-signin/google-signin");
+    } catch {
+      return null;
+    }
+  };
   const ui = React.useMemo(() => {
     if (language === "he") {
       return {
@@ -87,6 +102,152 @@ const SignUpScreen: React.FC = () => {
       signupSuccessManualLogin: "Signup successful but failed to auto-login. Please login manually.",
     };
   }, [language]);
+
+  const parseAuthError = (error: any): string => {
+    const message = error?.data?.message || error?.response?.data?.message || error?.message;
+    if (message) return message;
+
+    if (error?.code === "SIGN_IN_CANCELLED") {
+      return "Sign in was cancelled.";
+    }
+    if (error?.code === "IN_PROGRESS") {
+      return "Sign in already in progress.";
+    }
+    if (error?.code === "PLAY_SERVICES_NOT_AVAILABLE") {
+      return "Google Play Services is not available on this device.";
+    }
+
+    return "Something went wrong. Please try again.";
+  };
+
+  const completeSocialAuth = async (response: any) => {
+    const payload = response?.data?.accessToken || response?.data?.user ? response.data : response;
+
+    if (!payload?.accessToken || !payload?.user) {
+      alert(ui.signupFailedServer);
+      return;
+    }
+
+    const userType = payload.user?.userType;
+    const storedRole = await AsyncStorage.getItem("userRole");
+    const effectiveRole =
+      userType === "buyer" || userType === "vendor"
+        ? userType
+        : storedRole === "buyer" || storedRole === "vendor"
+          ? storedRole
+          : "user";
+
+    const normalizedUser = { ...payload.user, userType: effectiveRole };
+
+    await AsyncStorage.setItem("accessToken", payload.accessToken);
+    if (payload.refreshToken) {
+      await AsyncStorage.setItem("refreshToken", payload.refreshToken);
+    }
+    await AsyncStorage.setItem("user", JSON.stringify(normalizedUser));
+    await AsyncStorage.setItem("userRole", effectiveRole);
+
+    dispatch(apiSlice.util.resetApiState());
+    dispatch(setCredentials({
+      user: normalizedUser,
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken || null
+    }));
+
+    if (payload?.isNewUser === true) {
+      router.replace("/(onboarding)/user-selection");
+      return;
+    }
+
+    if (effectiveRole === "vendor") {
+      router.replace("/(tabs)");
+      return;
+    }
+
+    if (effectiveRole === "buyer") {
+      router.replace("/(users)");
+      return;
+    }
+
+    router.replace("/(onboarding)/user-selection");
+  };
+
+  const handleGoogleSignup = async () => {
+    if (Constants.appOwnership === "expo") {
+      Alert.alert("Google Sign-In unavailable", "Use a development build (not Expo Go) for native Google Sign-In.");
+      return;
+    }
+    if (!googleWebClientId) {
+      Alert.alert("Missing Google Client ID", "Set EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in .env and restart the app.");
+      return;
+    }
+    const googleModule = getGoogleModule();
+    if (!googleModule) {
+      Alert.alert("Google Sign-In unavailable", "RNGoogleSignin native module is missing. Rebuild the app with expo run:android/ios.");
+      return;
+    }
+
+    setIsSocialLoading(true);
+    try {
+      const { GoogleSignin } = googleModule;
+      GoogleSignin.configure({ webClientId: googleWebClientId });
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const signInResult = await GoogleSignin.signIn();
+      let idToken = (signInResult as any)?.data?.idToken || (signInResult as any)?.idToken;
+
+      if (!idToken) {
+        const tokenPayload = await GoogleSignin.getTokens();
+        idToken = tokenPayload?.idToken;
+      }
+
+      if (!idToken) {
+        throw new Error("Failed to get Google ID token");
+      }
+
+      const response = await googleAuthMutation({ idToken }).unwrap();
+      await completeSocialAuth(response);
+    } catch (error) {
+      Alert.alert("Google Signup Failed", parseAuthError(error));
+    } finally {
+      setIsSocialLoading(false);
+    }
+  };
+
+  const handleAppleSignup = async () => {
+    if (Platform.OS !== "ios" || !AppleAuth.isSupported) {
+      alert("Apple Sign In is only available on supported iOS devices.");
+      return;
+    }
+
+    setIsSocialLoading(true);
+    try {
+      const appleAuthRequestResponse = await AppleAuth.performRequest({
+        requestedOperation: AppleRequestOperation.LOGIN,
+        requestedScopes: [AppleRequestScope.EMAIL, AppleRequestScope.FULL_NAME],
+      });
+
+      const { identityToken, authorizationCode, fullName } = appleAuthRequestResponse;
+
+      if (!identityToken || !authorizationCode) {
+        throw new Error("Apple Sign In failed - missing tokens");
+      }
+
+      const displayName = fullName?.givenName
+        ? `${fullName.givenName} ${fullName.familyName ?? ""}`.trim()
+        : undefined;
+
+      const response = await appleAuthMutation({
+        identityToken,
+        authorizationCode,
+        fullName: displayName,
+      }).unwrap();
+
+      await completeSocialAuth(response);
+    } catch (error) {
+      alert(parseAuthError(error));
+    } finally {
+      setIsSocialLoading(false);
+    }
+  };
 
   const handleSignup = async () => {
     if (!acceptedTerms) {
@@ -262,10 +423,10 @@ const SignUpScreen: React.FC = () => {
 
           {/* Social Icons */}
           <View style={styles.socialContainer}>
-            <TouchableOpacity style={styles.socialIcon}>
+            <TouchableOpacity style={styles.socialIcon} onPress={handleGoogleSignup} disabled={isSocialLoading || isLoading}>
               <Chrome color="#EA4335" size={24} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialIcon}>
+            <TouchableOpacity style={styles.socialIcon} onPress={handleAppleSignup} disabled={isSocialLoading || isLoading}>
               <Apple color="#000" size={24} />
             </TouchableOpacity>
           </View>
@@ -383,3 +544,4 @@ const styles = StyleSheet.create({
 });
 
 export default SignUpScreen;
+
