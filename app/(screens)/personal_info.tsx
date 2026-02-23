@@ -1,4 +1,5 @@
 import { useGetProfileQuery } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { FontAwesome5, Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -16,9 +17,46 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const PersonalInfoScreen = () => {
+  const { language, t } = useTranslation();
   const currentUser = useAppSelector(selectCurrentUser);
   const { data: profileData } = useGetProfileQuery({});
   const displayUser = profileData?.data || currentUser;
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        personalInformation: "מידע אישי",
+        contactInformation: "פרטי קשר",
+        identification: "זיהוי",
+        fullName: "שם מלא",
+        dateOfBirth: "תאריך לידה",
+        phone: "טלפון",
+        idType: "סוג מזהה",
+        idNumber: "מספר מזהה",
+      };
+    }
+    if (language === "hi") {
+      return {
+        personalInformation: "व्यक्तिगत जानकारी",
+        contactInformation: "संपर्क जानकारी",
+        identification: "पहचान",
+        fullName: "पूरा नाम",
+        dateOfBirth: "जन्म तिथि",
+        phone: "फोन",
+        idType: "आईडी प्रकार",
+        idNumber: "आईडी नंबर",
+      };
+    }
+    return {
+      personalInformation: "Personal Information",
+      contactInformation: "Contact Information",
+      identification: "Identification",
+      fullName: "Full Name",
+      dateOfBirth: "Date of Birth",
+      phone: "Phone",
+      idType: "ID Type",
+      idNumber: "ID Number",
+    };
+  }, [language]);
 
   console.log(displayUser, "displayUser");
   // Initialize state with Redux data or defaults
@@ -68,8 +106,8 @@ const PersonalInfoScreen = () => {
 
     if (permissionResult.granted === false) {
       Alert.alert(
-        "Permission Required",
-        "Please grant camera roll permissions to upload an image."
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Please grant camera roll permissions to upload an image.")
       );
       return;
     }
@@ -91,8 +129,8 @@ const PersonalInfoScreen = () => {
       if (!result.canceled && result.assets[0]) {
         setUser((prev) => ({ ...prev, avatar: result.assets[0].uri }));
       }
-    } catch (error) {
-      Alert.alert("Error", "Failed to open gallery");
+    } catch {
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image. Please try again."));
     }
   };
 
@@ -137,7 +175,7 @@ const PersonalInfoScreen = () => {
           <MaterialIcons name="arrow-back-ios" size={20} color="#4B5563" />
         </TouchableOpacity>
         <Text style={{ fontSize: 18, fontWeight: "700", color: "#1F2937" }}>
-          Personal info
+          {t("personal_info", "Personal info")}
         </Text>
         <TouchableOpacity
           onPress={() => router.push("/(screens)/edit_personal_info")}
@@ -183,7 +221,7 @@ const PersonalInfoScreen = () => {
               <MaterialIcons name="photo-camera" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
-          <Text
+            <Text
             style={{
               fontSize: 20,
               fontWeight: "700",
@@ -215,16 +253,16 @@ const PersonalInfoScreen = () => {
               color: "#1F2937",
               marginBottom: 20,
             }}
-          >
-            Personal Information
+            >
+            {ui.personalInformation}
           </Text>
           <InfoRow
-            label="Full Name"
+            label={ui.fullName}
             value={user.name}
             icon={<Ionicons name="person-outline" size={24} color="#9CA3AF" />}
           />
           <InfoRow
-            label="Date of Birth"
+            label={ui.dateOfBirth}
             value={user.dob}
             icon={
               <Ionicons name="calendar-outline" size={24} color="#9CA3AF" />
@@ -252,18 +290,18 @@ const PersonalInfoScreen = () => {
               color: "#1F2937",
               marginBottom: 20,
             }}
-          >
-            Contact Information
+            >
+            {ui.contactInformation}
           </Text>
           <InfoRow
-            label="Email"
+            label={t("info_email", "Email")}
             value={user.email}
             icon={
               <MaterialIcons name="mail-outline" size={24} color="#9CA3AF" />
             }
           />
           <InfoRow
-            label="Phone"
+            label={ui.phone}
             value={user.phone}
             icon={<Ionicons name="call-outline" size={24} color="#9CA3AF" />}
           />
@@ -288,16 +326,16 @@ const PersonalInfoScreen = () => {
               color: "#1F2937",
               marginBottom: 20,
             }}
-          >
-            Identification
+            >
+            {ui.identification}
           </Text>
           <InfoRow
-            label="ID Type"
+            label={ui.idType}
             value={user.idType}
             icon={<FontAwesome5 name="id-card" size={20} color="#9CA3AF" />}
           />
           <InfoRow
-            label="ID Number"
+            label={ui.idNumber}
             value={user.nationalIdNumber}
             icon={<FontAwesome5 name="id-card" size={20} color="#9CA3AF" />}
           />

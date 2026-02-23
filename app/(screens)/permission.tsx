@@ -1,10 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React, { useState } from 'react'
+import { useTranslation } from '@/hooks/use-translation'
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 const PermissionScreen = () => {
+    const { language, t } = useTranslation();
     const [permissions, setPermissions] = useState({
         camera: true,
         photos: true,
@@ -15,6 +17,37 @@ const PermissionScreen = () => {
         storage: true,
         calendar: false
     });
+
+    const labels = React.useMemo(() => {
+        if (language === "he") {
+            return {
+                locationAccess: "גישה למיקום",
+                allowLocation: "אפשר גישה למיקום שלך",
+                allowNotifications: "אפשר התראות",
+                allowPush: "אפשר התראות דחיפה",
+                cameraAccess: "גישה למצלמה",
+                allowCamera: "אפשר גישה למצלמה לצילום",
+            };
+        }
+        if (language === "hi") {
+            return {
+                locationAccess: "लोकेशन एक्सेस",
+                allowLocation: "आपकी लोकेशन तक पहुंच की अनुमति दें",
+                allowNotifications: "नोटिफिकेशन की अनुमति दें",
+                allowPush: "पुश नोटिफिकेशन की अनुमति दें",
+                cameraAccess: "कैमरा एक्सेस",
+                allowCamera: "फोटो लेने के लिए कैमरा एक्सेस दें",
+            };
+        }
+        return {
+            locationAccess: "Location Access",
+            allowLocation: "Allow access to your location",
+            allowNotifications: "Allow Notifications",
+            allowPush: "Allow push notifications",
+            cameraAccess: "Camera Access",
+            allowCamera: "Allow access to camera for taking photos",
+        };
+    }, [language]);
 
     const handleBack = () => {
         router.back();
@@ -27,10 +60,10 @@ const PermissionScreen = () => {
         }));
     };
 
-    const permissionItems: Array<{ key: keyof typeof permissions; label: string; description: string }> = [
-        { key: 'location', label: 'Location Access', description: 'Allow access to your location' },
-        { key: 'notifications', label: 'Allow Notifications', description: 'Allow push notifications' },
-        { key: 'camera', label: 'Camera Access', description: 'Allow access to camera for taking photos' },
+    const permissionItems: { key: keyof typeof permissions; label: string; description: string }[] = [
+        { key: 'location', label: labels.locationAccess, description: labels.allowLocation },
+        { key: 'notifications', label: labels.allowNotifications, description: labels.allowPush },
+        { key: 'camera', label: labels.cameraAccess, description: labels.allowCamera },
     ];
 
     const ToggleSwitch = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
@@ -76,7 +109,7 @@ const PermissionScreen = () => {
                 <TouchableOpacity onPress={() => handleBack()}>
                     <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>Permission</Text>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>{t("permission", "Permission")}</Text>
                 <View style={{ width: 24 }} />
             </View>
 

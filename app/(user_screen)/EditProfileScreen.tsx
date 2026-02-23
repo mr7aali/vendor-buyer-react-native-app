@@ -1,4 +1,5 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
   DateTimePickerEvent,
@@ -31,6 +32,7 @@ interface FormData {
 }
 
 const EditProfileScreen = () => {
+  const { language, t } = useTranslation();
   const { data: profileData } = useGetProfileQuery({});
   const [updateProfile, { isLoading }] = useUpdateProfileMutation();
   const userData = profileData?.data;
@@ -65,6 +67,51 @@ const EditProfileScreen = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   const categories = ["Business", "Personal", "Shopping", "Others"];
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        editProfile: "עריכת פרופיל",
+        fullName: "שם מלא",
+        email: "כתובת אימייל",
+        password: "סיסמה",
+        selectCategory: "בחר קטגוריה",
+        businessAddress: "כתובת עסק",
+        chooseCategory: "בחר קטגוריה",
+        save: "שמור",
+        saving: "שומר...",
+        profileSaved: "פרטי הפרופיל נשמרו!",
+        failedSave: "שמירת פרטי הפרופיל נכשלה",
+      };
+    }
+    if (language === "hi") {
+      return {
+        editProfile: "प्रोफाइल एडिट करें",
+        fullName: "पूरा नाम",
+        email: "ईमेल पता",
+        password: "पासवर्ड",
+        selectCategory: "कैटेगरी चुनें",
+        businessAddress: "व्यवसाय पता",
+        chooseCategory: "कैटेगरी चुनें",
+        save: "सेव करें",
+        saving: "सेव हो रहा है...",
+        profileSaved: "प्रोफाइल जानकारी सेव हो गई!",
+        failedSave: "प्रोफाइल जानकारी सेव नहीं हो सकी",
+      };
+    }
+    return {
+      editProfile: "Edit Profile",
+      fullName: "Full name",
+      email: "E-mail address",
+      password: "Password",
+      selectCategory: "Select Category",
+      businessAddress: "Business Address",
+      chooseCategory: "Choose Category",
+      save: "Save",
+      saving: "Saving...",
+      profileSaved: "Profile information saved!",
+      failedSave: "Failed to save profile information",
+    };
+  }, [language]);
 
   const handleChange = (name: keyof FormData, value: string | Date) => {
     setFormData({ ...formData, [name]: value } as FormData);
@@ -87,11 +134,11 @@ const EditProfileScreen = () => {
       if (formData.address) updateData.address = formData.address;
 
       await updateProfile(updateData).unwrap();
-      Alert.alert("Success", "Profile information saved!");
+      Alert.alert(t("success", "Success"), ui.profileSaved);
       router.back();
     } catch (error) {
       console.error("Failed to update profile", error);
-      Alert.alert("Error", "Failed to save profile information");
+      Alert.alert(t("error", "Error"), ui.failedSave);
     }
   };
 
@@ -102,7 +149,7 @@ const EditProfileScreen = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <MaterialCommunityIcons name="chevron-left" size={28} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle}>{ui.editProfile}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -115,13 +162,13 @@ const EditProfileScreen = () => {
           contentContainerStyle={styles.scrollContent}
         >
           <InputGroup
-            label="Full name"
+            label={ui.fullName}
             value={formData.fullName}
             onChange={(val) => handleChange("fullName", val)}
           />
 
           <InputGroup
-            label="E-mail address"
+            label={ui.email}
             value={formData.email}
             keyboardType="email-address"
             onChange={(val) => handleChange("email", val)}
@@ -131,7 +178,7 @@ const EditProfileScreen = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={ui.password}
               secureTextEntry={!showPassword}
               value={formData.password}
               onChangeText={(val) => handleChange("password", val)}
@@ -179,7 +226,7 @@ const EditProfileScreen = () => {
                 { color: formData.category ? "#333" : "#999" },
               ]}
             >
-              {formData.category || "Select Category"}
+              {formData.category || ui.selectCategory}
             </Text>
             <MaterialCommunityIcons
               name="chevron-down"
@@ -189,13 +236,13 @@ const EditProfileScreen = () => {
           </TouchableOpacity>
 
           <InputGroup
-            label="Business Address"
+            label={ui.businessAddress}
             value={formData.address}
             onChange={(val) => handleChange("address", val)}
           />
 
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>{isLoading ? "Saving..." : "Save"}</Text>
+            <Text style={styles.saveButtonText}>{isLoading ? ui.saving : ui.save}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -207,7 +254,7 @@ const EditProfileScreen = () => {
           onPress={() => setShowCategoryModal(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Choose Category</Text>
+            <Text style={styles.modalTitle}>{ui.chooseCategory}</Text>
             {categories.map((item) => (
               <TouchableOpacity
                 key={item}

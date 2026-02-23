@@ -1,4 +1,5 @@
 import { images } from "@/constants/import_images";
+import { useTranslation } from "@/hooks/use-translation";
 import { useGetProfileQuery } from "@/store/api/authApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
@@ -12,9 +13,43 @@ import React, { useState } from "react";
 import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 const VerificationCard = () => {
+  const { language, t } = useTranslation();
   const currentUser = useAppSelector(selectCurrentUser);
   const { data: profileData } = useGetProfileQuery({});
   const displayUser = profileData?.data || currentUser;
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        businessInformation: "מידע עסקי",
+        contactInformation: "פרטי קשר",
+        businessName: "שם העסק",
+        phone: "טלפון",
+        identification: "זיהוי",
+        businessId: "מזהה עסק",
+        warning: "אם תשנה מידע עסקי, סטטוס האימות ייבדק מחדש ויכול לקחת עד 15 ימים.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        businessInformation: "व्यवसाय जानकारी",
+        contactInformation: "संपर्क जानकारी",
+        businessName: "व्यवसाय का नाम",
+        phone: "फोन",
+        identification: "पहचान",
+        businessId: "व्यवसाय आईडी",
+        warning: "अगर आप कोई व्यवसाय जानकारी बदलते हैं, तो आपका सत्यापन स्टेटस फिर से समीक्षा किया जाएगा और इसमें 15 दिन लग सकते हैं।",
+      };
+    }
+    return {
+      businessInformation: "Business Information",
+      contactInformation: "Contact Information",
+      businessName: "Business Name",
+      phone: "Phone",
+      identification: "Identification",
+      businessId: "Business ID",
+      warning: "If you change any business information, your verification status will be reviewed again and may take up to 15 days.",
+    };
+  }, [language]);
   const [user, setUser] = useState({
     businessName: displayUser?.vendor?.businessName || displayUser?.vendor?.storename || "N/A",
     avatar:
@@ -77,7 +112,7 @@ const VerificationCard = () => {
               />
             </TouchableOpacity>
             <Text style={{ fontSize: 18, fontWeight: "600" }}>
-              Business info
+              {t("business_info", "Business info")}
             </Text>
             <TouchableOpacity
               onPress={() => router.push("/(screens)/edit_business_info")}
@@ -129,7 +164,7 @@ const VerificationCard = () => {
                   letterSpacing: 0.2,
                 }}
               >
-                Business Information
+                {ui.businessInformation}
               </Text>
               {/* Business Name*/}
               <View
@@ -153,7 +188,7 @@ const VerificationCard = () => {
                       marginBottom: 8,
                     }}
                   >
-                    Business Name
+                    {ui.businessName}
                   </Text>
                   <Text
                     style={{
@@ -185,7 +220,7 @@ const VerificationCard = () => {
                   letterSpacing: 0.2,
                 }}
               >
-                Contact Information
+                {ui.contactInformation}
               </Text>
 
               {/* Email */}
@@ -211,7 +246,7 @@ const VerificationCard = () => {
                       letterSpacing: 0.2,
                     }}
                   >
-                    Email
+                    {t("info_email", "Email")}
                   </Text>
                   <Text
                     style={{
@@ -249,7 +284,7 @@ const VerificationCard = () => {
                       letterSpacing: 0.2,
                     }}
                   >
-                    Phone
+                    {ui.phone}
                   </Text>
                   <Text
                     style={{
@@ -291,7 +326,7 @@ const VerificationCard = () => {
                       letterSpacing: 0.2,
                     }}
                   >
-                    Addresse
+                    {t("info_address_1", "Address")}
                   </Text>
                   <Text
                     style={{
@@ -326,7 +361,7 @@ const VerificationCard = () => {
                   letterSpacing: 0.2,
                 }}
               >
-                Identification
+                {ui.identification}
               </Text>
               {/* Business ID */}
               <View
@@ -351,7 +386,7 @@ const VerificationCard = () => {
                       letterSpacing: 0.2,
                     }}
                   >
-                    Business ID
+                    {ui.businessId}
                   </Text>
                   <Text
                     style={{
@@ -394,8 +429,7 @@ const VerificationCard = () => {
                     letterSpacing: 0.2,
                   }}
                 >
-                  If you change any business information, your verification
-                  status will be reviewed again and may take up to 15 days.
+                  {ui.warning}
                 </Text>
               </View>
             </View>

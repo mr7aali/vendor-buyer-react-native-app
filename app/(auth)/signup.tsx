@@ -1,6 +1,7 @@
 
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
 
 import React, { useState } from "react";
 import {
@@ -24,29 +25,84 @@ import { Apple, Chrome, Facebook } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const SignUpScreen: React.FC = () => {
+  const { language } = useTranslation();
   const dispatch = useAppDispatch();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
 
-  const [register, { isLoading, error }] = useRegisterMutation();
+  const [register, { isLoading }] = useRegisterMutation();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        signUp: "הרשמה",
+        subtitle: "זה לוקח רק דקה ליצור חשבון",
+        email: "כתובת אימייל",
+        password: "סיסמה",
+        confirmPassword: "אימות סיסמה",
+        acceptTerms: "אשר תנאים והגבלות",
+        signingUp: "נרשם...",
+        orContinue: "או המשך עם",
+        pleaseAcceptTerms: "נא לאשר תנאים והגבלות",
+        fillAllFields: "נא למלא את כל השדות",
+        passwordsMismatch: "הסיסמאות אינן תואמות!",
+        signupFailed: "הרשמה נכשלה",
+        signupFailedServer: "הרשמה נכשלה: לא ניתן להגיע לשרת",
+        signupSuccessManualLogin: "ההרשמה הצליחה אבל התחברות אוטומטית נכשלה. התחבר ידנית.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        signUp: "साइन अप",
+        subtitle: "अकाउंट बनाने में केवल एक मिनट लगता है",
+        email: "ईमेल पता",
+        password: "पासवर्ड",
+        confirmPassword: "पासवर्ड पुष्टि करें",
+        acceptTerms: "नियम और शर्तें स्वीकार करें",
+        signingUp: "साइन अप हो रहा है...",
+        orContinue: "या जारी रखें",
+        pleaseAcceptTerms: "कृपया नियम और शर्तें स्वीकार करें",
+        fillAllFields: "कृपया सभी फ़ील्ड भरें",
+        passwordsMismatch: "पासवर्ड मेल नहीं खाते!",
+        signupFailed: "साइन अप विफल रहा",
+        signupFailedServer: "साइन अप विफल: सर्वर तक पहुंच नहीं",
+        signupSuccessManualLogin: "साइन अप सफल रहा लेकिन ऑटो-लॉगिन विफल रहा। कृपया मैन्युअली लॉगिन करें।",
+      };
+    }
+    return {
+      signUp: "Sign Up",
+      subtitle: "It only takes a minute to create your account",
+      email: "E-mail address",
+      password: "Password",
+      confirmPassword: "Confirm Password",
+      acceptTerms: "Accept terms & conditions",
+      signingUp: "Signing Up...",
+      orContinue: "Or Continue With",
+      pleaseAcceptTerms: "Please accept the terms and conditions",
+      fillAllFields: "Please fill in all fields",
+      passwordsMismatch: "Passwords do not match!",
+      signupFailed: "Signup failed",
+      signupFailedServer: "Signup failed: Unable to reach server",
+      signupSuccessManualLogin: "Signup successful but failed to auto-login. Please login manually.",
+    };
+  }, [language]);
 
   const handleSignup = async () => {
     if (!acceptedTerms) {
-      alert("Please accept the terms and conditions");
+      alert(ui.pleaseAcceptTerms);
       return;
     }
     const locationData = await AsyncStorage.getItem("userLocation");
 
     // Basic Validation
     if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
-      alert("Please fill in all fields");
+      alert(ui.fillAllFields);
       return;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      alert(ui.passwordsMismatch);
       return;
     }
 
@@ -103,7 +159,7 @@ const SignUpScreen: React.FC = () => {
         router.replace("/(onboarding)/user-selection");
       } else {
         console.error("Signup response missing data/token", response);
-        alert("Signup successful but failed to auto-login. Please login manually.");
+        alert(ui.signupSuccessManualLogin);
         router.push("/(auth)/login");
       }
     } catch (err) {
@@ -111,10 +167,10 @@ const SignUpScreen: React.FC = () => {
       const fetchStatus = (err as any)?.status;
       const serverMessage = (err as any)?.data?.message;
       if (fetchStatus === 'FETCH_ERROR') {
-        alert("Signup failed: Unable to reach server. Check EXPO_PUBLIC_API_URL and backend availability.");
+        alert(`${ui.signupFailedServer}. Check EXPO_PUBLIC_API_URL and backend availability.`);
         return;
       }
-      alert("Signup failed: " + (serverMessage || "Something went wrong"));
+      alert(`${ui.signupFailed}: ` + (serverMessage || "Something went wrong"));
     }
   };
 
@@ -134,9 +190,9 @@ const SignUpScreen: React.FC = () => {
         >
           {/* Header Section */}
           <View style={styles.headerContainer}>
-            <Text style={styles.title}>Sign Up</Text>
+            <Text style={styles.title}>{ui.signUp}</Text>
             <Text style={styles.subtitle}>
-              It only takes a minute to create your account
+              {ui.subtitle}
             </Text>
           </View>
 
@@ -145,7 +201,7 @@ const SignUpScreen: React.FC = () => {
 
             <TextInput
               style={styles.input}
-              placeholder="E-mail address"
+              placeholder={ui.email}
               placeholderTextColor="#999"
               keyboardType="email-address"
               autoCapitalize="none"
@@ -155,7 +211,7 @@ const SignUpScreen: React.FC = () => {
 
             <TextInput
               style={styles.input}
-              placeholder="********"
+              placeholder={ui.password}
               placeholderTextColor="#999"
               secureTextEntry
               value={password}
@@ -164,7 +220,7 @@ const SignUpScreen: React.FC = () => {
 
             <TextInput
               style={styles.input}
-              placeholder="********"
+              placeholder={ui.confirmPassword}
               placeholderTextColor="#999"
               secureTextEntry
               value={confirmPassword}
@@ -182,7 +238,7 @@ const SignUpScreen: React.FC = () => {
                   acceptedTerms && styles.checkboxChecked,
                 ]}
               />
-              <Text style={styles.termsText}>Accept terms & conditions</Text>
+              <Text style={styles.termsText}>{ui.acceptTerms}</Text>
             </TouchableOpacity>
 
             {/* Sign Up Button */}
@@ -192,7 +248,7 @@ const SignUpScreen: React.FC = () => {
               disabled={isLoading}
             >
               <Text style={styles.signUpButtonText}>
-                {isLoading ? "Signing Up..." : "Sign Up"}
+                {isLoading ? ui.signingUp : ui.signUp}
               </Text>
             </TouchableOpacity>
           </View>
@@ -200,7 +256,7 @@ const SignUpScreen: React.FC = () => {
           {/* Divider */}
           <View style={styles.dividerContainer}>
             <View style={styles.line} />
-            <Text style={styles.dividerText}>Or Continue With</Text>
+            <Text style={styles.dividerText}>{ui.orContinue}</Text>
             <View style={styles.line} />
           </View>
 

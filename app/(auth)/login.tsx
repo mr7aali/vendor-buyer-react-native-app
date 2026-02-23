@@ -3,12 +3,12 @@
 
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTranslation } from "@/hooks/use-translation";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,15 +23,68 @@ import { apiSlice } from "@/store/api/apiSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
 
-const { width } = Dimensions.get("window");
-
 export default function LoginScreen() {
+  const { language } = useTranslation();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const [emailOrPhone, setEmailOrPhone] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        welcomeBack: "ברוך שובך",
+        loginToAccount: "התחבר לחשבון שלך",
+        enterEmail: "הזן אימייל",
+        emailAddress: "כתובת אימייל",
+        password: "סיסמה",
+        rememberMe: "זכור אותי",
+        forgotPassword: "שכחת סיסמה?",
+        login: "התחברות",
+        loggingIn: "מתחבר...",
+        orContinue: "או המשך עם",
+        noAccount: "אין לך חשבון?",
+        signUp: "הרשמה",
+        loginFailed: "ההתחברות נכשלה",
+        invalidResponse: "התחברות נכשלה: תגובת שרת לא תקינה",
+      };
+    }
+    if (language === "hi") {
+      return {
+        welcomeBack: "वापसी पर स्वागत है",
+        loginToAccount: "अपने अकाउंट में लॉगिन करें",
+        enterEmail: "अपना ईमेल दर्ज करें",
+        emailAddress: "ईमेल पता",
+        password: "पासवर्ड",
+        rememberMe: "मुझे याद रखें",
+        forgotPassword: "पासवर्ड भूल गए?",
+        login: "लॉगिन",
+        loggingIn: "लॉगिन हो रहा है...",
+        orContinue: "या जारी रखें",
+        noAccount: "क्या आपका अकाउंट नहीं है?",
+        signUp: "साइन अप",
+        loginFailed: "लॉगिन विफल",
+        invalidResponse: "लॉगिन विफल: अमान्य सर्वर रिस्पॉन्स",
+      };
+    }
+    return {
+      welcomeBack: "Welcome Back",
+      loginToAccount: "Login to your account",
+      enterEmail: "Enter Your E-mail",
+      emailAddress: "E-mail address",
+      password: "Password",
+      rememberMe: "Remember me",
+      forgotPassword: "Forgot password?",
+      login: "Login",
+      loggingIn: "Logging in...",
+      orContinue: "Or Continue With",
+      noAccount: "Don t have an account?",
+      signUp: "Sign Up",
+      loginFailed: "Login failed",
+      invalidResponse: "Login failed: Invalid server response",
+    };
+  }, [language]);
 
   const [login, { isLoading }] = useLoginMutation();
 
@@ -45,7 +98,7 @@ export default function LoginScreen() {
 
       if (!data || !data.accessToken) {
         console.error('Login response missing data or accessToken!', userData);
-        alert("Login failed: Invalid server response");
+        alert(ui.invalidResponse);
         return;
       }
 
@@ -89,7 +142,7 @@ export default function LoginScreen() {
       }
     } catch (err) {
       console.error('Login error full object:', JSON.stringify(err, null, 2));
-      alert("Login failed: " + ((err as any)?.data?.message || "Check your credentials"));
+      alert(`${ui.loginFailed}: ` + ((err as any)?.data?.message || "Check your credentials"));
     }
   };
 
@@ -102,22 +155,22 @@ export default function LoginScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.welcomeText}>Welcome Back</Text>
-          <Text style={styles.subText}>Login to your account</Text>
+          <Text style={styles.welcomeText}>{ui.welcomeBack}</Text>
+          <Text style={styles.subText}>{ui.loginToAccount}</Text>
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Enter Your E-mail</Text>
+          <Text style={styles.label}>{ui.enterEmail}</Text>
           <TextInput
             style={styles.input}
-            placeholder="E-mail address"
+            placeholder={ui.emailAddress}
             placeholderTextColor="#999"
             value={emailOrPhone}
             onChangeText={setEmailOrPhone}
             autoCapitalize="none"
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{ui.password}</Text>
           <View style={styles.passwordInputWrapper}>
             <Ionicons name="lock-closed-outline" size={20} color="#ccc" style={styles.lockIcon} />
             <TextInput
@@ -142,23 +195,23 @@ export default function LoginScreen() {
               <View style={[styles.checkbox, rememberMe && styles.checkboxActive]}>
                 {rememberMe && <View style={styles.checkboxInner} />}
               </View>
-              <Text style={styles.optionText}>Remember me</Text>
+              <Text style={styles.optionText}>{ui.rememberMe}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
-              <Text style={styles.forgotText}>Forgot password?</Text>
+              <Text style={styles.forgotText}>{ui.forgotPassword}</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={isLoading}>
-            {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.loginButtonText}>Login</Text>}
+            {isLoading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.loginButtonText}>{ui.login}</Text>}
           </TouchableOpacity>
         </View>
 
         <View style={styles.socialSection}>
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>Or Continue With</Text>
+            <Text style={styles.dividerText}>{ui.orContinue}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -169,9 +222,9 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.footerRow}>
-            <Text style={styles.footerText}>Don t have an account? </Text>
+            <Text style={styles.footerText}>{`${ui.noAccount} `}</Text>
             <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
-              <Text style={styles.signUpText}>Sign Up</Text>
+              <Text style={styles.signUpText}>{ui.signUp}</Text>
             </TouchableOpacity>
           </View>
         </View>

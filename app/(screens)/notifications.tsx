@@ -1,4 +1,5 @@
 import { useSocket } from "@/context/SocketContext";
+import { useTranslation } from "@/hooks/use-translation";
 import {
   UserNotification,
   useDeleteMyNotificationMutation,
@@ -22,20 +23,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const timeAgo = (value: string) => {
+const timeAgo = (value: string, t: (key: string, fallback?: string) => string) => {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Just now";
+  if (Number.isNaN(date.getTime())) return t("notif_just_now", "Just now");
   const diff = Date.now() - date.getTime();
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  if (diff < minute) return "Just now";
-  if (diff < hour) return `${Math.floor(diff / minute)} min ago`;
-  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
-  return `${Math.floor(diff / day)}d ago`;
+  if (diff < minute) return t("notif_just_now", "Just now");
+  if (diff < hour) return `${Math.floor(diff / minute)} ${t("notif_min_ago", "min ago")}`;
+  if (diff < day) return `${Math.floor(diff / hour)} ${t("notif_h_ago", "h ago")}`;
+  return `${Math.floor(diff / day)} ${t("notif_d_ago", "d ago")}`;
 };
 
 const Notifications = () => {
+  const { t } = useTranslation();
   const { socket } = useSocket();
   const { data: notifications = [], isLoading, isFetching, refetch } = useGetMyNotificationsQuery();
   const [markRead] = useMarkMyNotificationReadMutation();
@@ -44,6 +46,14 @@ const Notifications = () => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<UserNotification | null>(null);
+
+  const ui = useMemo(
+    () => ({
+      deleteNotificationTitle: `${t("notif_delete", "Delete")} ${t("notif_notification", "Notification")}`,
+      deleteNotificationText: "Are you sure you want to delete this notification?",
+    }),
+    [t]
+  );
 
   useEffect(() => {
     if (!socket) return;
@@ -85,7 +95,7 @@ const Notifications = () => {
     try {
       await removeNotification(selectedItem.id).unwrap();
     } catch (error: any) {
-      Alert.alert("Error", error?.data?.message || "Failed to delete notification");
+      Alert.alert(t("error", "Error"), error?.data?.message || t("notif_failed_delete", "Failed to delete notification"));
     } finally {
       setModalVisible(false);
       setSelectedItem(null);
@@ -107,19 +117,19 @@ const Notifications = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
           </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontWeight: "600" }}>Notifications ({unreadCount})</Text>
+          <Text style={{ fontSize: 18, fontWeight: "600" }}>{`${t("notif_notifications", "Notifications")} (${unreadCount})`}</Text>
           <TouchableOpacity
             disabled={!unreadCount || isMarkingAll}
             onPress={async () => {
               try {
                 await markAllRead().unwrap();
               } catch (error: any) {
-                Alert.alert("Error", error?.data?.message || "Failed to mark all as read");
+                Alert.alert(t("error", "Error"), error?.data?.message || t("notif_failed_mark_all_read", "Failed to mark all as read"));
               }
             }}
           >
             <Text style={{ color: !unreadCount || isMarkingAll ? "#9CBABA" : "#278687", fontWeight: "700" }}>
-              Mark all
+              {t("notif_mark_all", "Mark all")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -170,7 +180,7 @@ const Notifications = () => {
 
                   <View style={{ flex: 1, gap: 4 }}>
                     <Text style={{ fontSize: 14, fontWeight: "700", color: "#253038" }} numberOfLines={1}>
-                      {notification.title || "Notification"}
+                      {notification.title || t("notif_notification", "Notification")}
                     </Text>
                     <Text
                       style={{
@@ -189,7 +199,7 @@ const Notifications = () => {
                         marginTop: 2,
                       }}
                     >
-                      {timeAgo(notification.createdAt)}
+                      {timeAgo(notification.createdAt, t)}
                     </Text>
                   </View>
 
@@ -213,7 +223,7 @@ const Notifications = () => {
                 </TouchableOpacity>
               ))}
               {!notifications.length ? (
-                <Text style={{ textAlign: "center", color: "#6B7280", marginTop: 20 }}>No notifications</Text>
+                <Text style={{ textAlign: "center", color: "#6B7280", marginTop: 20 }}>{t("notif_no_notifications", "No notifications")}</Text>
               ) : null}
             </View>
           </ScrollView>
@@ -258,9 +268,7 @@ const Notifications = () => {
                 fontSize: 18,
                 fontWeight: "600",
               }}
-            >
-              Delete Notification
-            </Text>
+            >{ui.deleteNotificationTitle}</Text>
             <Text
               style={{
                 marginBottom: 20,
@@ -268,7 +276,7 @@ const Notifications = () => {
                 color: "#666",
               }}
             >
-              Are you sure you want to delete this notification?
+              {ui.deleteNotificationText}
             </Text>
             <View style={{ flexDirection: "row", gap: 15 }}>
               <Pressable
@@ -288,7 +296,7 @@ const Notifications = () => {
                     fontWeight: "600",
                   }}
                 >
-                  Cancel
+                  {t("cancel", "Cancel")}
                 </Text>
               </Pressable>
               <Pressable
@@ -308,7 +316,7 @@ const Notifications = () => {
                     fontWeight: "600",
                   }}
                 >
-                  Confirm
+                  {t("confirm", "Confirm")}
                 </Text>
               </Pressable>
             </View>
@@ -320,3 +328,4 @@ const Notifications = () => {
 };
 
 export default Notifications;
+

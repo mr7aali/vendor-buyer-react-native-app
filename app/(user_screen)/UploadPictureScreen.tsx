@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -22,11 +23,48 @@ import { updateBuyerRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
 
 const UploadPictureScreen = () => {
+  const { language, t } = useTranslation();
   const dispatch = useDispatch();
   const buyerData = useSelector((state: RootState) => state.registration.buyer);
   const auth = useSelector((state: RootState) => state.auth);
   const [registerBuyer, { isLoading }] = useRegisterBuyerMutation();
   const [image, setImage] = useState<string | null>(null);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        uploadPicture: "העלה תמונה שלך",
+        upload: "העלה",
+        submit: "שלח",
+        required: "נדרש",
+        uploadProfilePicture: "נא להעלות תמונת פרופיל.",
+        registrationSuccess: "ההרשמה הצליחה!",
+        registrationFailed: "ההרשמה נכשלה",
+        networkError: "שגיאת רשת: לא ניתן להגיע לשרת. בדוק את החיבור.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        uploadPicture: "अपनी तस्वीर अपलोड करें",
+        upload: "अपलोड",
+        submit: "सबमिट करें",
+        required: "आवश्यक",
+        uploadProfilePicture: "कृपया प्रोफाइल तस्वीर अपलोड करें।",
+        registrationSuccess: "रजिस्ट्रेशन सफल रहा!",
+        registrationFailed: "रजिस्ट्रेशन विफल रहा",
+        networkError: "नेटवर्क त्रुटि: सर्वर तक नहीं पहुंच सके। कृपया कनेक्शन जांचें।",
+      };
+    }
+    return {
+      uploadPicture: "Upload your picture",
+      upload: "Upload",
+      submit: "Submit",
+      required: "Required",
+      uploadProfilePicture: "Please upload a profile picture.",
+      registrationSuccess: "Registration successful!",
+      registrationFailed: "Registration failed",
+      networkError: "Network error: Could not reach server. Please check your connection.",
+    };
+  }, [language]);
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images
     ? [(ImagePicker as any).MediaType.Images]
     : ImagePicker.MediaTypeOptions.Images;
@@ -47,7 +85,7 @@ const UploadPictureScreen = () => {
 
   const handleSubmit = async () => {
     if (!image) {
-      Alert.alert("Required", "Please upload a profile picture.");
+      Alert.alert(ui.required, ui.uploadProfilePicture);
       return;
     }
 
@@ -127,8 +165,8 @@ const UploadPictureScreen = () => {
           await AsyncStorage.setItem("userRole", "buyer");
         }
 
-        Alert.alert("Success", "Registration successful!", [
-          { text: "OK", onPress: () => router.push("/(users)") }
+        Alert.alert(t("success", "Success"), ui.registrationSuccess, [
+          { text: t("ok", "OK"), onPress: () => router.push("/(users)") }
         ]);
       } catch (err: any) {
         console.error("Registration failed raw error:", err);
@@ -136,13 +174,13 @@ const UploadPictureScreen = () => {
       }
     } catch (error: any) {
       console.error("Registration validation failed:", JSON.stringify(error, null, 2));
-      let errorMessage = "Registration failed";
+      let errorMessage = ui.registrationFailed;
       if (error?.status === 'FETCH_ERROR') {
-        errorMessage = "Network error: Could not reach server. Please check your connection.";
+        errorMessage = ui.networkError;
       } else if (error?.data?.message) {
         errorMessage = error.data.message;
       }
-      Alert.alert("Error", errorMessage);
+      Alert.alert(t("error", "Error"), errorMessage);
     }
   };
 
@@ -151,8 +189,8 @@ const UploadPictureScreen = () => {
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Denied",
-        "Sorry, we need camera roll permissions to make this work!"
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
       );
       return;
     }
@@ -172,7 +210,7 @@ const UploadPictureScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.label}>Upload your picture</Text>
+        <Text style={styles.label}>{ui.uploadPicture}</Text>
 
         {/* Upload Box Section */}
         <TouchableOpacity
@@ -185,7 +223,7 @@ const UploadPictureScreen = () => {
           ) : (
             <View style={styles.placeholderContainer}>
               <Ionicons name="camera" size={45} color="#444" />
-              <Text style={styles.uploadText}>Upload</Text>
+              <Text style={styles.uploadText}>{ui.upload}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -199,7 +237,7 @@ const UploadPictureScreen = () => {
           {isLoading ? (
             <ActivityIndicator color="#FFF" />
           ) : (
-            <Text style={styles.submitButtonText}>Submit</Text>
+            <Text style={styles.submitButtonText}>{ui.submit}</Text>
           )}
         </TouchableOpacity>
       </View>

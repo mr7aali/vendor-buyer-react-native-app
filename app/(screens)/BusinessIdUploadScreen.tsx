@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "@/hooks/use-translation";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +24,7 @@ import { updateVendorRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
 
 const BusinessIdUploadScreen: React.FC = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const dispatch = useDispatch();
   const vendorData = useSelector((state: RootState) => state.registration.vendor);
@@ -36,6 +38,39 @@ const BusinessIdUploadScreen: React.FC = () => {
   const [businessId, setBusinessId] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        businessId: "מזהה עסק",
+        uploadBusinessId: "העלה מזהה עסק",
+        upload: "העלה",
+        submit: "שלח",
+        required: "נדרש",
+        provideIdAndImage: "נא להזין מזהה עסק ולהעלות תמונה.",
+        vendorRegistered: "רישום ספק הצליח!",
+      };
+    }
+    if (language === "hi") {
+      return {
+        businessId: "व्यवसाय आईडी",
+        uploadBusinessId: "अपना व्यवसाय आईडी अपलोड करें",
+        upload: "अपलोड",
+        submit: "सबमिट करें",
+        required: "आवश्यक",
+        provideIdAndImage: "कृपया व्यवसाय आईडी दें और इमेज अपलोड करें।",
+        vendorRegistered: "वेंडर रजिस्ट्रेशन सफल रहा!",
+      };
+    }
+    return {
+      businessId: "Business ID",
+      uploadBusinessId: "Upload your Business ID",
+      upload: "Upload",
+      submit: "Submit",
+      required: "Required",
+      provideIdAndImage: "Please provide Business ID and upload an image.",
+      vendorRegistered: "Vendor registration successful!",
+    };
+  }, [language]);
 
   const getMimeType = (uri: string) => {
     const lower = uri.toLowerCase();
@@ -56,8 +91,8 @@ const BusinessIdUploadScreen: React.FC = () => {
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Denied",
-        "Sorry, we need camera roll permissions to make this work!"
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
       );
       return;
     }
@@ -77,7 +112,7 @@ const BusinessIdUploadScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("ImagePicker Error: ", error);
-      Alert.alert("Error", "Something went wrong while picking the image.");
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image. Please try again."));
     }
   };
 
@@ -85,7 +120,7 @@ const BusinessIdUploadScreen: React.FC = () => {
     if (isSubmitting || isLoading) return;
 
     if (!businessId || !selectedImage) {
-      Alert.alert("Required", "Please provide Business ID and upload an image.");
+      Alert.alert(ui.required, ui.provideIdAndImage);
       return;
     }
 
@@ -199,8 +234,8 @@ const BusinessIdUploadScreen: React.FC = () => {
         await AsyncStorage.setItem('userRole', 'vendor');
       }
 
-      Alert.alert("Success", "Vendor registration successful!", [
-        { text: "OK", onPress: () => router.push("/(tabs)") }
+      Alert.alert(t("success", "Success"), ui.vendorRegistered, [
+        { text: t("ok", "OK"), onPress: () => router.push("/(tabs)") }
       ]);
 
     } catch (error: any) {
@@ -229,7 +264,7 @@ const BusinessIdUploadScreen: React.FC = () => {
         >
           {/* Business ID Input Section */}
           <View style={styles.inputSection}>
-            <Text style={styles.label}>Business ID</Text>
+            <Text style={styles.label}>{ui.businessId}</Text>
             <TextInput
               style={styles.input}
               placeholder="3264 35465"
@@ -242,7 +277,7 @@ const BusinessIdUploadScreen: React.FC = () => {
 
           {/* Business ID Upload Section */}
           <View style={styles.uploadSection}>
-            <Text style={styles.label}>Upload your Business ID</Text>
+            <Text style={styles.label}>{ui.uploadBusinessId}</Text>
             <TouchableOpacity
               style={styles.uploadBox}
               onPress={handleImagePicker}
@@ -261,7 +296,7 @@ const BusinessIdUploadScreen: React.FC = () => {
                     }}
                     style={styles.cameraIcon}
                   />
-                  <Text style={styles.uploadText}>Upload</Text>
+                  <Text style={styles.uploadText}>{ui.upload}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -278,7 +313,7 @@ const BusinessIdUploadScreen: React.FC = () => {
             {isLoading || isSubmitting ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.submitButtonText}>Submit</Text>
+              <Text style={styles.submitButtonText}>{ui.submit}</Text>
             )}
           </TouchableOpacity>
         </View>

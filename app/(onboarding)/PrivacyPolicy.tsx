@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -11,13 +12,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PrivacyPolicy() {
+  const { t } = useTranslation();
   const [accepted, setAccepted] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.modalContainer}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Privacy & Policy</Text>
+          <Text style={styles.headerTitle}>{t("privacy_heading", "Privacy & Policy")}</Text>
           <TouchableOpacity onPress={() => router.back()}>
             {/* <Ionicons name="close" size={24} color="#333" /> */}
           </TouchableOpacity>
@@ -26,20 +28,19 @@ export default function PrivacyPolicy() {
         <ScrollView showsVerticalScrollIndicator={false} style={styles.content}>
           <Text style={styles.updateDate}>Last updated on 23 August 2025</Text>
           <Text style={styles.textBody}>
-            We collect personal information that you voluntarily provide to us
-            when you register on the [app/service], express an interest in
-            obtaining information about us or our products and services...
+            {t("privacy_intro", "Privacy policy")}
           </Text>
-          <Text style={styles.sectionTitle}>1. Information we collect</Text>
+          <Text style={styles.sectionTitle}>{t("privacy_section_1_title", "1. Information we collect")}</Text>
           <Text style={styles.textBody}>
-            The personal information that we collect depends on the context of
-            your interactions with us and the [app/service]...
+            {t("privacy_section_1_body", "Details about collected information.")}
           </Text>
-          <Text style={styles.sectionTitle}>2.Information use collected</Text>
+          <Text style={styles.sectionTitle}>{t("privacy_section_2_title", "2. How We Use Your Information")}</Text>
           <Text style={styles.textBody}>
-            We process your personal information for these purposes in reliance
-            on our legitimate business interests, in order to enter into or
-            perform a contract with you,
+            {t("privacy_section_2_body", "Details about data usage.")}
+          </Text>
+          <Text style={styles.sectionTitle}>{t("privacy_section_3_title", "3. Information Sharing")}</Text>
+          <Text style={styles.textBody}>
+            {t("privacy_section_3_body", "Details about sharing information.")}
           </Text>
 
           <TouchableOpacity
@@ -49,7 +50,7 @@ export default function PrivacyPolicy() {
             <View style={[styles.checkbox, accepted && styles.checked]}>
               {accepted && <Ionicons name="checkmark" size={14} color="#FFF" />}
             </View>
-            <Text style={styles.checkboxText}>Accept Privacy & Policy</Text>
+            <Text style={styles.checkboxText}>{`${t("confirm", "Confirm")} ${t("privacy_heading", "Privacy & Policy")}`}</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -60,7 +61,7 @@ export default function PrivacyPolicy() {
           }
           disabled={!accepted}
         >
-          <Text style={styles.nextText}>Next</Text>
+          <Text style={styles.nextText}>{t("info_continue", "Continue")}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

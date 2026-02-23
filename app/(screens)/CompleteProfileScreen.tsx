@@ -331,11 +331,11 @@
 
 
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
-  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -353,8 +353,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { updateVendorRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
 
-const { width } = Dimensions.get("window");
-
 interface ProfileFormData {
   fullName: string;
   phone: string;
@@ -368,6 +366,7 @@ interface ProfileFormData {
 }
 
 const CompleteProfileScreen: React.FC = () => {
+  const { language } = useTranslation();
   const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -387,10 +386,79 @@ const CompleteProfileScreen: React.FC = () => {
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [isGenderModalVisible, setIsGenderModalVisible] = useState(false);
 
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        completeProfile: "השלם את הפרופיל שלך",
+        subtitle: "מלא את הפרטים למטה כדי להשלים את פרופיל העסק שלך.",
+        enterFullName: "הזן את שמך המלא",
+        enterPhone: "הזן מספר טלפון",
+        enterEmail: "הזן כתובת אימייל",
+        countryRegion: "מדינה/אזור",
+        enterAddress: "הזן כתובת",
+        enterStoreName: "הזן שם חנות",
+        aboutStore: "על החנות שלך",
+        describeStore: "תיאור קצר של המוצרים או השירותים שלך",
+        enterGender: "הזן מגדר",
+        selectGender: "בחר מגדר",
+        selectGenderTitle: "בחירת מגדר",
+        submit: "שלח",
+        required: "נדרש",
+        pleaseSelectGender: "נא לבחור מגדר.",
+        male: "זכר",
+        female: "נקבה",
+        other: "אחר",
+      };
+    }
+    if (language === "hi") {
+      return {
+        completeProfile: "अपना प्रोफाइल पूरा करें",
+        subtitle: "अपना व्यवसाय प्रोफाइल पूरा करने के लिए नीचे विवरण भरें।",
+        enterFullName: "अपना पूरा नाम दर्ज करें",
+        enterPhone: "अपना फोन नंबर दर्ज करें",
+        enterEmail: "ईमेल पता दर्ज करें",
+        countryRegion: "देश/क्षेत्र",
+        enterAddress: "अपना पता दर्ज करें",
+        enterStoreName: "अपनी दुकान का नाम दर्ज करें",
+        aboutStore: "अपने स्टोर के बारे में",
+        describeStore: "अपने उत्पादों या सेवाओं का संक्षिप्त विवरण दें",
+        enterGender: "अपना जेंडर चुनें",
+        selectGender: "जेंडर चुनें",
+        selectGenderTitle: "जेंडर चुनें",
+        submit: "सबमिट करें",
+        required: "आवश्यक",
+        pleaseSelectGender: "कृपया अपना जेंडर चुनें।",
+        male: "पुरुष",
+        female: "महिला",
+        other: "अन्य",
+      };
+    }
+    return {
+      completeProfile: "Complete your profile",
+      subtitle: "Fill in the details below to complete your business profile.",
+      enterFullName: "Enter Your Full Name",
+      enterPhone: "Enter Your Phone Number",
+      enterEmail: "Enter Email Address",
+      countryRegion: "Country/Region",
+      enterAddress: "Enter Your Address",
+      enterStoreName: "Enter Your Store Name",
+      aboutStore: "About Your Store",
+      describeStore: "Briefly describe your products or services",
+      enterGender: "Enter Your Gender",
+      selectGender: "Select Gender",
+      selectGenderTitle: "Select Gender",
+      submit: "Submit",
+      required: "Required",
+      pleaseSelectGender: "Please select your gender.",
+      male: "Male",
+      female: "Female",
+      other: "Other",
+    };
+  }, [language]);
   const genderOptions = [
-    { label: "Male", value: "Male" },
-    { label: "Female", value: "Female" },
-    { label: "Other", value: "Other" },
+    { label: ui.male, value: "Male" },
+    { label: ui.female, value: "Female" },
+    { label: ui.other, value: "Other" },
   ];
 
   const onSelectCountry = (country: Country) => {
@@ -412,7 +480,7 @@ const CompleteProfileScreen: React.FC = () => {
 
   const handleSubmit = () => {
     if (!formData.gender) {
-      Alert.alert("Required", "Please select your gender.");
+      Alert.alert(ui.required, ui.pleaseSelectGender);
       return;
     }
     dispatch(updateVendorRegistration(formData));
@@ -455,20 +523,20 @@ const CompleteProfileScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Complete your profile</Text>
+            <Text style={styles.title}>{ui.completeProfile}</Text>
             <Text style={styles.subTitle}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.
+              {ui.subtitle}
             </Text>
           </View>
 
           <View style={styles.form}>
-            {renderField("Enter Your Full Name", "Enter your full name", "fullName")}
-            {renderField("Enter Your Phone Number", "Enter phone number", "phone", false, "phone-pad")}
-            {renderField("Enter Email Address", "Enter email address", "email", false, "email-address", false)}
+            {renderField(ui.enterFullName, ui.enterFullName, "fullName")}
+            {renderField(ui.enterPhone, ui.enterPhone, "phone", false, "phone-pad")}
+            {renderField(ui.enterEmail, ui.enterEmail, "email", false, "email-address", false)}
 
             {/* Country/Region Field */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Country/Region</Text>
+              <Text style={styles.label}>{ui.countryRegion}</Text>
               <TouchableOpacity
                 style={styles.dropdown}
                 onPress={() => setShowCountryPicker(true)}
@@ -491,20 +559,20 @@ const CompleteProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
 
-            {renderField("Enter Your Address", "Enter your address", "address")}
-            {renderField("Enter Your Store Name", "Enter Your Store Name", "storename")}
-            {renderField("About Your Store", "Briefly describe your products or services", "storeDescription", true)}
+            {renderField(ui.enterAddress, ui.enterAddress, "address")}
+            {renderField(ui.enterStoreName, ui.enterStoreName, "storename")}
+            {renderField(ui.aboutStore, ui.describeStore, "storeDescription", true)}
 
             {/* Gender Field */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.label}>Enter Your Gender</Text>
+              <Text style={styles.label}>{ui.enterGender}</Text>
               <TouchableOpacity
                 style={styles.dropdown}
                 onPress={() => setIsGenderModalVisible(true)}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.dropdownText, formData.gender && { color: "#111" }]}>
-                  {formData.gender || "Select Gender"}
+                  {formData.gender || ui.selectGender}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
@@ -515,7 +583,7 @@ const CompleteProfileScreen: React.FC = () => {
               onPress={handleSubmit}
               activeOpacity={0.8}
             >
-              <Text style={styles.submitButtonText}>Submit</Text>
+              <Text style={styles.submitButtonText}>{ui.submit}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -534,7 +602,7 @@ const CompleteProfileScreen: React.FC = () => {
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Gender</Text>
+              <Text style={styles.modalTitle}>{ui.selectGenderTitle}</Text>
               <TouchableOpacity onPress={() => setIsGenderModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#181725" />
               </TouchableOpacity>
