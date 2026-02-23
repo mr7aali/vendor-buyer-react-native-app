@@ -102,7 +102,7 @@ export default function RootLayout() {
       } finally {
         setIsReady(true);
         // Delay redirect slightly so navigator is mounted before route change.
-        if (shouldRedirect) {
+        if (shouldRedirect && targetPath !== "/(onboarding)") {
           setTimeout(() => {
             router.replace(targetPath as any);
           }, 500);
