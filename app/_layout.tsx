@@ -5,6 +5,7 @@ import "react-native-reanimated";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { Provider, useSelector } from 'react-redux';
 import { SocketProvider } from "../context/SocketContext";
+import { registerForPushNotificationsAsync, syncPushTokenToBackend } from "../services/pushNotifications";
 import { useGetProfileQuery } from "../store/api/authApiSlice";
 import { setCredentials } from '../store/slices/authSlice';
 import { setLanguage } from '../store/slices/languageSlice';
@@ -16,6 +17,7 @@ const AuthSync = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.accessToken);
   const refreshToken = useSelector((state: RootState) => state.auth.refreshToken);
+  const syncedPushTokenRef = React.useRef<string | null>(null);
 
   const { data: profileData } = useGetProfileQuery(undefined, {
     skip: !token
@@ -40,6 +42,36 @@ const AuthSync = () => {
       }));
     }
   }, [profileData, token, refreshToken, dispatch, user]);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const registerAndSyncPushToken = async () => {
+      try {
+        if (!token) return;
+
+        const tokens = await registerForPushNotificationsAsync();
+        if (!tokens || !isMounted) return;
+
+        const tokenKey = `${tokens.expoPushToken || ""}|${tokens.nativePushToken || ""}`;
+        if (!tokenKey.replace("|", "")) return;
+        if (tokenKey === syncedPushTokenRef.current) return;
+
+        const synced = await syncPushTokenToBackend(tokens, token);
+        if (synced && isMounted) {
+          syncedPushTokenRef.current = tokenKey;
+        }
+      } catch (error) {
+        console.warn("Push token registration/sync effect failed.", error);
+      }
+    };
+
+    registerAndSyncPushToken();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
 
   return null;
 };

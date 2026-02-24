@@ -1,8 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Notifications from "expo-notifications";
 import React, { useState } from 'react'
 import { useTranslation } from '@/hooks/use-translation'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 const PermissionScreen = () => {
@@ -11,12 +12,25 @@ const PermissionScreen = () => {
         camera: true,
         photos: true,
         location: false,
-        notifications: true,
+        notifications: false,
         microphone: false,
         contacts: false,
         storage: true,
         calendar: false
     });
+    const [isCheckingNotification, setIsCheckingNotification] = useState(false);
+
+    React.useEffect(() => {
+        const loadNotificationPermission = async () => {
+            const settings = await Notifications.getPermissionsAsync();
+            setPermissions((prev) => ({
+                ...prev,
+                notifications: settings.status === "granted",
+            }));
+        };
+
+        loadNotificationPermission();
+    }, []);
 
     const labels = React.useMemo(() => {
         if (language === "he") {
@@ -53,11 +67,51 @@ const PermissionScreen = () => {
         router.back();
     };
 
-    const togglePermission = (key: keyof typeof permissions) => {
-        setPermissions(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
+    const togglePermission = async (key: keyof typeof permissions) => {
+        if (key !== "notifications") {
+            setPermissions(prev => ({
+                ...prev,
+                [key]: !prev[key]
+            }));
+            return;
+        }
+
+        if (isCheckingNotification) return;
+        setIsCheckingNotification(true);
+
+        try {
+            const current = await Notifications.getPermissionsAsync();
+
+            if (current.status === "granted") {
+                Alert.alert(
+                    t("notif_permission_enabled", "Notifications already enabled"),
+                    t("notif_permission_settings", "To disable notifications, open device settings."),
+                    [
+                        { text: t("cancel", "Cancel"), style: "cancel" },
+                        { text: t("open_settings", "Open Settings"), onPress: () => Linking.openSettings() }
+                    ]
+                );
+                setPermissions(prev => ({ ...prev, notifications: true }));
+                return;
+            }
+
+            const requested = await Notifications.requestPermissionsAsync();
+            const granted = requested.status === "granted";
+            setPermissions(prev => ({ ...prev, notifications: granted }));
+
+            if (!granted) {
+                Alert.alert(
+                    t("notif_permission_denied", "Permission denied"),
+                    t("notif_permission_denied_msg", "Please enable notification access from device settings."),
+                    [
+                        { text: t("cancel", "Cancel"), style: "cancel" },
+                        { text: t("open_settings", "Open Settings"), onPress: () => Linking.openSettings() }
+                    ]
+                );
+            }
+        } finally {
+            setIsCheckingNotification(false);
+        }
     };
 
     const permissionItems: { key: keyof typeof permissions; label: string; description: string }[] = [
