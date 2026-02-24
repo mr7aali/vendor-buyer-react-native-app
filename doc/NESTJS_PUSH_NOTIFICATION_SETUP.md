@@ -14,7 +14,7 @@ Frontend currently sends push token data after login and expects backend to:
 
 ### 1.1 Save/Update Push Token
 
-- **Method**: `POST /auth/push-token`
+- **Method**: `POST /notifications/fcm-token`
 - **Auth**: Bearer token required
 - **Request body**:
 
@@ -42,7 +42,19 @@ Frontend currently sends push token data after login and expects backend to:
 }
 ```
 
-### 1.2 Optional Test Push Endpoint
+### 1.2 Remove Push Token (Logout)
+
+- **Method**: `DELETE /notifications/fcm-token`
+- **Auth**: Bearer token required
+- **Request body**:
+
+```json
+{
+  "token": "<fcm-device-token>"
+}
+```
+
+### 1.3 Optional Test Push Endpoint
 
 - **Method**: `POST /notifications/test`
 - **Auth**: admin/internal
@@ -131,14 +143,20 @@ export class SavePushTokenDto {
 
 ```ts
 @UseGuards(AuthGuard('jwt'))
-@Controller('auth')
+@Controller('notifications')
 export class PushTokenController {
   constructor(private readonly pushTokenService: PushTokenService) {}
 
-  @Post('push-token')
+  @Post('fcm-token')
   async saveToken(@Req() req: any, @Body() dto: SavePushTokenDto) {
     await this.pushTokenService.upsertUserToken(req.user.id, dto);
     return { success: true, message: 'Push token saved' };
+  }
+
+  @Delete('fcm-token')
+  async removeToken(@Req() req: any, @Body() dto: SavePushTokenDto) {
+    await this.pushTokenService.removeUserToken(req.user.id, dto.token);
+    return { success: true };
   }
 }
 ```
@@ -220,7 +238,7 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 ## 11) End-to-End Test Checklist
 
 1. User লগইন করে token register call hit হচ্ছে কি না
-2. `POST /auth/push-token` returns `success: true`
+2. `POST /notifications/fcm-token` returns success
 3. DB-তে token row save হচ্ছে
 4. Admin test endpoint দিয়ে push পাঠানো যাচ্ছে
 5. App foreground/background state-এ notification receive হচ্ছে
@@ -235,4 +253,3 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY----
 - Notification sender service live
 - Invalid token cleanup live
 - One business event (e.g. order status update) থেকে push verified
-

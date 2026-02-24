@@ -1,3 +1,4 @@
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useGetProfileQuery } from "@/store/api/authApiSlice";
 import { useAppDispatch } from "@/store/hooks";
 import { logOut } from "@/store/slices/authSlice";
@@ -26,6 +27,9 @@ const ProfileScreen = () => {
   const onLogout = async () => {
     setShowLogoutModal(false);
     try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      await unregisterPushTokenFromBackend(accessToken);
+
       // Clear AsyncStorage
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');

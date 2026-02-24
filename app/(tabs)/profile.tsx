@@ -5,8 +5,9 @@ import {
   useCreateVendorAccountMutation,
   useGetVendorAccountStatusQuery,
 } from "@/store/api/paymentApiSlice";
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectCurrentUser } from "@/store/slices/authSlice";
+import { logOut, selectCurrentAccessToken, selectCurrentUser } from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -35,6 +36,7 @@ const ProfileScreen = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
+  const accessToken = useAppSelector(selectCurrentAccessToken);
   const [isBusinessProfile, setIsBusinessProfile] = useState(false);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -93,6 +95,8 @@ const ProfileScreen = () => {
   const onLogout = async () => {
     setShowLogoutModal(false);
     try {
+      await unregisterPushTokenFromBackend(accessToken);
+
       // Clear AsyncStorage
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');

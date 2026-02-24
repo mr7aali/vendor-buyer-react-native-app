@@ -1,6 +1,7 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 Notifications.setNotificationHandler({
@@ -14,8 +15,9 @@ Notifications.setNotificationHandler({
 const rawApiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
 const apiUrl = rawApiUrl.trim().replace(/\/+$/, "");
 
-const rawPushTokenEndpoint = process.env.EXPO_PUBLIC_PUSH_TOKEN_ENDPOINT ?? "/auth/push-token";
+const rawPushTokenEndpoint = process.env.EXPO_PUBLIC_PUSH_TOKEN_ENDPOINT ?? "/notifications/fcm-token";
 const pushTokenEndpoint = rawPushTokenEndpoint.trim();
+const STORAGE_PUSH_TOKEN_KEY = "pushDeviceToken";
 
 const buildEndpointUrl = () => {
   if (!pushTokenEndpoint) return "";
@@ -108,6 +110,12 @@ export const syncPushTokenToBackend = async (tokens: PushTokens, accessToken?: s
   }
 
   try {
+    const tokenToSend = tokens.nativePushToken || tokens.expoPushToken;
+    if (!tokenToSend) {
+      console.warn("Push token sync skipped: no token to send.");
+      return false;
+    }
+
     const response = await fetch(endpointUrl, {
       method: "POST",
       headers: {
@@ -115,11 +123,7 @@ export const syncPushTokenToBackend = async (tokens: PushTokens, accessToken?: s
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        token: tokens.expoPushToken || tokens.nativePushToken,
-        expoPushToken: tokens.expoPushToken,
-        devicePushToken: tokens.nativePushToken,
-        devicePushTokenType: Platform.OS === "android" ? "fcm" : "apns",
-        platform: Platform.OS,
+        token: tokenToSend,
       }),
     });
 
@@ -128,10 +132,43 @@ export const syncPushTokenToBackend = async (tokens: PushTokens, accessToken?: s
       return false;
     }
 
+    await AsyncStorage.setItem(STORAGE_PUSH_TOKEN_KEY, tokenToSend);
     console.log("[PushToken] Sync success:", endpointUrl);
     return true;
   } catch (error) {
     console.warn("Push token sync failed due to network/runtime error.", error);
+    return false;
+  }
+};
+
+export const unregisterPushTokenFromBackend = async (accessToken?: string | null) => {
+  if (!accessToken) return false;
+
+  const endpointUrl = buildEndpointUrl();
+  if (!endpointUrl) return false;
+
+  try {
+    const savedToken = await AsyncStorage.getItem(STORAGE_PUSH_TOKEN_KEY);
+    if (!savedToken) return true;
+
+    const response = await fetch(endpointUrl, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ token: savedToken }),
+    });
+
+    if (!response.ok) {
+      console.warn(`Push token delete failed with status ${response.status}.`);
+      return false;
+    }
+
+    await AsyncStorage.removeItem(STORAGE_PUSH_TOKEN_KEY);
+    return true;
+  } catch (error) {
+    console.warn("Push token delete failed.", error);
     return false;
   }
 };
