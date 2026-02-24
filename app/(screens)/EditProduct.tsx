@@ -1,5 +1,5 @@
 import { useGetCategoriesByVendorQuery } from '@/store/api/categoryApiSlice';
-import { useCreateProductMutation, useGetProductByIdQuery, useUpdateProductMutation } from '@/store/api/product_api_slice';
+import { useCreateProductMutation, useCreateProductSpecificationMutation, useGetProductByIdQuery, useUpdateProductMutation } from '@/store/api/product_api_slice';
 import { useTranslation } from '@/hooks/use-translation';
 import { useAppSelector } from '@/store/hooks';
 import { selectCurrentUser } from '@/store/slices/authSlice';
@@ -13,6 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 type SpecItem = { label: string; value: string };
 
 const getEntityId = (entity: any) => entity?.id || entity?._id;
+
+const getProductIdFromResponse = (response: any) =>
+  response?.id ||
+  response?._id ||
+  response?.data?.id ||
+  response?.data?._id ||
+  response?.data?.data?.id ||
+  response?.data?.data?._id ||
+  '';
 
 export default function EditProduct() {
   const { language, t } = useTranslation();
@@ -31,6 +40,7 @@ export default function EditProduct() {
   const { data: productData, isLoading: isLoadingProduct } = useGetProductByIdQuery(productId, { skip: !productId });
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
+  const [createProductSpecification] = useCreateProductSpecificationMutation();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -249,17 +259,46 @@ export default function EditProduct() {
       }
     });
 
-    // Keep specs client-side display only until backend supports this field.
-    // This ensures "only added specs are shown" behavior in UI.
+    // Create only newly added specs to avoid duplicate records on edit.
+
+    const existingSpecPairs = new Set(
+      (productData?.specification && typeof productData.specification === 'object'
+        ? Object.entries(productData.specification)
+            .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+            .map(([key, value]) => `${String(key).trim().toLowerCase()}::${String(value).trim()}`)
+        : []),
+    );
+
+    const specsToCreate = specifications
+      .map((spec) => ({ label: spec.label.trim(), value: spec.value.trim() }))
+      .filter((spec) => spec.label && spec.value)
+      .filter((spec) => !existingSpecPairs.has(`${spec.label.toLowerCase()}::${spec.value}`));
 
     try {
+      let savedProductId = productId;
+
       if (productId) {
-        await updateProduct({ id: productId, formData }).unwrap();
+        const updated = await updateProduct({ id: productId, formData }).unwrap();
+        savedProductId = productId || getProductIdFromResponse(updated);
         Alert.alert(t('success', 'Success'), ui.successUpdated);
       } else {
-        await createProduct(formData).unwrap();
+        const created = await createProduct(formData).unwrap();
+        savedProductId = getProductIdFromResponse(created);
         Alert.alert(t('success', 'Success'), ui.successCreated);
       }
+
+      if (savedProductId && specsToCreate.length > 0) {
+        await Promise.all(
+          specsToCreate.map((spec) =>
+            createProductSpecification({
+              productId: String(savedProductId),
+              label: spec.label,
+              value: spec.value,
+            }).unwrap(),
+          ),
+        );
+      }
+
       router.back();
     } catch (error: any) {
       Alert.alert(t('error', 'Error'), error?.data?.message || ui.failedSaveProduct);

@@ -1,4 +1,5 @@
 import { useDeleteProductMutation, useGetProductByIdQuery } from '@/store/api/product_api_slice';
+import { useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,6 +20,7 @@ export default function ProductDetails() {
   const { language, t } = useTranslation();
   const { id } = useLocalSearchParams();
   const { data: product, isLoading, isError } = useGetProductByIdQuery(id as string, { skip: !id });
+  const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery({ productId: String(id), page: 1, limit: 10 }, { skip: !id });
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
 
   const ui = useMemo(() => {
@@ -91,6 +93,7 @@ export default function ProductDetails() {
         value: Array.isArray(value) ? value.join(', ') : String(value),
       }));
   }, [product]);
+  const reviews = reviewsData?.data?.reviews || [];
 
   const handleDelete = () => {
     Alert.alert(ui.deleteProduct, ui.deleteConfirm, [
@@ -202,6 +205,30 @@ export default function ProductDetails() {
           </View>
         ) : null}
 
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('product_details_customer_reviews', 'Customer Reviews')}</Text>
+          {isReviewsLoading ? (
+            <ActivityIndicator size="small" color="#278687" style={{ marginTop: 8 }} />
+          ) : reviews.length > 0 ? (
+            reviews.map((review: any, index: number) => (
+              <View key={review._id || `${index}`} style={[styles.reviewRow, index < reviews.length - 1 ? styles.reviewBorder : null]}>
+                <View style={styles.reviewHead}>
+                  <Text style={styles.reviewName}>{review.user?.fullName || t('product_details_unknown_user', 'Unknown User')}</Text>
+                  <Text style={styles.reviewDate}>{review?.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</Text>
+                </View>
+                <View style={styles.reviewStars}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Ionicons key={s} name="star" size={12} color={s <= Number(review.rating || 0) ? '#F0B429' : '#D7E0E5'} />
+                  ))}
+                </View>
+                <Text style={styles.reviewComment}>{review.comment || '-'}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.reviewEmpty}>{t('product_details_no_reviews', 'No reviews yet for this product.')}</Text>
+          )}
+        </View>
+
         <View style={styles.footerRow}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={isDeleting}>
             <Ionicons name="trash-outline" size={18} color="#EF595A" />
@@ -249,6 +276,14 @@ const styles = StyleSheet.create({
   specBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
   specLabel: { fontSize: 13, color: '#6E7B84' },
   specValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  reviewRow: { paddingVertical: 10 },
+  reviewBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
+  reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reviewName: { fontSize: 13, color: '#1F2A30', fontWeight: '700' },
+  reviewDate: { fontSize: 11, color: '#8A969D' },
+  reviewStars: { flexDirection: 'row', gap: 3, marginTop: 3 },
+  reviewComment: { marginTop: 5, fontSize: 12, color: '#55626A' },
+  reviewEmpty: { marginTop: 8, fontSize: 12, color: '#8A969D' },
   footerRow: { flexDirection: 'row', marginTop: 4, marginBottom: 6 },
   deleteBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.4, borderColor: '#F2B6BA', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginRight: 8, gap: 6, backgroundColor: '#FFF6F6' },
   deleteText: { color: '#EF595A', fontWeight: '700' },

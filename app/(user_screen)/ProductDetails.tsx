@@ -72,7 +72,7 @@ const ProductDetails = () => {
       await createReview({
         productId: actualId,
         rating: userRating,
-
+        comment: userComment.trim(),
       }).unwrap();
       Alert.alert(t("success", "Success"), t("product_details_review_success", "Review submitted successfully!"));
       setIsReviewModalVisible(false);

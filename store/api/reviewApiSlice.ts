@@ -49,7 +49,7 @@ export const reviewApiSlice = apiSlice.injectEndpoints({
             query: () => '/reviews/buyer/vendors',
             providesTags: [{ type: 'Review', id: 'BUYER_LIST' }],
         }),
-        createReview: builder.mutation<any, { productId: string; rating: number; }>({
+        createReview: builder.mutation<any, { productId: string; rating: number; comment?: string }>({
             query: (body) => ({
                 url: '/reviews/product',
                 method: 'POST',

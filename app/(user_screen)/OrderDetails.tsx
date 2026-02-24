@@ -1,4 +1,5 @@
 import { useGetOrderByIdQuery, useUpdateOrderStatusMutation } from '@/store/api/orderApiSlice';
+import { useCreateReviewMutation } from '@/store/api/reviewApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,6 +17,7 @@ const toNumber = (value: any, fallback = 0) => {
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || 'pending').toLowerCase();
 const getItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
+const getProductId = (item: any) => item?.product?.id || item?.product?._id || item?.productId?.id || item?.productId?._id || item?.productId;
 
 const OrderDetails = () => {
   const { t } = useTranslation();
@@ -23,6 +25,7 @@ const OrderDetails = () => {
   const { id } = useLocalSearchParams();
   const { data: order, isLoading, error, refetch } = useGetOrderByIdQuery(id as string, { skip: !id });
   const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
+  const [createReview, { isLoading: isSubmittingReview }] = useCreateReviewMutation();
 
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [rating, setRating] = useState(5);
@@ -74,7 +77,47 @@ const OrderDetails = () => {
     }
   };
 
-  const canConfirmPickup = status === 'delivered' || status === 'shipped' || status === 'processing';
+  const handleSubmitFeedback = async () => {
+    const comment = feedback.trim();
+    if (!comment) {
+      Alert.alert(t('error', 'Error'), t('product_details_enter_comment', 'Please enter a comment'));
+      return;
+    }
+
+    const productIds: string[] = Array.from(
+      new Set(
+        items
+          .map((item: any) => getProductId(item))
+          .filter((value: unknown): value is string | number => typeof value === 'string' || typeof value === 'number')
+          .map((value: string | number) => String(value)),
+      ),
+    );
+
+    if (!productIds.length) {
+      Alert.alert(t('error', 'Error'), t('product_details_not_found', 'Product not found'));
+      return;
+    }
+
+    try {
+      await Promise.all(
+        productIds.map((productId) =>
+          createReview({
+            productId,
+            rating,
+            comment,
+          }).unwrap(),
+        ),
+      );
+      setShowFeedbackModal(false);
+      setFeedback('');
+      setRating(5);
+      Alert.alert(t('success', 'Success'), t('product_details_review_success', 'Review submitted successfully!'));
+    } catch (err: any) {
+      Alert.alert(t('error', 'Error'), err?.data?.message || t('product_details_review_failed', 'Failed to submit review'));
+    }
+  };
+
+  const canConfirmPickup = status === 'delivered';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -220,8 +263,8 @@ const OrderDetails = () => {
               multiline
             />
 
-            <TouchableOpacity style={styles.doneBtn} onPress={() => setShowFeedbackModal(false)}>
-              <Text style={styles.doneText}>{t('order_details_done', 'Done')}</Text>
+            <TouchableOpacity style={[styles.doneBtn, isSubmittingReview ? { opacity: 0.7 } : null]} onPress={handleSubmitFeedback} disabled={isSubmittingReview}>
+              {isSubmittingReview ? <ActivityIndicator color="#FFF" /> : <Text style={styles.doneText}>{t('order_details_done', 'Done')}</Text>}
             </TouchableOpacity>
           </View>
         </View>
