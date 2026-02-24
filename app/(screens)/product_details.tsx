@@ -15,12 +15,30 @@ const toNumber = (value: any, fallback = 0) => {
 };
 
 const money = (value: any) => `$${toNumber(value).toFixed(2)}`;
+const resolveEntityId = (value: any): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    if (typeof value.id === 'string' || typeof value.id === 'number') return String(value.id);
+    if (typeof value._id === 'string' || typeof value._id === 'number') return String(value._id);
+  }
+  return '';
+};
 
 export default function ProductDetails() {
   const { language, t } = useTranslation();
-  const { id } = useLocalSearchParams();
-  const { data: product, isLoading, isError } = useGetProductByIdQuery(id as string, { skip: !id });
-  const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery({ productId: String(id), page: 1, limit: 10 }, { skip: !id });
+  const { id: idParam } = useLocalSearchParams();
+  const id = Array.isArray(idParam) ? idParam[0] : idParam;
+  const requestId = String(id || '');
+  const { data: product, isLoading, isError } = useGetProductByIdQuery(requestId, {
+    skip: !requestId,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+  });
+  const reviewProductId = resolveEntityId(product) || requestId;
+  const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery(
+    { productId: reviewProductId, page: 1, limit: 10 },
+    { skip: !reviewProductId },
+  );
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
 
   const ui = useMemo(() => {
@@ -85,13 +103,35 @@ export default function ProductDetails() {
   }, [language]);
 
   const specs = useMemo(() => {
-    const raw = product?.specification && typeof product.specification === 'object' ? product.specification : {};
-    return Object.entries(raw)
-      .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
-      .map(([key, value]) => ({
-        label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
-        value: Array.isArray(value) ? value.join(', ') : String(value),
-      }));
+    const formatLabel = (key: string) => key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+    const mapArrayToSpecs = (list: any[]) =>
+      list
+        .map((item: any) => {
+          const key = item?.key || item?.label || item?.name || item?.specificationLabel;
+          const value = item?.value ?? item?.specificationValue ?? item?.content ?? item?.description;
+          return {
+            label: key ? formatLabel(String(key)) : '',
+            value: Array.isArray(value) ? value.join(', ') : value != null ? String(value) : '',
+          };
+        })
+        .filter((spec: { label: string; value: string }) => spec.label && spec.value.trim() !== '');
+
+    const objectSpec =
+      product?.specification && typeof product.specification === 'object' && !Array.isArray(product.specification)
+        ? Object.entries(product.specification)
+            .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+            .map(([key, value]) => ({
+              label: formatLabel(String(key)),
+              value: Array.isArray(value) ? value.join(', ') : String(value),
+            }))
+        : [];
+
+    if (objectSpec.length > 0) return objectSpec;
+    if (Array.isArray(product?.specification)) return mapArrayToSpecs(product.specification);
+    if (Array.isArray(product?.specifications)) return mapArrayToSpecs(product.specifications);
+    if (Array.isArray(product?.productSpecifications)) return mapArrayToSpecs(product.productSpecifications);
+    if (Array.isArray(product?.specificationList)) return mapArrayToSpecs(product.specificationList);
+    return [];
   }, [product]);
   const reviews = reviewsData?.data?.reviews || [];
 
@@ -103,7 +143,7 @@ export default function ProductDetails() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteProduct(id as string).unwrap();
+            await deleteProduct(requestId).unwrap();
             router.back();
           } catch {
             Alert.alert(t('error', 'Error'), ui.failedDeleteProduct);

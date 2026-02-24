@@ -58,6 +58,26 @@ const getProductName = (order: any) => {
   );
 };
 
+const resolveEntityId = (value: any): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+    if (typeof value._id === "string" || typeof value._id === "number") return String(value._id);
+  }
+  return "";
+};
+
+const getProductId = (order: any) => {
+  const item = getPrimaryItem(order);
+  return (
+    resolveEntityId(order?.product) ||
+    resolveEntityId(order?.productId) ||
+    resolveEntityId(item?.product) ||
+    resolveEntityId(item?.productId) ||
+    ""
+  );
+};
+
 const getOrderCode = (order: any) => {
   const rawId = String(order?._id || order?.id || "");
   return rawId ? `#${rawId.slice(-6)}` : "#------";
@@ -214,7 +234,12 @@ export default function OrdersScreen() {
             onPress={() =>
               router.push({
                 pathname: "/(user_screen)/OrderDetails",
-                params: { id: item._id || item.id, status: item.status },
+                params: {
+                  id: item._id || item.id,
+                  status: item.status,
+                  productId: getProductId(item),
+                  productName: getProductName(item) || "",
+                },
               })
             }
           >

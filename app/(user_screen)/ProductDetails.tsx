@@ -27,15 +27,36 @@ import { useSelector } from "react-redux";
 
 const { width } = Dimensions.get("window");
 
+const resolveEntityId = (value: any): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+    if (typeof value._id === "string" || typeof value._id === "number") return String(value._id);
+  }
+  return "";
+};
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const getApiErrorMessage = (err: any, fallback: string) => {
+  if (Array.isArray(err?.data?.messages) && err.data.messages.length) return err.data.messages.join("\n");
+  return err?.data?.message || err?.message || fallback;
+};
+
 const ProductDetails = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { id, productId } = useLocalSearchParams();
-  const actualId = (id || productId) as string;
+  const { id: idParam, productId: productIdParam, orderId: orderIdParam } = useLocalSearchParams();
+  const id = Array.isArray(idParam) ? idParam[0] : idParam;
+  const productId = Array.isArray(productIdParam) ? productIdParam[0] : productIdParam;
+  const routeOrderIdRaw = Array.isArray(orderIdParam) ? orderIdParam[0] : orderIdParam;
+  const routeOrderId = String(routeOrderIdRaw || "");
+  const reviewOrderId = isUuid(routeOrderId) ? routeOrderId : "";
+  const actualId = String(id || productId || "");
   const { data: product, isLoading, error } = useGetProductByIdQuery(actualId, { skip: !actualId });
+  const reviewProductId = resolveEntityId(product) || actualId;
   const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery(
-    { productId: actualId },
-    { skip: !actualId }
+    { productId: reviewProductId },
+    { skip: !reviewProductId }
   );
   const [createOrder, { isLoading: isCreating }] = useCreateOrderMutation();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
@@ -69,8 +90,13 @@ const ProductDetails = () => {
     }
 
     try {
+      if (!reviewOrderId) {
+        Alert.alert(t("error", "Error"), t("order_details_failed_confirm_pickup", "Valid order id is required to submit review"));
+        return;
+      }
       await createReview({
-        productId: actualId,
+        productId: reviewProductId,
+        orderId: reviewOrderId,
         rating: userRating,
         comment: userComment.trim(),
       }).unwrap();
@@ -79,7 +105,10 @@ const ProductDetails = () => {
       setUserComment("");
       setUserRating(5);
     } catch (err: any) {
-      Alert.alert(t("error", "Error"), err?.data?.message || t("product_details_review_failed", "Failed to submit review"));
+      Alert.alert(
+        t("error", "Error"),
+        getApiErrorMessage(err, t("product_details_review_failed", "Failed to submit review")),
+      );
     }
   };
 

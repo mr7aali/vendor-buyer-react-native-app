@@ -1,5 +1,5 @@
-import { useGetOrderByIdQuery, useUpdateOrderStatusMutation } from '@/store/api/orderApiSlice';
-import { useCreateReviewMutation } from '@/store/api/reviewApiSlice';
+import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
+import { useCreateReviewMutation, useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,18 +13,35 @@ const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const getApiErrorMessage = (err: any, fallback: string) => {
+  if (Array.isArray(err?.data?.messages) && err.data.messages.length) return err.data.messages.join('\n');
+  return err?.data?.message || err?.message || fallback;
+};
 
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || 'pending').toLowerCase();
 const getItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
-const getProductId = (item: any) => item?.product?.id || item?.product?._id || item?.productId?.id || item?.productId?._id || item?.productId;
+const resolveEntityId = (value: any): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    if (typeof value.id === 'string' || typeof value.id === 'number') return String(value.id);
+    if (typeof value._id === 'string' || typeof value._id === 'number') return String(value._id);
+  }
+  return '';
+};
+const getProductId = (item: any) => resolveEntityId(item?.product) || resolveEntityId(item?.productId) || '';
+const getProductName = (item: any) =>
+  item?.product?.name || item?.product?.title || item?.name || item?.title || '';
 
 const OrderDetails = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const { data: order, isLoading, error, refetch } = useGetOrderByIdQuery(id as string, { skip: !id });
-  const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
+  const { id: routeIdParam, productId: fallbackProductIdParam, productName: fallbackProductNameParam } = useLocalSearchParams();
+  const routeId = Array.isArray(routeIdParam) ? routeIdParam[0] : routeIdParam;
+  const routeOrderId = String(routeId || '');
+  const { data: order, isLoading, error } = useGetOrderByIdQuery(routeOrderId, { skip: !routeOrderId });
   const [createReview, { isLoading: isSubmittingReview }] = useCreateReviewMutation();
 
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -33,12 +50,42 @@ const OrderDetails = () => {
 
   const status = normalizeStatus(order?.status);
   const items = useMemo(() => getItems(order), [order]);
+  const fallbackProductId = Array.isArray(fallbackProductIdParam) ? fallbackProductIdParam[0] : fallbackProductIdParam;
+  const fallbackProductName = Array.isArray(fallbackProductNameParam) ? fallbackProductNameParam[0] : fallbackProductNameParam;
+  const resolvedOrderId = useMemo(() => {
+    const candidates = [resolveEntityId(order), resolveEntityId(order?._id), routeOrderId];
+    return candidates.find((candidate) => isUuid(candidate)) || '';
+  }, [order, routeOrderId]);
+  const primaryProductId = useMemo(() => {
+    const fromItems = items
+      .map((item: any) => getProductId(item))
+      .find((value: any) => !!value);
+    if (fromItems) return String(fromItems);
+    if (fallbackProductId) return resolveEntityId(fallbackProductId);
+    return '';
+  }, [items, fallbackProductId]);
+  const primaryProductName = useMemo(() => {
+    const fromItem = items.find((item: any) => getProductName(item)) || null;
+    return getProductName(fromItem) || String(fallbackProductName || '');
+  }, [items, fallbackProductName]);
+  const { data: productReviewsData } = useGetProductReviewsQuery(
+    { productId: primaryProductId },
+    { skip: !primaryProductId },
+  );
 
   const subtotal = toNumber(order?.subtotal);
   const tax = toNumber(order?.taxAmount, 0);
   const shipping = toNumber(order?.shippingCost, 0);
   const discount = toNumber(order?.discountAmount);
   const total = toNumber(order?.totalAmount);
+  const productReviews = productReviewsData?.data?.reviews || [];
+  const apiAverageRating = toNumber((productReviewsData as any)?.data?.averageRating, NaN);
+  const totalProductReviews = toNumber(productReviewsData?.data?.meta?.total, productReviews.length);
+  const avgProductRating = totalProductReviews > 0
+    ? (Number.isFinite(apiAverageRating)
+      ? apiAverageRating
+      : productReviews.reduce((acc: number, curr: any) => acc + toNumber(curr?.rating), 0) / Math.max(productReviews.length, 1))
+    : 0;
 
   const timeline = useMemo(() => {
     const created = order?.createdAt ? new Date(order.createdAt) : null;
@@ -68,33 +115,28 @@ const OrderDetails = () => {
   }
 
   const handleConfirmPickup = async () => {
-    try {
-      await updateOrderStatus({ id: order?.id, status: 'completed' }).unwrap();
-      await refetch();
-      setShowFeedbackModal(true);
-    } catch (err: any) {
-      Alert.alert(t('error', 'Error'), err?.data?.message || t('order_details_failed_confirm_pickup', 'Failed to confirm pickup'));
-    }
+    setShowFeedbackModal(true);
   };
 
   const handleSubmitFeedback = async () => {
     const comment = feedback.trim();
-    if (!comment) {
-      Alert.alert(t('error', 'Error'), t('product_details_enter_comment', 'Please enter a comment'));
-      return;
-    }
-
     const productIds: string[] = Array.from(
       new Set(
         items
           .map((item: any) => getProductId(item))
-          .filter((value: unknown): value is string | number => typeof value === 'string' || typeof value === 'number')
-          .map((value: string | number) => String(value)),
+          .filter((value: string) => !!value && value !== '[object Object]'),
       ),
     );
+    if (!productIds.length && primaryProductId) {
+      productIds.push(primaryProductId);
+    }
 
     if (!productIds.length) {
       Alert.alert(t('error', 'Error'), t('product_details_not_found', 'Product not found'));
+      return;
+    }
+    if (!resolvedOrderId) {
+      Alert.alert(t('error', 'Error'), t('order_details_failed_confirm_pickup', 'Invalid order id for review'));
       return;
     }
 
@@ -103,6 +145,7 @@ const OrderDetails = () => {
         productIds.map((productId) =>
           createReview({
             productId,
+            orderId: resolvedOrderId,
             rating,
             comment,
           }).unwrap(),
@@ -113,7 +156,10 @@ const OrderDetails = () => {
       setRating(5);
       Alert.alert(t('success', 'Success'), t('product_details_review_success', 'Review submitted successfully!'));
     } catch (err: any) {
-      Alert.alert(t('error', 'Error'), err?.data?.message || t('product_details_review_failed', 'Failed to submit review'));
+      Alert.alert(
+        t('error', 'Error'),
+        getApiErrorMessage(err, t('product_details_review_failed', 'Failed to submit review')),
+      );
     }
   };
 
@@ -219,9 +265,9 @@ const OrderDetails = () => {
         <TouchableOpacity
           style={[styles.confirmBtn, !canConfirmPickup ? styles.confirmBtnDisabled : null]}
           onPress={handleConfirmPickup}
-          disabled={!canConfirmPickup || isUpdating}
+          disabled={!canConfirmPickup}
         >
-          {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmBtnText}>{t('order_details_confirm_pickup', 'Confirm Pickup')}</Text>}
+          <Text style={styles.confirmBtnText}>{t('order_details_confirm_pickup', 'Confirm Pickup')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -238,8 +284,14 @@ const OrderDetails = () => {
 
             <Text style={styles.modalTitle}>{t('order_details_task_completed', 'Task Completed')}</Text>
             <Text style={styles.modalSub}>{t('order_details_avg_rating_feedback', 'Average Rating and Feedback')}</Text>
+            {!!primaryProductName && (
+              <Text numberOfLines={1} style={styles.productNameText}>{primaryProductName}</Text>
+            )}
 
             <Text style={styles.ratingLabel}>{t('order_details_avg_rating', 'Avg. Rating')}</Text>
+            <Text style={styles.avgText}>
+              {avgProductRating.toFixed(1)} ({totalProductReviews} {t('product_details_reviews', 'reviews')})
+            </Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <TouchableOpacity key={s} onPress={() => setRating(s)} style={styles.starCell}>
@@ -323,7 +375,9 @@ const styles = StyleSheet.create({
   checkWrap: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: '#2A8C8B', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: -6 },
   modalTitle: { textAlign: 'center', fontSize: 20, fontWeight: '700', color: '#1F2A30', marginTop: 10 },
   modalSub: { textAlign: 'center', color: '#718089', fontSize: 12, marginTop: 4 },
+  productNameText: { textAlign: 'center', color: '#5E6D76', fontSize: 13, marginTop: 4, fontWeight: '600' },
   ratingLabel: { fontSize: 12, color: '#4A5962', fontWeight: '700', marginTop: 8 },
+  avgText: { fontSize: 12, color: '#6F7E87', marginTop: 2 },
   starsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   starCell: { width: 42, alignItems: 'center' },
   starTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },

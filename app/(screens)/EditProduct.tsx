@@ -10,7 +10,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type SpecItem = { label: string; value: string };
+type SpecItem = { label: string; value: string; isExisting?: boolean };
 
 const getEntityId = (entity: any) => entity?.id || entity?._id;
 
@@ -171,6 +171,7 @@ export default function EditProduct() {
             .map(([key, value]) => ({
               label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
               value: Array.isArray(value) ? value.join(', ') : String(value),
+              isExisting: true,
             }))
         : [];
     setSpecifications(mappedSpecs);
@@ -217,7 +218,7 @@ export default function EditProduct() {
       Alert.alert(ui.specMissingFields, ui.specMissingFieldsMsg);
       return;
     }
-    setSpecifications((prev) => [...prev, { label, value }]);
+    setSpecifications((prev) => [...prev, { label, value, isExisting: false }]);
     setNewSpecLabel('');
     setNewSpecValue('');
     setIsSpecModalVisible(false);
@@ -261,30 +262,26 @@ export default function EditProduct() {
 
     // Create only newly added specs to avoid duplicate records on edit.
 
-    const existingSpecPairs = new Set(
-      (productData?.specification && typeof productData.specification === 'object'
-        ? Object.entries(productData.specification)
-            .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
-            .map(([key, value]) => `${String(key).trim().toLowerCase()}::${String(value).trim()}`)
-        : []),
-    );
-
     const specsToCreate = specifications
+      .filter((spec) => !spec.isExisting)
       .map((spec) => ({ label: spec.label.trim(), value: spec.value.trim() }))
       .filter((spec) => spec.label && spec.value)
-      .filter((spec) => !existingSpecPairs.has(`${spec.label.toLowerCase()}::${spec.value}`));
+      .filter((spec, index, self) => self.findIndex((s) => s.label.toLowerCase() === spec.label.toLowerCase() && s.value === spec.value) === index);
 
     try {
       let savedProductId = productId;
+      const isEditing = !!productId;
 
-      if (productId) {
+      if (isEditing) {
         const updated = await updateProduct({ id: productId, formData }).unwrap();
         savedProductId = productId || getProductIdFromResponse(updated);
-        Alert.alert(t('success', 'Success'), ui.successUpdated);
       } else {
         const created = await createProduct(formData).unwrap();
         savedProductId = getProductIdFromResponse(created);
-        Alert.alert(t('success', 'Success'), ui.successCreated);
+      }
+
+      if (specsToCreate.length > 0 && !savedProductId) {
+        throw new Error('Product saved but no product id returned for specification create.');
       }
 
       if (savedProductId && specsToCreate.length > 0) {
@@ -299,6 +296,7 @@ export default function EditProduct() {
         );
       }
 
+      Alert.alert(t('success', 'Success'), isEditing ? ui.successUpdated : ui.successCreated);
       router.back();
     } catch (error: any) {
       Alert.alert(t('error', 'Error'), error?.data?.message || ui.failedSaveProduct);
