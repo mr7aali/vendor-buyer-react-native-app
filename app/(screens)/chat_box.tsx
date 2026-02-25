@@ -6,10 +6,12 @@ import { RootState } from "@/store/store";
 import { useTranslation } from "@/hooks/use-translation";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -45,18 +47,21 @@ interface CustomChatMessage {
 
 const normalizeId = (value: any): string => {
   if (value === undefined || value === null) return "";
-  return String(value);
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return "";
 };
 
 const resolveEntityId = (entity: any): string => {
+  if (entity === undefined || entity === null) return "";
+  if (typeof entity === "string" || typeof entity === "number") return String(entity);
+  if (typeof entity !== "object") return "";
   return normalizeId(
     entity?.userId ??
     entity?._id ??
     entity?.id ??
     entity?.user?.userId ??
     entity?.user?._id ??
-    entity?.user?.id ??
-    entity
+    entity?.user?.id
   );
 };
 
@@ -77,10 +82,12 @@ const ChatCouponCard = ({
   coupon,
   isOwn,
   labels,
+  onCopyCode,
 }: {
   coupon: any;
   isOwn: boolean;
   labels: { code: string; limitedTime: string; minSpend: string; offer: string; defaultDiscount: string };
+  onCopyCode: (code?: string) => void;
 }) => {
   if (!coupon) return null;
   return (
@@ -95,7 +102,12 @@ const ChatCouponCard = ({
       </View>
       <View style={styles.chatCouponBody}>
         <View style={styles.chatCouponTop}>
-          <Text style={styles.chatCouponCode}>{labels.code}:{coupon.code}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+            <Text style={styles.chatCouponCode}>{labels.code}:{coupon.code}</Text>
+            <TouchableOpacity onPress={() => onCopyCode(coupon?.code)} style={{ padding: 2 }}>
+              <MaterialIcons name="content-copy" size={18} color="#374151" />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.chatCouponDiscount}>{coupon.discount || labels.defaultDiscount}</Text>
         </View>
         <Text style={styles.chatCouponDesc} numberOfLines={2}>{coupon.desc || coupon.description}</Text>
@@ -323,18 +335,26 @@ const ChatBox: React.FC = () => {
       return [];
     }
     const myId = normalizeId(currentUserId);
+    const partnerId = normalizeId(activePartnerId);
     return messagesData.map((msg: any) => ({
       id: msg._id || msg.id,
       text: msg.messageText || msg.text || "",
       timestamp: msg.createdAt,
-      isOwn:
-        normalizeId(resolveEntityId(msg?.senderId)) === myId ||
-        normalizeId(resolveEntityId(msg?.sender)) === myId ||
-        normalizeId(msg?.senderId) === myId,
+      isOwn: (() => {
+        const senderId = normalizeId(resolveEntityId(msg?.senderId) || resolveEntityId(msg?.sender));
+        const receiverId = normalizeId(resolveEntityId(msg?.receiverId) || resolveEntityId(msg?.receiver));
+
+        // Strong signal for 1:1 chat: if message receiver is partner, it's mine.
+        if (partnerId && receiverId && receiverId === partnerId) return true;
+        if (partnerId && senderId && senderId === partnerId) return false;
+
+        // Fallback to current user id match.
+        return !!myId && senderId === myId;
+      })(),
       type: msg.type || "text",
       couponDetails: msg.couponDetails,
     }));
-  }, [messagesData, currentUserId]);
+  }, [messagesData, currentUserId, activePartnerId]);
 
   React.useEffect(() => {
     if (!Array.isArray(messagesData) || !currentUserId) return;
@@ -429,6 +449,16 @@ const ChatBox: React.FC = () => {
     });
   };
 
+  const handleCopyCouponCode = async (code?: string) => {
+    if (!code) return;
+    try {
+      await Clipboard.setStringAsync(String(code));
+      Alert.alert("Copied", "Coupon code copied");
+    } catch {
+      Alert.alert("Copy failed", "Could not copy coupon code");
+    }
+  };
+
   const renderMessage = ({ item: msg }: { item: CustomChatMessage }) => {
     const isCoupon =
       msg.type === "coupon" ||
@@ -445,6 +475,7 @@ const ChatBox: React.FC = () => {
             <ChatCouponCard
               coupon={msg.couponDetails || parseCouponFromText(msg.text)}
               isOwn={msg.isOwn}
+              onCopyCode={handleCopyCouponCode}
               labels={{
                 code: t("chat_coupon_code", "Code"),
                 limitedTime: t("chat_coupon_limited_time", "Limited Time"),
