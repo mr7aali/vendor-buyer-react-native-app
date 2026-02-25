@@ -106,6 +106,7 @@
 
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -123,7 +124,35 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const { width } = Dimensions.get("window");
 
 export default function LocationAccess() {
+  const { language, t } = useTranslation();
   const router = useRouter();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        allowLocationTitle: "אפשר גישה למיקום",
+        allowLocationSubtitle: "כדי למצוא ספקים קרובים, אנא שתף את המיקום שלך.",
+        allowLocationButton: "אפשר גישה למיקום",
+        locationRequired: "נדרשת הרשאה למיקום כדי להמשיך",
+        failedGetLocation: "לא ניתן לקבל מיקום",
+      };
+    }
+    if (language === "hi") {
+      return {
+        allowLocationTitle: "लोकेशन एक्सेस दें",
+        allowLocationSubtitle: "आपके पास के सर्विस प्रोवाइडर खोजने के लिए, कृपया अपनी लोकेशन शेयर करें।",
+        allowLocationButton: "लोकेशन एक्सेस दें",
+        locationRequired: "आगे बढ़ने के लिए लोकेशन अनुमति आवश्यक है",
+        failedGetLocation: "लोकेशन प्राप्त नहीं हो सकी",
+      };
+    }
+    return {
+      allowLocationTitle: "Allow Location Access",
+      allowLocationSubtitle: "To help you find the best service providers near you, please share your location.",
+      allowLocationButton: "Allow location access",
+      locationRequired: "Location permission is required to continue",
+      failedGetLocation: "Failed to get location",
+    };
+  }, [language]);
 
   const handleAllowLocation = async () => {
     try {
@@ -133,8 +162,8 @@ export default function LocationAccess() {
 
       if (status !== "granted") {
         Alert.alert(
-          "Permission required",
-          "Location permission is required to continue"
+          t("permission_required", "Permission required"),
+          ui.locationRequired
         );
         return;
       }
@@ -173,7 +202,7 @@ export default function LocationAccess() {
       router.replace("/(auth)/login");
     } catch (error) {
       console.log("Location error:", error);
-      Alert.alert("Error", "Failed to get location");
+      Alert.alert(t("error", "Error"), ui.failedGetLocation);
     }
   };
 
@@ -192,10 +221,9 @@ export default function LocationAccess() {
         </View>
 
         {/* Text */}
-        <Text style={styles.title}>Allow Location Access</Text>
+        <Text style={styles.title}>{ui.allowLocationTitle}</Text>
         <Text style={styles.subtitle}>
-          To help you find the best service providers near you, please
-          share your location.
+          {ui.allowLocationSubtitle}
         </Text>
 
         {/* Button */}
@@ -205,7 +233,7 @@ export default function LocationAccess() {
           onPress={handleAllowLocation}
         >
           <Text style={styles.buttonText}>
-            Allow location access
+            {ui.allowLocationButton}
           </Text>
         </TouchableOpacity>
       </View>

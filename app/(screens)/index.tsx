@@ -13,8 +13,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../hooks/use-translation";
 
 export default function AddProduct() {
+  const { t } = useTranslation();
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -32,8 +34,8 @@ export default function AddProduct() {
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
-          "Permission required",
-          "We need access to your photos to upload images."
+          t("permission_required", "Permission required"),
+          t("need_photos_permission", "We need access to your photos to upload images.")
         );
         return;
       }
@@ -50,7 +52,7 @@ export default function AddProduct() {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to pick image. Please try again.");
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image. Please try again."));
     }
   };
 
@@ -60,19 +62,19 @@ export default function AddProduct() {
 
   const validateForm = () => {
     if (!productName.trim()) {
-      Alert.alert("Validation Error", "Please enter product name");
+      Alert.alert(t("validation_error", "Validation Error"), t("please_enter_product_name", "Please enter product name"));
       return false;
     }
     if (!description.trim()) {
-      Alert.alert("Validation Error", "Please enter product description");
+      Alert.alert(t("validation_error", "Validation Error"), t("please_enter_product_description", "Please enter product description"));
       return false;
     }
     if (!price.trim() || isNaN(Number(price)) || Number(price) <= 0) {
-      Alert.alert("Validation Error", "Please enter a valid price");
+      Alert.alert(t("validation_error", "Validation Error"), t("please_enter_valid_price", "Please enter a valid price"));
       return false;
     }
     if (!image) {
-      Alert.alert("Validation Error", "Please upload a product image");
+      Alert.alert(t("validation_error", "Validation Error"), t("please_upload_product_image", "Please upload a product image"));
       return false;
     }
     return true;
@@ -88,15 +90,15 @@ export default function AddProduct() {
       specs.length > 0
     ) {
       Alert.alert(
-        "Discard Changes",
-        "Are you sure you want to discard all changes?",
+        t("discard_changes", "Discard Changes"),
+        t("discard_changes_confirm", "Are you sure you want to discard all changes?"),
         [
           {
-            text: "Cancel",
+            text: t("cancel", "Cancel"),
             style: "cancel",
           },
           {
-            text: "Discard",
+            text: t("discard", "Discard"),
             style: "destructive",
             onPress: () => router.back(),
           },
@@ -125,12 +127,16 @@ export default function AddProduct() {
 
     console.log("Product data ready for API:", productData);
 
-    Alert.alert("Success", "Product data is ready for API submission!", [
+    Alert.alert(
+      t("success", "Success"),
+      t("product_ready_for_api", "Product data is ready for API submission!"),
+      [
       {
-        text: "OK",
+        text: t("ok", "OK"),
         onPress: () => router.back(),
       },
-    ]);
+      ]
+    );
   };
 
   const addSpecification = () => {
@@ -141,8 +147,8 @@ export default function AddProduct() {
       setShowSpecInputs(false);
     } else {
       Alert.alert(
-        "Validation Error",
-        "Please enter both key and value for specification"
+        t("validation_error", "Validation Error"),
+        t("please_enter_spec_key_value", "Please enter both key and value for specification")
       );
     }
   };
@@ -172,7 +178,7 @@ export default function AddProduct() {
         <TouchableOpacity onPress={handleCancel}>
           <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "600" }}>Add Product</Text>
+        <Text style={{ fontSize: 18, fontWeight: "600" }}>{t("add_product", "Add Product")}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -194,7 +200,7 @@ export default function AddProduct() {
               marginBottom: 16,
             }}
           >
-            Product Image *
+            {t("product_image_required", "Product Image *")}
           </Text>
 
           <TouchableOpacity
@@ -261,7 +267,7 @@ export default function AddProduct() {
                     marginBottom: 4,
                   }}
                 >
-                  Upload Image
+                  {t("upload_image", "Upload Image")}
                 </Text>
                 <Text
                   style={{
@@ -269,7 +275,7 @@ export default function AddProduct() {
                     color: "#9CA3AF",
                   }}
                 >
-                  Tap to select from gallery
+                  {t("tap_select_gallery", "Tap to select from gallery")}
                 </Text>
               </>
             )}
@@ -293,7 +299,7 @@ export default function AddProduct() {
               marginBottom: 20,
             }}
           >
-            Product Details
+            {t("product_details", "Product Details")}
           </Text>
 
           {/* Product Name */}
@@ -306,7 +312,7 @@ export default function AddProduct() {
                 fontWeight: "500",
               }}
             >
-              Product Name *
+              {t("product_name_required", "Product Name *")}
             </Text>
             <TextInput
               style={{
@@ -318,7 +324,7 @@ export default function AddProduct() {
                 color: "#1F2937",
                 backgroundColor: "#FFF",
               }}
-              placeholder="Enter product name"
+              placeholder={t("enter_product_name", "Enter product name")}
               placeholderTextColor="#9CA3AF"
               value={productName}
               onChangeText={setProductName}
@@ -335,7 +341,7 @@ export default function AddProduct() {
                 fontWeight: "500",
               }}
             >
-              Description *
+              {t("description_required", "Description *")}
             </Text>
             <TextInput
               style={{
@@ -349,7 +355,7 @@ export default function AddProduct() {
                 height: 100,
                 textAlignVertical: "top",
               }}
-              placeholder="Enter product description"
+              placeholder={t("enter_product_description", "Enter product description")}
               placeholderTextColor="#9CA3AF"
               multiline
               numberOfLines={4}
@@ -368,7 +374,7 @@ export default function AddProduct() {
                 fontWeight: "500",
               }}
             >
-              Price *
+              {t("price_required", "Price *")}
             </Text>
             <View style={{ position: "relative" }}>
               <Text
@@ -394,7 +400,7 @@ export default function AddProduct() {
                   color: "#1F2937",
                   backgroundColor: "#FFF",
                 }}
-                placeholder="0.00"
+                placeholder={t("price_placeholder", "0.00")}
                 placeholderTextColor="#9CA3AF"
                 keyboardType="decimal-pad"
                 value={price}
@@ -413,7 +419,7 @@ export default function AddProduct() {
                 fontWeight: "500",
               }}
             >
-              Category
+              {t("category", "Category")}
             </Text>
             <TextInput
               style={{
@@ -425,7 +431,7 @@ export default function AddProduct() {
                 color: "#1F2937",
                 backgroundColor: "#FFF",
               }}
-              placeholder="Enter category (optional)"
+              placeholder={t("enter_category_optional", "Enter category (optional)")}
               placeholderTextColor="#9CA3AF"
               value={category}
               onChangeText={setCategory}
@@ -457,12 +463,12 @@ export default function AddProduct() {
                 color: "#1F2937",
               }}
             >
-              Specifications
+              {t("specifications", "Specifications")}
             </Text>
             {!showSpecInputs && (
               <TouchableOpacity onPress={() => setShowSpecInputs(true)}>
                 <Text style={{ color: "#278687", fontWeight: "500" }}>
-                  + Add
+                  {t("add_with_plus", "+ Add")}
                 </Text>
               </TouchableOpacity>
             )}
@@ -482,7 +488,7 @@ export default function AddProduct() {
                       color: "#1F2937",
                       backgroundColor: "#FFF",
                     }}
-                    placeholder="Key (e.g., Color)"
+                    placeholder={t("spec_key_example", "Key (e.g., Color)")}
                     placeholderTextColor="#9CA3AF"
                     value={specKey}
                     onChangeText={setSpecKey}
@@ -499,7 +505,7 @@ export default function AddProduct() {
                       color: "#1F2937",
                       backgroundColor: "#FFF",
                     }}
-                    placeholder="Value (e.g., Red)"
+                    placeholder={t("spec_value_example", "Value (e.g., Red)")}
                     placeholderTextColor="#9CA3AF"
                     value={specValue}
                     onChangeText={setSpecValue}
@@ -527,7 +533,7 @@ export default function AddProduct() {
                   }}
                 >
                   <Text style={{ color: "#6B7280", fontWeight: "500" }}>
-                    Cancel
+                    {t("cancel", "Cancel")}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -539,7 +545,7 @@ export default function AddProduct() {
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ color: "white", fontWeight: "500" }}>Add</Text>
+                  <Text style={{ color: "white", fontWeight: "500" }}>{t("add", "Add")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -611,7 +617,7 @@ export default function AddProduct() {
               }}
             >
               <Text style={{ color: "#9CA3AF", fontSize: 14 }}>
-                No specifications added
+                {t("no_specifications_added", "No specifications added")}
               </Text>
             </View>
           )}
@@ -642,7 +648,7 @@ export default function AddProduct() {
                   marginBottom: 4,
                 }}
               >
-                Active Status
+                {t("active_status", "Active Status")}
               </Text>
               <Text
                 style={{
@@ -650,7 +656,7 @@ export default function AddProduct() {
                   color: "#6B7280",
                 }}
               >
-                Show product in store
+                {t("show_product_in_store", "Show product in store")}
               </Text>
             </View>
             <Switch
@@ -692,7 +698,7 @@ export default function AddProduct() {
               fontWeight: "600",
             }}
           >
-            Cancel
+            {t("cancel", "Cancel")}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -712,7 +718,7 @@ export default function AddProduct() {
               fontWeight: "600",
             }}
           >
-            Add Product
+            {t("add_product", "Add Product")}
           </Text>
         </TouchableOpacity>
       </View>

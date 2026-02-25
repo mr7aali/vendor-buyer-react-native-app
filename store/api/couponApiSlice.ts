@@ -1,5 +1,46 @@
 import { apiSlice } from './apiSlice';
 
+const hasCouponShape = (item: any) =>
+    item &&
+    typeof item === 'object' &&
+    (typeof item.code === 'string' || typeof item.couponCode === 'string') &&
+    (
+        item.discountValue !== undefined ||
+        item.discount !== undefined ||
+        item.value !== undefined
+    );
+
+const findCouponArrayDeep = (input: any): any[] => {
+    if (!input) return [];
+    if (Array.isArray(input)) {
+        if (input.some(hasCouponShape)) return input;
+        for (const entry of input) {
+            const nested = findCouponArrayDeep(entry);
+            if (nested.length) return nested;
+        }
+        return [];
+    }
+    if (typeof input === 'object') {
+        for (const key of Object.keys(input)) {
+            const nested = findCouponArrayDeep((input as any)[key]);
+            if (nested.length) return nested;
+        }
+    }
+    return [];
+};
+
+const normalizeCoupon = (coupon: any) => ({
+    ...coupon,
+    id: coupon?.id || coupon?._id || coupon?.couponId || '',
+    code: coupon?.code || coupon?.couponCode || '',
+    discountType: coupon?.discountType || coupon?.discount_type || coupon?.type || 'fixed',
+    discountValue: Number(coupon?.discountValue ?? coupon?.discount ?? coupon?.value ?? 0),
+    minPurchaseAmount: Number(coupon?.minPurchaseAmount ?? coupon?.minimumPurchase ?? coupon?.min_purchase_amount ?? 0),
+    validFrom: coupon?.validFrom || coupon?.startDate || coupon?.fromDate || coupon?.createdAt,
+    validUntil: coupon?.validUntil || coupon?.endDate || coupon?.toDate || coupon?.expiresAt,
+    isActive: coupon?.isActive !== undefined ? coupon.isActive : coupon?.active !== undefined ? coupon.active : true,
+});
+
 export interface Coupon {
     id: string;
     name: string;
@@ -56,7 +97,14 @@ export const couponApiSlice = apiSlice.injectEndpoints({
                     if (!response) return [];
                     if (Array.isArray(response)) return response;
                     if (response.data && Array.isArray(response.data)) return response.data;
+                    if (response.data?.coupons && Array.isArray(response.data.coupons)) return response.data.coupons;
+                    if (response.data?.items && Array.isArray(response.data.items)) return response.data.items;
                     if (response.coupons && Array.isArray(response.coupons)) return response.coupons;
+                    if (response.items && Array.isArray(response.items)) return response.items;
+                    const deepFound = findCouponArrayDeep(response);
+                    if (deepFound.length) {
+                        return deepFound.map(normalizeCoupon);
+                    }
                     return [];
                 } catch (error) {
                     console.error('Coupon API - transformResponse error:', error);

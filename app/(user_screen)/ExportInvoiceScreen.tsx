@@ -1,4 +1,5 @@
 import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,6 +19,7 @@ const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const getItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
 
 const ExportInvoiceScreen = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { data: order, isLoading } = useGetOrderByIdQuery(id as string, { skip: !id });
@@ -28,6 +30,87 @@ const ExportInvoiceScreen = () => {
   const shipping = toNumber(order?.shippingCost, 0);
   const discount = toNumber(order?.discountAmount);
   const total = toNumber(order?.totalAmount);
+  const ui = useMemo(() => {
+    if (language === "he") {
+      return {
+        exportInvoice: "ייצוא חשבונית",
+        store: "חנות",
+        vendor: "ספק",
+        orderId: "מזהה הזמנה",
+        invoiceTotal: "סה\"כ חשבונית",
+        orderItems: "פריטי הזמנה",
+        paymentDetails: "פרטי תשלום",
+        subtotal: "סכום ביניים",
+        tax: "מס(7.5%)",
+        shipping: "משלוח",
+        discount: "הנחה",
+        total: "סה\"כ",
+        orderNotFound: "ההזמנה לא נמצאה",
+        downloadReceipt: "הורד קבלה",
+        dateIssued: "תאריך הנפקה",
+        from: "מאת",
+        billTo: "חיוב אל",
+        paymentDate: "תאריך תשלום",
+        customer: "לקוח",
+        addressUnavailable: "כתובת לא זמינה",
+        product: "מוצר",
+        nA: "לא זמין",
+        failedDownload: "לא ניתן ליצור או להוריד את הקבלה.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        exportInvoice: "इनवॉइस एक्सपोर्ट",
+        store: "स्टोर",
+        vendor: "वेंडर",
+        orderId: "ऑर्डर आईडी",
+        invoiceTotal: "इनवॉइस कुल",
+        orderItems: "ऑर्डर आइटम्स",
+        paymentDetails: "भुगतान विवरण",
+        subtotal: "उपकुल",
+        tax: "टैक्स(7.5%)",
+        shipping: "शिपिंग",
+        discount: "छूट",
+        total: "कुल",
+        orderNotFound: "ऑर्डर नहीं मिला",
+        downloadReceipt: "रसीद डाउनलोड करें",
+        dateIssued: "जारी तिथि",
+        from: "से",
+        billTo: "बिल टू",
+        paymentDate: "भुगतान तिथि",
+        customer: "ग्राहक",
+        addressUnavailable: "पता उपलब्ध नहीं",
+        product: "प्रोडक्ट",
+        nA: "N/A",
+        failedDownload: "रसीद बनाना या डाउनलोड करना संभव नहीं हुआ।",
+      };
+    }
+    return {
+      exportInvoice: "Export invoice",
+      store: "Store",
+      vendor: "Vendor",
+      orderId: "Order ID",
+      invoiceTotal: "Invoice Total",
+      orderItems: "Order items",
+      paymentDetails: "Payment details",
+      subtotal: "Subtotal",
+      tax: "Tax(7.5%)",
+      shipping: "Shipping",
+      discount: "Discount",
+      total: "Total",
+      orderNotFound: "Order not found",
+      downloadReceipt: "Download Receipt",
+      dateIssued: "Date Issued",
+      from: "From",
+      billTo: "Bill to",
+      paymentDate: "Payment Date",
+      customer: "Customer",
+      addressUnavailable: "Address unavailable",
+      product: "Product",
+      nA: "N/A",
+      failedDownload: "Unable to generate or download the receipt.",
+    };
+  }, [language]);
 
   const handleDownloadReceipt = async () => {
     if (!order) return;
@@ -45,29 +128,29 @@ const ExportInvoiceScreen = () => {
           </style>
         </head>
         <body>
-          <h2>Export invoice</h2>
+          <h2>${ui.exportInvoice}</h2>
           <div class="card">
-            <div class="row"><span>Store</span><span>${order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</span></div>
-            <div class="row"><span>Order ID</span><span>${order?.orderNumber || order?.id}</span></div>
-            <div class="row"><span>Invoice Total</span><span>${formatMoney(total)}</span></div>
+            <div class="row"><span>${ui.store}</span><span>${order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</span></div>
+            <div class="row"><span>${ui.orderId}</span><span>${order?.orderNumber || order?.id}</span></div>
+            <div class="row"><span>${ui.invoiceTotal}</span><span>${formatMoney(total)}</span></div>
           </div>
           <div class="card">
-            <div class="title">Order items</div>
+            <div class="title">${ui.orderItems}</div>
             ${items.map((item: any) => `
               <div class="row">
-                <span>${item?.product?.name || 'Product'} x${item?.quantity || 1}</span>
+                <span>${item?.product?.name || ui.product} x${item?.quantity || 1}</span>
                 <span>${formatMoney(item?.unitPrice || item?.totalPrice)}</span>
               </div>
             `).join('')}
           </div>
           <div class="card">
-            <div class="title">Payment details</div>
-            <div class="row"><span>Subtotal</span><span>${formatMoney(subtotal)}</span></div>
-            <div class="row"><span>Tax</span><span>${formatMoney(tax)}</span></div>
-            <div class="row"><span>Shipping</span><span>${formatMoney(shipping)}</span></div>
-            <div class="row"><span>Discount</span><span>${formatMoney(discount)}</span></div>
+            <div class="title">${ui.paymentDetails}</div>
+            <div class="row"><span>${ui.subtotal}</span><span>${formatMoney(subtotal)}</span></div>
+            <div class="row"><span>${ui.tax}</span><span>${formatMoney(tax)}</span></div>
+            <div class="row"><span>${ui.shipping}</span><span>${formatMoney(shipping)}</span></div>
+            <div class="row"><span>${ui.discount}</span><span>${formatMoney(discount)}</span></div>
             <div class="dash"></div>
-            <div class="row"><strong>Total</strong><strong>${formatMoney(total)}</strong></div>
+            <div class="row"><strong>${ui.total}</strong><strong>${formatMoney(total)}</strong></div>
           </div>
         </body>
       </html>
@@ -77,7 +160,7 @@ const ExportInvoiceScreen = () => {
       const { uri } = await Print.printToFileAsync({ html: htmlContent });
       await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
     } catch (error) {
-      Alert.alert('Error', 'Unable to generate or download the receipt.');
+      Alert.alert(t("error", "Error"), ui.failedDownload);
       console.error(error);
     }
   };
@@ -93,7 +176,7 @@ const ExportInvoiceScreen = () => {
   if (!order) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text>Order not found</Text>
+        <Text>{ui.orderNotFound}</Text>
       </SafeAreaView>
     );
   }
@@ -104,7 +187,7 @@ const ExportInvoiceScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#1C252B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Export invoice</Text>
+        <Text style={styles.headerTitle}>{ui.exportInvoice}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -113,11 +196,11 @@ const ExportInvoiceScreen = () => {
           <View style={styles.vendorRow}>
             <Image source={{ uri: order?.vendor?.logoUrl || IMAGE_FALLBACK }} style={styles.logo} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.vendorName}>{order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</Text>
-              <Text style={styles.smallText} numberOfLines={2}>{order?.vendor?.address || 'Address unavailable'}</Text>
+              <Text style={styles.vendorName}>{order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</Text>
+              <Text style={styles.smallText} numberOfLines={2}>{order?.vendor?.address || ui.addressUnavailable}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.label}>Invoice Total</Text>
+              <Text style={styles.label}>{ui.invoiceTotal}</Text>
               <Text style={styles.invoiceTotal}>{formatMoney(total)}</Text>
             </View>
           </View>
@@ -126,13 +209,13 @@ const ExportInvoiceScreen = () => {
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <View>
-              <Text style={styles.label}>Date Issued</Text>
-              <Text style={styles.value}>{order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</Text>
+              <Text style={styles.label}>{ui.dateIssued}</Text>
+              <Text style={styles.value}>{order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : ui.nA}</Text>
               <Text style={styles.value}>{order?.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.label}>From</Text>
-              <Text style={styles.value}>{order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</Text>
+              <Text style={styles.label}>{ui.from}</Text>
+              <Text style={styles.value}>{order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</Text>
               <Text style={styles.smallText}>{order?.vendor?.country || ''}</Text>
             </View>
           </View>
@@ -141,25 +224,25 @@ const ExportInvoiceScreen = () => {
 
           <View style={styles.rowBetween}>
             <View>
-              <Text style={styles.label}>Bill to</Text>
-              <Text style={styles.value}>{order?.buyer?.fullName || 'Customer'}</Text>
+              <Text style={styles.label}>{ui.billTo}</Text>
+              <Text style={styles.value}>{order?.buyer?.fullName || ui.customer}</Text>
               <Text style={styles.smallText}>{order?.buyer?.phone || ''}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.label}>Order ID</Text>
+              <Text style={styles.label}>{ui.orderId}</Text>
               <Text style={styles.value}>{order?.orderNumber || order?.id}</Text>
-              <Text style={styles.label}>Payment Date</Text>
-              <Text style={styles.smallText}>{order?.payment?.createdAt ? new Date(order.payment.createdAt).toLocaleString() : 'N/A'}</Text>
+              <Text style={styles.label}>{ui.paymentDate}</Text>
+              <Text style={styles.smallText}>{order?.payment?.createdAt ? new Date(order.payment.createdAt).toLocaleString() : ui.nA}</Text>
             </View>
           </View>
 
           <View style={styles.divider} />
 
-          <Text style={styles.sectionTitle}>Order items</Text>
+          <Text style={styles.sectionTitle}>{ui.orderItems}</Text>
           {items.map((item: any) => (
             <View key={item?.id} style={styles.itemRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{item?.product?.name || 'Product'}</Text>
+                <Text style={styles.itemName}>{item?.product?.name || ui.product}</Text>
                 <Text style={styles.itemMeta}>x{item?.quantity || 1}</Text>
               </View>
               <Text style={styles.itemPrice}>{formatMoney(item?.unitPrice || item?.totalPrice)}</Text>
@@ -168,18 +251,18 @@ const ExportInvoiceScreen = () => {
 
           <View style={styles.dashed} />
 
-          <Text style={styles.sectionTitle}>Payment details</Text>
-          <View style={styles.paymentRow}><Text style={styles.label}>Subtotal</Text><Text style={styles.value}>{formatMoney(subtotal)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.label}>Tax(7.5%)</Text><Text style={styles.value}>{formatMoney(tax)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.label}>Shipping</Text><Text style={styles.value}>{formatMoney(shipping)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.label}>Discount</Text><Text style={styles.value}>{formatMoney(discount)}</Text></View>
+          <Text style={styles.sectionTitle}>{ui.paymentDetails}</Text>
+          <View style={styles.paymentRow}><Text style={styles.label}>{ui.subtotal}</Text><Text style={styles.value}>{formatMoney(subtotal)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.label}>{ui.tax}</Text><Text style={styles.value}>{formatMoney(tax)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.label}>{ui.shipping}</Text><Text style={styles.value}>{formatMoney(shipping)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.label}>{ui.discount}</Text><Text style={styles.value}>{formatMoney(discount)}</Text></View>
           <View style={styles.dashed} />
-          <View style={styles.paymentRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalLabel}>{formatMoney(total)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.totalLabel}>{ui.total}</Text><Text style={styles.totalLabel}>{formatMoney(total)}</Text></View>
         </View>
 
         <TouchableOpacity style={styles.downloadButton} onPress={handleDownloadReceipt}>
           <Ionicons name="download-outline" size={20} color="#FFF" />
-          <Text style={styles.downloadButtonText}>Download Receipt</Text>
+          <Text style={styles.downloadButtonText}>{ui.downloadReceipt}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

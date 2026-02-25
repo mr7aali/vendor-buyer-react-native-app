@@ -1,4 +1,8 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
+import { setCredentials } from "@/store/slices/authSlice";
+import { RootState } from "@/store/store";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -13,11 +17,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 const EditPersonalInfoScreen = () => {
-  const { data: profileData } = useGetProfileQuery({});
+  const { language, t } = useTranslation();
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery({});
   const [updateProfile, { isLoading }] = useUpdateProfileMutation();
   const userData = profileData?.data;
+  const dispatch = useDispatch();
+  const authState = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -26,6 +34,63 @@ const EditPersonalInfoScreen = () => {
     email: "",
     address: "",
   });
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        editPersonalInfo: "עריכת מידע אישי",
+        enterFullName: "הזן את שמך המלא",
+        enterPhone: "הזן מספר טלפון",
+        enterEmail: "הזן כתובת אימייל",
+        enterAddress: "הזן כתובת",
+        save: "שמור",
+        saving: "שומר...",
+        missingInfo: "מידע חסר",
+        fillRequired: "יש למלא את כל השדות הנדרשים לפני שמירה.",
+        invalidEmail: "אימייל לא תקין",
+        invalidEmailMsg: "נא להזין כתובת אימייל תקינה.",
+        invalidPhone: "טלפון לא תקין",
+        invalidPhoneMsg: "נא להזין מספר טלפון תקין.",
+        personalSaved: "המידע האישי נשמר בהצלחה!",
+        failedUpdate: "עדכון הפרופיל נכשל. נסה שוב.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        editPersonalInfo: "व्यक्तिगत जानकारी संपादित करें",
+        enterFullName: "अपना पूरा नाम दर्ज करें",
+        enterPhone: "अपना फोन नंबर दर्ज करें",
+        enterEmail: "ईमेल पता दर्ज करें",
+        enterAddress: "अपना पता दर्ज करें",
+        save: "सेव करें",
+        saving: "सेव हो रहा है...",
+        missingInfo: "जानकारी अधूरी है",
+        fillRequired: "सेव करने से पहले सभी आवश्यक फ़ील्ड भरें।",
+        invalidEmail: "अमान्य ईमेल",
+        invalidEmailMsg: "कृपया मान्य ईमेल पता दर्ज करें।",
+        invalidPhone: "अमान्य फोन",
+        invalidPhoneMsg: "कृपया मान्य फोन नंबर दर्ज करें।",
+        personalSaved: "आपकी व्यक्तिगत जानकारी सफलतापूर्वक सेव हो गई!",
+        failedUpdate: "प्रोफाइल अपडेट विफल रहा। कृपया फिर से प्रयास करें।",
+      };
+    }
+    return {
+      editPersonalInfo: "Edit Personal info",
+      enterFullName: "Enter Your Full Name",
+      enterPhone: "Enter Your Phone Number",
+      enterEmail: "Enter Email Address",
+      enterAddress: "Enter Your Address",
+      save: "Save",
+      saving: "Saving...",
+      missingInfo: "Missing Information",
+      fillRequired: "Please fill in all required fields before saving.",
+      invalidEmail: "Invalid Email",
+      invalidEmailMsg: "Please enter a valid email address.",
+      invalidPhone: "Invalid Phone",
+      invalidPhoneMsg: "Please enter a valid phone number.",
+      personalSaved: "Your personal information has been saved successfully!",
+      failedUpdate: "Failed to update profile. Please try again.",
+    };
+  }, [language]);
 
   useEffect(() => {
     if (userData) {
@@ -55,9 +120,9 @@ const EditPersonalInfoScreen = () => {
 
     if (emptyFields.length > 0) {
       Alert.alert(
-        "Missing Information",
-        "Please fill in all required fields before saving.",
-        [{ text: "OK" }]
+        ui.missingInfo,
+        ui.fillRequired,
+        [{ text: t("ok", "OK") }]
       );
       return;
     }
@@ -65,8 +130,8 @@ const EditPersonalInfoScreen = () => {
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.", [
-        { text: "OK" },
+      Alert.alert(ui.invalidEmail, ui.invalidEmailMsg, [
+        { text: t("ok", "OK") },
       ]);
       return;
     }
@@ -74,33 +139,55 @@ const EditPersonalInfoScreen = () => {
     // Phone validation (basic)
     const phoneRegex = /^[\d\s\-\+\(\)]+$/;
     if (formData.phone && !phoneRegex.test(formData.phone)) {
-      Alert.alert("Invalid Phone", "Please enter a valid phone number.", [
-        { text: "OK" },
+      Alert.alert(ui.invalidPhone, ui.invalidPhoneMsg, [
+        { text: t("ok", "OK") },
       ]);
       return;
     }
 
     // Success - Save data and navigate back
     try {
-      const updateData: any = {};
-
-      // Send only vendor table fields without nesting
-      if (formData.fullName) updateData.fullName = formData.fullName;
-      if (formData.phone) updateData.phone = formData.phone;
-      if (formData.address) updateData.address = formData.address;
-
-      // Clean up empty objects if necessary, but backend might handle partials.
-      // If user provided no email change, we might not want to send user object with just empty fields if backend validates.
-      // But typically sending what we have is okay.
+      const updateData: any = {
+        vendor: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          address: formData.address,
+        },
+      };
 
       await updateProfile(updateData).unwrap();
+      await refetchProfile();
+
+        if (authState?.accessToken) {
+          const mergedUser = {
+            ...(authState.user || {}),
+            vendor: {
+              ...((authState.user as any)?.vendor || {}),
+              fullName: formData.fullName,
+            phone: formData.phone,
+            address: formData.address,
+          },
+          fullName: formData.fullName || (authState.user as any)?.fullName,
+          phone: formData.phone || (authState.user as any)?.phone,
+          address: formData.address || (authState.user as any)?.address,
+        };
+
+        dispatch(
+          setCredentials({
+            user: mergedUser as any,
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken || "",
+          })
+        );
+        await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
+      }
 
       Alert.alert(
-        "Success",
-        "Your personal information has been saved successfully!",
+        t("success", "Success"),
+        ui.personalSaved,
         [
           {
-            text: "OK",
+            text: t("ok", "OK"),
             onPress: () => {
               router.back();
             },
@@ -109,7 +196,7 @@ const EditPersonalInfoScreen = () => {
       );
     } catch (error) {
       console.error("Update failed", error);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+      Alert.alert(t("error", "Error"), ui.failedUpdate);
     }
   };
 
@@ -148,7 +235,7 @@ const EditPersonalInfoScreen = () => {
               />
             </TouchableOpacity>
             <Text style={{ fontSize: 18, fontWeight: "600" }}>
-              Edit Personal info
+              {ui.editPersonalInfo}
             </Text>
             <View></View>
           </View>
@@ -163,7 +250,7 @@ const EditPersonalInfoScreen = () => {
                 letterSpacing: -0.3,
               }}
             >
-              Enter Your Full Name
+              {ui.enterFullName}
             </Text>
             <View
               style={{
@@ -186,7 +273,7 @@ const EditPersonalInfoScreen = () => {
                   height: "100%",
                   letterSpacing: -0.3,
                 }}
-                placeholder="Enter Your Full Name"
+                placeholder={ui.enterFullName}
                 placeholderTextColor="#999999"
                 value={formData.fullName}
                 onChangeText={(text) => handleInputChange("fullName", text)}
@@ -207,7 +294,7 @@ const EditPersonalInfoScreen = () => {
                 letterSpacing: -0.3,
               }}
             >
-              Enter Your Phone Number
+              {ui.enterPhone}
             </Text>
             <View
               style={{
@@ -230,7 +317,7 @@ const EditPersonalInfoScreen = () => {
                   height: "100%",
                   letterSpacing: -0.3,
                 }}
-                placeholder="Enter phone number"
+                placeholder={ui.enterPhone}
                 placeholderTextColor="#999999"
                 value={formData.phone}
                 onChangeText={(text) => handleInputChange("phone", text)}
@@ -251,7 +338,7 @@ const EditPersonalInfoScreen = () => {
                 letterSpacing: -0.3,
               }}
             >
-              Enter Email Address
+              {ui.enterEmail}
             </Text>
             <View
               style={{
@@ -275,7 +362,7 @@ const EditPersonalInfoScreen = () => {
                   letterSpacing: -0.3,
                   opacity: 0.6
                 }}
-                placeholder="Enter email address"
+                placeholder={ui.enterEmail}
                 placeholderTextColor="#999999"
                 value={formData.email}
                 editable={false}
@@ -298,7 +385,7 @@ const EditPersonalInfoScreen = () => {
                 letterSpacing: -0.3,
               }}
             >
-              Enter Your Address
+              {ui.enterAddress}
             </Text>
             <View
               style={{
@@ -322,7 +409,7 @@ const EditPersonalInfoScreen = () => {
                   textAlignVertical: "top",
                   letterSpacing: -0.3,
                 }}
-                placeholder="Enter your address"
+                placeholder={ui.enterAddress}
                 placeholderTextColor="#999999"
                 value={formData.address}
                 onChangeText={(text) => handleInputChange("address", text)}
@@ -359,7 +446,7 @@ const EditPersonalInfoScreen = () => {
                 letterSpacing: -0.3,
               }}
             >
-              {isLoading ? "Saving..." : "Save"}
+              {isLoading ? ui.saving : ui.save}
             </Text>
           </TouchableOpacity>
 

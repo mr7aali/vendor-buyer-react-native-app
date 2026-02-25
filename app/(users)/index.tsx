@@ -326,6 +326,7 @@ import { useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import { Bell, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
@@ -352,6 +353,7 @@ const normalizeStatus = (value: any) => String(value || "pending").toLowerCase()
 const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const user = useAppSelector(selectCurrentUser);
   const { data: statsData } = useGetUserVendorStatisticsQuery(undefined, {
     refetchOnFocus: true,
@@ -393,15 +395,15 @@ const Dashboard: React.FC = () => {
     const role = String(statsData?.role || "").toLowerCase();
     if (role === "vendor") {
       return [
-        { key: "sales", label: "Total Sales", value: formatMoney(statsData?.totalSales?.value), Icon: TrendingUp },
-        { key: "active", label: "Active Orders", value: String(toNumber(statsData?.activeOrders?.value)), Icon: Zap },
+        { key: "sales", label: t("total_sales", "Total Sales"), value: formatMoney(statsData?.totalSales?.value), Icon: TrendingUp },
+        { key: "active", label: t("active_orders", "Active Orders"), value: String(toNumber(statsData?.activeOrders?.value)), Icon: Zap },
       ];
     }
     return [
-      { key: "completed", label: "Completed Order", value: String(toNumber(statsData?.completedOrders)), Icon: TrendingUp },
-      { key: "active", label: "Active Orders", value: String(toNumber(statsData?.activeOrders)), Icon: Zap },
+      { key: "completed", label: t("completed_order", "Completed Order"), value: String(toNumber(statsData?.completedOrders)), Icon: TrendingUp },
+      { key: "active", label: t("active_orders", "Active Orders"), value: String(toNumber(statsData?.activeOrders)), Icon: Zap },
     ];
-  }, [statsData]);
+  }, [statsData, t]);
 
   const recentOrders = React.useMemo(() => {
     const sorted = [...ordersData].sort((a: any, b: any) => {
@@ -440,7 +442,7 @@ const Dashboard: React.FC = () => {
             />
           </TouchableOpacity>
           <View style={styles.userText}>
-            <Text style={styles.welcomeTitle}>Welcome back</Text>
+            <Text style={styles.welcomeTitle}>{t("welcome_back", "Welcome back")}</Text>
             <Text style={styles.userName}>{userName}</Text>
           </View>
         </View>
@@ -475,9 +477,9 @@ const Dashboard: React.FC = () => {
         {/* QR Scan Section */}
         <View style={styles.qrSection}>
           <View style={styles.qrTextContent}>
-            <Text style={styles.qrTitle}>Scan Vendor QR Code</Text>
+            <Text style={styles.qrTitle}>{t("scan_vendor_qr_code", "Scan Vendor QR Code")}</Text>
             <Text style={styles.qrSubtitle}>
-              Connect with local vendors instantly
+              {t("connect_local_vendors", "Connect with local vendors instantly")}
             </Text>
           </View>
           <TouchableOpacity
@@ -491,23 +493,23 @@ const Dashboard: React.FC = () => {
 
         {/* How It Works Section */}
         <View style={styles.howItWorksCard}>
-          <Text style={styles.sectionTitleWhite}>How It Works</Text>
+          <Text style={styles.sectionTitleWhite}>{t("how_it_works", "How It Works")}</Text>
           <View style={styles.stepsList}>
             <Text style={styles.stepItem}>
-              1. Scan a vendor s QR code or barcode
+              {t("how_step_1", "1. Scan a vendor s QR code or barcode")}
             </Text>
             <Text style={styles.stepItem}>
-              2. Browse their catalog and chat directly
+              {t("how_step_2", "2. Browse their catalog and chat directly")}
             </Text>
             <Text style={styles.stepItem}>
-              3. Negotiate prices and place orders
+              {t("how_step_3", "3. Negotiate prices and place orders")}
             </Text>
-            <Text style={styles.stepItem}>4. Track delivery in real-time</Text>
+            <Text style={styles.stepItem}>{t("how_step_4", "4. Track delivery in real-time")}</Text>
           </View>
         </View>
 
         {/* Recent Order Section (Updated) */}
-        <Text style={styles.sectionTitleMain}>Recent order</Text>
+        <Text style={styles.sectionTitleMain}>{t("recent_order", "Recent order")}</Text>
 
         <View style={{ gap: 15 }}>
           {recentOrders.length ? (
@@ -524,7 +526,7 @@ const Dashboard: React.FC = () => {
                 order?.vendor?.fullName ||
                 order?.vendor?.storename ||
                 order?.buyer?.fullName ||
-                "Customer";
+                t("customer", "Customer");
               const itemTitle =
                 firstItem?.product?.name ||
                 firstItem?.product?.title ||
@@ -557,7 +559,7 @@ const Dashboard: React.FC = () => {
                   </View>
 
                   <Text style={styles.orderAddress} numberOfLines={1}>
-                    {order?.shippingAddress || "Address unavailable"}
+                    {order?.shippingAddress || t("address_unavailable", "Address unavailable")}
                   </Text>
 
                   <View style={styles.ratingRow}>
@@ -583,7 +585,7 @@ const Dashboard: React.FC = () => {
               );
             })
           ) : (
-            <Text style={{ fontSize: 13, color: "#6B7280" }}>No recent orders found.</Text>
+            <Text style={{ fontSize: 13, color: "#6B7280" }}>{t("no_recent_orders_found", "No recent orders found.")}</Text>
           )}
         </View>
       </ScrollView>

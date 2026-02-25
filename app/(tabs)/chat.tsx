@@ -1,4 +1,5 @@
 import { supportTickets } from '@/constants/common';
+import { useTranslation } from '@/hooks/use-translation';
 import { useGetConversationsQuery, useMarkAsReadMutation } from '@/store/api/chatApiSlice';
 import { RootState } from '@/store/store';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ const formatTime = (value: any) => {
 
 export default function ChatTabs() {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = normalizeId(user?.userId || user?.id || (user as any)?._id);
 
@@ -41,7 +43,7 @@ export default function ChatTabs() {
         partner?.businessName ||
         partner?.storename ||
         partner?.email ||
-        'User';
+        t('chat_user_fallback', 'User');
       const text = row?.lastMessage?.messageText || '';
       return String(name).toLowerCase().includes(q) || String(text).toLowerCase().includes(q);
     });
@@ -60,7 +62,7 @@ export default function ChatTabs() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chat</Text>
+        <Text style={styles.headerTitle}>{t('chat_title', 'Chat')}</Text>
         <View style={{ width: 20 }} />
       </View>
 
@@ -69,7 +71,7 @@ export default function ChatTabs() {
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search by name"
+          placeholder={t('chat_search_by_name', 'Search by name')}
           placeholderTextColor="#9CA3AF"
           style={styles.searchInput}
         />
@@ -77,10 +79,10 @@ export default function ChatTabs() {
 
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tab, activeTab === 'chat' && styles.tabActive]} onPress={() => setActiveTab('chat')}>
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>{t('chat_tab_chat', 'Chat')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'support' && styles.tabActive]} onPress={() => setActiveTab('support')}>
-          <Text style={[styles.tabText, activeTab === 'support' && styles.tabTextActive]}>Support</Text>
+          <Text style={[styles.tabText, activeTab === 'support' && styles.tabTextActive]}>{t('chat_tab_support', 'Support')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -88,7 +90,7 @@ export default function ChatTabs() {
         {activeTab === 'chat' ? (
           <View style={styles.listWrap}>
             {isConversationsLoading ? (
-              <Text style={styles.emptyText}>Loading conversations...</Text>
+              <Text style={styles.emptyText}>{t('chat_loading_conversations', 'Loading conversations...')}</Text>
             ) : filteredConversations.length ? (
               filteredConversations.map((conversation: any, index: number) => {
                 const partner = conversation?.partner || conversation?.participant || {};
@@ -98,9 +100,9 @@ export default function ChatTabs() {
                   partner?.businessName ||
                   partner?.storename ||
                   partner?.email ||
-                  'User';
+                  t('chat_user_fallback', 'User');
                 const avatar = partner?.avatar || partner?.logoUrl || 'https://via.placeholder.com/48';
-                const lastText = conversation?.lastMessage?.messageText || 'No messages yet';
+                const lastText = conversation?.lastMessage?.messageText || t('chat_no_messages_yet', 'No messages yet');
                 const unreadCount = Number(conversation?.unreadCount || 0);
                 const messageId = conversation?.lastMessage?.id || conversation?.lastMessage?._id;
 
@@ -119,6 +121,7 @@ export default function ChatTabs() {
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {
+                          role: 'vendor',
                           partnerId,
                           conversationId: normalizeId(conversation?.id || conversation?._id || partnerId),
                           fullname: displayName,
@@ -145,7 +148,7 @@ export default function ChatTabs() {
                 );
               })
             ) : (
-              <Text style={styles.emptyText}>No conversations found.</Text>
+              <Text style={styles.emptyText}>{t('chat_no_conversations_found', 'No conversations found.')}</Text>
             )}
           </View>
         ) : (

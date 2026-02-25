@@ -6,9 +6,12 @@ import {
   ShoppingBag,
   User,
 } from "lucide-react-native";
+import { useTranslation } from "@/hooks/use-translation";
 import React from "react";
 
 export default function UsersLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -35,35 +38,35 @@ export default function UsersLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tab_home", "Home"),
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
+          title: t("tab_chat", "Chat"),
           tabBarIcon: ({ color }) => <MessageCircle size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="order"
         options={{
-          title: "Order",
+          title: t("tab_order", "Order"),
           tabBarIcon: ({ color }) => <Package size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="cart"
         options={{
-          title: "Cart",
+          title: t("tab_cart", "Cart"),
           tabBarIcon: ({ color }) => <ShoppingBag size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("tab_profile", "Profile"),
           tabBarIcon: ({ color }) => <User size={24} color={color} />,
         }}
       />
@@ -71,7 +74,7 @@ export default function UsersLayout() {
       <Tabs.Screen
         name="categoriesScreen"
         options={{
-          title: "Categories",
+          title: t("tab_categories", "Categories"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
           tabBarStyle: {
@@ -85,7 +88,7 @@ export default function UsersLayout() {
       <Tabs.Screen
         name="Information"
         options={{
-          title: "Information",
+          title: t("tab_information", "Information"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
           tabBarStyle: {

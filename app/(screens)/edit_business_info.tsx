@@ -1,4 +1,8 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
+import { setCredentials } from "@/store/slices/authSlice";
+import { RootState } from "@/store/store";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -15,11 +19,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 const BusinessInfoForm = () => {
-  const { data: profileData } = useGetProfileQuery({});
-  const [updateProfile, { isLoading }] = useUpdateProfileMutation();
+  const { language, t } = useTranslation();
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery({});
+  const [updateProfile] = useUpdateProfileMutation();
   const userData = profileData?.data;
+  const dispatch = useDispatch();
+  const authState = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -33,6 +41,81 @@ const BusinessInfoForm = () => {
 
   const [profileImage, setProfileImage] = useState<any>(null);
   const [businessIdImage, setBusinessIdImage] = useState<any>(null);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        editBusinessInfo: "עריכת מידע עסקי",
+        uploadProfilePicture: "העלה תמונת פרופיל",
+        clickUploadProfile: "לחץ להעלאת תמונת פרופיל",
+        enterFullName: "הזן את שמך המלא",
+        enterPhone: "הזן מספר טלפון",
+        enterEmail: "הזן כתובת אימייל",
+        enterAddress: "הזן כתובת",
+        businessId: "מזהה עסק",
+        uploadBusinessId: "העלה מזהה עסק",
+        upload: "העלה",
+        submit: "שלח",
+        missingInfo: "מידע חסר",
+        fillRequired: "נא למלא את כל השדות הנדרשים",
+        missingProfileImage: "חסרה תמונת פרופיל",
+        uploadProfileImage: "נא להעלות תמונת פרופיל",
+        missingDocument: "חסר מסמך",
+        uploadBusinessIdDoc: "נא להעלות מזהה עסק",
+        successBusinessSaved: "המידע העסקי נשמר בהצלחה!",
+        failedBusinessUpdate: "עדכון המידע העסקי נכשל.",
+        uploadFailed: "העלאת הקובץ נכשלה",
+        warning: "אם תשנה מידע עסקי, סטטוס האימות ייבדק מחדש",
+      };
+    }
+    if (language === "hi") {
+      return {
+        editBusinessInfo: "व्यवसाय जानकारी संपादित करें",
+        uploadProfilePicture: "प्रोफाइल तस्वीर अपलोड करें",
+        clickUploadProfile: "अपनी प्रोफाइल इमेज अपलोड करने के लिए क्लिक करें",
+        enterFullName: "अपना पूरा नाम दर्ज करें",
+        enterPhone: "अपना फोन नंबर दर्ज करें",
+        enterEmail: "ईमेल पता दर्ज करें",
+        enterAddress: "अपना पता दर्ज करें",
+        businessId: "व्यवसाय आईडी",
+        uploadBusinessId: "अपना व्यवसाय आईडी अपलोड करें",
+        upload: "अपलोड",
+        submit: "सबमिट करें",
+        missingInfo: "जानकारी अधूरी है",
+        fillRequired: "कृपया सभी आवश्यक फ़ील्ड भरें",
+        missingProfileImage: "प्रोफाइल इमेज नहीं है",
+        uploadProfileImage: "कृपया अपनी प्रोफाइल इमेज अपलोड करें",
+        missingDocument: "दस्तावेज़ नहीं है",
+        uploadBusinessIdDoc: "कृपया अपना व्यवसाय आईडी अपलोड करें",
+        successBusinessSaved: "व्यवसाय जानकारी सफलतापूर्वक सबमिट हुई!",
+        failedBusinessUpdate: "व्यवसाय जानकारी अपडेट नहीं हुई।",
+        uploadFailed: "फ़ाइल अपलोड विफल रहा",
+        warning: "यदि आप कोई व्यवसाय जानकारी बदलते हैं, तो आपका सत्यापन स्टेटस फिर से समीक्षा किया जाएगा",
+      };
+    }
+    return {
+      editBusinessInfo: "Edit Business info",
+      uploadProfilePicture: "Upload Profile Picture",
+      clickUploadProfile: "Click to upload your profile image",
+      enterFullName: "Enter Your Full Name",
+      enterPhone: "Enter your Phone Number",
+      enterEmail: "Enter Email Address",
+      enterAddress: "Enter Your Address",
+      businessId: "Business ID",
+      uploadBusinessId: "Upload your Business ID",
+      upload: "Upload",
+      submit: "Submit",
+      missingInfo: "Missing Information",
+      fillRequired: "Please fill in all required fields",
+      missingProfileImage: "Missing Profile Image",
+      uploadProfileImage: "Please upload your profile image",
+      missingDocument: "Missing Document",
+      uploadBusinessIdDoc: "Please upload your Business ID",
+      successBusinessSaved: "Business information submitted successfully!",
+      failedBusinessUpdate: "Failed to update business information.",
+      uploadFailed: "Failed to upload file",
+      warning: "If you change any business information, your verification status will be reviewed again",
+    };
+  }, [language]);
 
   React.useEffect(() => {
     if (userData) {
@@ -81,8 +164,8 @@ const BusinessInfoForm = () => {
 
         if (!permissionResult.granted) {
           Alert.alert(
-            "Permission Required",
-            "Please grant permission to access photos"
+            t("permission_required", "Permission Required"),
+            t("need_photos_permission", "Please grant permission to access photos")
           );
           return;
         }
@@ -103,7 +186,7 @@ const BusinessInfoForm = () => {
       }
     } catch (error) {
       console.error("Profile image upload error:", error);
-      Alert.alert("Error", "Failed to upload profile image");
+      Alert.alert(t("error", "Error"), ui.uploadFailed);
     }
   };
 
@@ -129,8 +212,8 @@ const BusinessInfoForm = () => {
 
         if (!permissionResult.granted) {
           Alert.alert(
-            "Permission Required",
-            "Please grant permission to access photos"
+            t("permission_required", "Permission Required"),
+            t("need_photos_permission", "Please grant permission to access photos")
           );
           return;
         }
@@ -151,7 +234,7 @@ const BusinessInfoForm = () => {
       }
     } catch (error) {
       console.error("Business ID upload error:", error);
-      Alert.alert("Error", "Failed to upload file");
+      Alert.alert(t("error", "Error"), ui.uploadFailed);
     }
   };
 
@@ -163,38 +246,66 @@ const BusinessInfoForm = () => {
     );
 
     if (emptyFields.length > 0) {
-      Alert.alert("Missing Information", "Please fill in all required fields");
+      Alert.alert(ui.missingInfo, ui.fillRequired);
       return;
     }
 
     if (!profileImage) {
-      Alert.alert("Missing Profile Image", "Please upload your profile image");
+      Alert.alert(ui.missingProfileImage, ui.uploadProfileImage);
       return;
     }
 
     if (!businessIdImage) {
-      Alert.alert("Missing Document", "Please upload your Business ID");
+      Alert.alert(ui.missingDocument, ui.uploadBusinessIdDoc);
       return;
     }
 
     // Submit logic here
     try {
-      const updateData: any = {};
-
-      // Send only vendor table fields without nesting
-      if (formData.fullName) updateData.fullName = formData.fullName;
-      if (formData.phoneNumber) updateData.phone = formData.phoneNumber;
-      if (formData.address) updateData.address = formData.address;
-      if (formData.businessName) updateData.storename = formData.businessName;
+      const updateData: any = {
+        vendor: {
+          fullName: formData.fullName,
+          phone: formData.phoneNumber,
+          address: formData.address,
+          storename: formData.businessName,
+        },
+      };
 
       await updateProfile(updateData).unwrap();
+      await refetchProfile();
 
-      Alert.alert("Success", "Business information submitted successfully!", [
-        { text: "OK", onPress: () => router.back() },
+        if (authState?.accessToken) {
+          const mergedUser = {
+            ...(authState.user || {}),
+            vendor: {
+              ...((authState.user as any)?.vendor || {}),
+              fullName: formData.fullName,
+            phone: formData.phoneNumber,
+            address: formData.address,
+            storename: formData.businessName,
+          },
+          fullName: formData.fullName || (authState.user as any)?.fullName,
+          phone: formData.phoneNumber || (authState.user as any)?.phone,
+          address: formData.address || (authState.user as any)?.address,
+          storename: formData.businessName || (authState.user as any)?.storename,
+        };
+
+        dispatch(
+          setCredentials({
+            user: mergedUser as any,
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken || "",
+          })
+        );
+        await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
+      }
+
+      Alert.alert(t("success", "Success"), ui.successBusinessSaved, [
+        { text: t("ok", "OK"), onPress: () => router.back() },
       ]);
     } catch (error) {
       console.error("Update failed", error);
-      Alert.alert("Error", "Failed to update business information.");
+      Alert.alert(t("error", "Error"), ui.failedBusinessUpdate);
     }
   };
 
@@ -228,7 +339,7 @@ const BusinessInfoForm = () => {
             <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
           </TouchableOpacity>
           <Text style={{ fontSize: 18, fontWeight: "600" }}>
-            Edit Business info
+            {ui.editBusinessInfo}
           </Text>
           <View style={{ width: 24 }} />
         </View>
@@ -270,8 +381,8 @@ const BusinessInfoForm = () => {
                     marginTop: 8,
                     textAlign: "center",
                   }}
-                >
-                  Upload Profile Picture
+                  >
+                  {ui.uploadProfilePicture}
                 </Text>
               </View>
             )}
@@ -284,7 +395,7 @@ const BusinessInfoForm = () => {
               textAlign: "center",
             }}
           >
-            Click to upload your profile image
+            {ui.clickUploadProfile}
           </Text>
         </View>
 
@@ -297,8 +408,8 @@ const BusinessInfoForm = () => {
               color: "#333333",
               marginBottom: 8,
             }}
-          >
-            Enter Your Full Name
+            >
+            {ui.enterFullName}
           </Text>
           <TextInput
             style={{
@@ -311,7 +422,7 @@ const BusinessInfoForm = () => {
               color: "#333333",
               backgroundColor: "#fafafa",
             }}
-            placeholder="Enter email address or number"
+            placeholder={ui.enterFullName}
             placeholderTextColor="#999999"
             value={formData.fullName}
             onChangeText={(text) => handleInputChange("fullName", text)}
@@ -327,8 +438,8 @@ const BusinessInfoForm = () => {
               color: "#333333",
               marginBottom: 8,
             }}
-          >
-            Enter your Phone Number
+            >
+            {ui.enterPhone}
           </Text>
           <TextInput
             style={{
@@ -341,7 +452,7 @@ const BusinessInfoForm = () => {
               color: "#333333",
               backgroundColor: "#fafafa",
             }}
-            placeholder="Enter phone number"
+            placeholder={ui.enterPhone}
             placeholderTextColor="#999999"
             value={formData.phoneNumber}
             onChangeText={(text) => handleInputChange("phoneNumber", text)}
@@ -358,8 +469,8 @@ const BusinessInfoForm = () => {
               color: "#333333",
               marginBottom: 8,
             }}
-          >
-            Enter Email Address
+            >
+            {ui.enterEmail}
           </Text>
           <TextInput
             style={{
@@ -372,7 +483,7 @@ const BusinessInfoForm = () => {
               color: "#333333",
               backgroundColor: "#fafafa",
             }}
-            placeholder="Enter email address"
+            placeholder={ui.enterEmail}
             placeholderTextColor="#999999"
             value={formData.email}
             onChangeText={(text) => handleInputChange("email", text)}
@@ -390,8 +501,8 @@ const BusinessInfoForm = () => {
               color: "#333333",
               marginBottom: 8,
             }}
-          >
-            Enter Your Address
+            >
+            {ui.enterAddress}
           </Text>
           <TextInput
             style={{
@@ -406,7 +517,7 @@ const BusinessInfoForm = () => {
               backgroundColor: "#fafafa",
               textAlignVertical: "top",
             }}
-            placeholder="Enter your address"
+            placeholder={ui.enterAddress}
             placeholderTextColor="#999999"
             value={formData.address}
             onChangeText={(text) => handleInputChange("address", text)}
@@ -434,7 +545,7 @@ const BusinessInfoForm = () => {
               marginBottom: 8,
             }}
           >
-            Business ID
+            {ui.businessId}
           </Text>
           <Text
             style={{
@@ -457,7 +568,7 @@ const BusinessInfoForm = () => {
               marginBottom: 12,
             }}
           >
-            Upload your Business ID
+            {ui.uploadBusinessId}
           </Text>
 
           <TouchableOpacity
@@ -498,7 +609,7 @@ const BusinessInfoForm = () => {
                     marginTop: 8,
                   }}
                 >
-                  Upload
+                  {ui.upload}
                 </Text>
               </View>
             )}
@@ -512,8 +623,7 @@ const BusinessInfoForm = () => {
               textAlign: "center",
             }}
           >
-            If you change any business information, your verification status
-            will be reviewed again
+            {ui.warning}
           </Text>
         </View>
 
@@ -540,7 +650,7 @@ const BusinessInfoForm = () => {
               color: "#ffffff",
             }}
           >
-            Submit
+            {ui.submit}
           </Text>
         </TouchableOpacity>
       </ScrollView>

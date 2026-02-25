@@ -13,7 +13,8 @@
       "silentLaunch": true
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.soriful420.yozietranceapp"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +25,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.soriful420.yozietranceApp"
+      "package": "com.soriful420.yozietranceApp",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -33,6 +35,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "color": "#278687"
+        }
+      ],
       [
         "@stripe/stripe-react-native",
         {

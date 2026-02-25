@@ -2,6 +2,7 @@ import { useAddToCartMutation } from "@/store/api/cartApiSlice";
 import { useCreateOrderMutation } from "@/store/api/orderApiSlice";
 import { useGetProductByIdQuery } from "@/store/api/product_api_slice";
 import { useCreateReviewMutation, useGetProductReviewsQuery } from "@/store/api/reviewApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { RootState } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -26,14 +27,36 @@ import { useSelector } from "react-redux";
 
 const { width } = Dimensions.get("window");
 
+const resolveEntityId = (value: any): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+    if (typeof value._id === "string" || typeof value._id === "number") return String(value._id);
+  }
+  return "";
+};
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const getApiErrorMessage = (err: any, fallback: string) => {
+  if (Array.isArray(err?.data?.messages) && err.data.messages.length) return err.data.messages.join("\n");
+  return err?.data?.message || err?.message || fallback;
+};
+
 const ProductDetails = () => {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { id, productId } = useLocalSearchParams();
-  const actualId = (id || productId) as string;
+  const { id: idParam, productId: productIdParam, orderId: orderIdParam } = useLocalSearchParams();
+  const id = Array.isArray(idParam) ? idParam[0] : idParam;
+  const productId = Array.isArray(productIdParam) ? productIdParam[0] : productIdParam;
+  const routeOrderIdRaw = Array.isArray(orderIdParam) ? orderIdParam[0] : orderIdParam;
+  const routeOrderId = String(routeOrderIdRaw || "");
+  const reviewOrderId = isUuid(routeOrderId) ? routeOrderId : "";
+  const actualId = String(id || productId || "");
   const { data: product, isLoading, error } = useGetProductByIdQuery(actualId, { skip: !actualId });
+  const reviewProductId = resolveEntityId(product) || actualId;
   const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery(
-    { productId: actualId },
-    { skip: !actualId }
+    { productId: reviewProductId },
+    { skip: !reviewProductId }
   );
   const [createOrder, { isLoading: isCreating }] = useCreateOrderMutation();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
@@ -58,33 +81,41 @@ const ProductDetails = () => {
 
   const handleReviewSubmit = async () => {
     if (!user) {
-      Alert.alert("Error", "Please login to submit a review");
+      Alert.alert(t("error", "Error"), t("product_details_login_review", "Please login to submit a review"));
       return;
     }
     if (!userComment.trim()) {
-      Alert.alert("Error", "Please enter a comment");
+      Alert.alert(t("error", "Error"), t("product_details_enter_comment", "Please enter a comment"));
       return;
     }
 
     try {
+      if (!reviewOrderId) {
+        Alert.alert(t("error", "Error"), t("order_details_failed_confirm_pickup", "Valid order id is required to submit review"));
+        return;
+      }
       await createReview({
-        productId: actualId,
+        productId: reviewProductId,
+        orderId: reviewOrderId,
         rating: userRating,
-
+        comment: userComment.trim(),
       }).unwrap();
-      Alert.alert("Success", "Review submitted successfully!");
+      Alert.alert(t("success", "Success"), t("product_details_review_success", "Review submitted successfully!"));
       setIsReviewModalVisible(false);
       setUserComment("");
       setUserRating(5);
     } catch (err: any) {
-      Alert.alert("Error", err?.data?.message || "Failed to submit review");
+      Alert.alert(
+        t("error", "Error"),
+        getApiErrorMessage(err, t("product_details_review_failed", "Failed to submit review")),
+      );
     }
   };
 
   const handleBuyNow = async () => {
     if (!product) return;
     if (!user) {
-      Alert.alert("Error", "Please login to place an order");
+      Alert.alert(t("error", "Error"), t("product_details_login_order", "Please login to place an order"));
       return;
     }
 
@@ -98,16 +129,16 @@ const ProductDetails = () => {
             price: product.price
           }
         ],
-        shippingAddress: "Default Shipping Address", // User should provide this in a real app
+        shippingAddress: t("product_details_default_shipping", "Default Shipping Address"), // User should provide this in a real app
         totalPrice: product.price * quantity,
       };
 
       const result = await createOrder(orderData).unwrap();
-      Alert.alert("Success", "Order placed successfully!", [
-        { text: "OK", onPress: () => router.push("/(users)/order") }
+      Alert.alert(t("success", "Success"), t("product_details_order_success", "Order placed successfully!"), [
+        { text: t("ok", "OK"), onPress: () => router.push("/(users)/order") }
       ]);
     } catch (err: any) {
-      Alert.alert("Error", err?.data?.message || "Failed to place order");
+      Alert.alert(t("error", "Error"), err?.data?.message || t("product_details_order_failed", "Failed to place order"));
     }
   };
 
@@ -122,9 +153,9 @@ const ProductDetails = () => {
   if (!product) {
     return (
       <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FBF9' }}>
-        <Text>Product not found</Text>
+        <Text>{t("product_details_not_found", "Product not found")}</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
-          <Text style={{ color: '#2D8C8C' }}>Go Back</Text>
+          <Text style={{ color: '#2D8C8C' }}>{t("product_details_go_back", "Go Back")}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -155,7 +186,7 @@ const ProductDetails = () => {
       <TouchableOpacity
         onPress={() => {
           if (!user) {
-            Alert.alert("Login Required", "Please login to give a review");
+            Alert.alert(t("product_details_login_required", "Login Required"), t("product_details_login_give_review", "Please login to give a review"));
             return;
           }
           setIsReviewModalVisible(true);
@@ -168,7 +199,7 @@ const ProductDetails = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>Details</Text>
+        <Text style={{ fontSize: 16, fontWeight: "600", color: "#333" }}>{t("product_details_title", "Details")}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -216,26 +247,26 @@ const ProductDetails = () => {
               <Ionicons key={i} name="star" size={14} color={i <= (product.rating || 0) ? "#FFD700" : "#E0E0E0"} />
             ))}
           </View>
-          <Text style={{ fontSize: 12, fontWeight: "bold", color: "#333" }}>
-            {avgRating} <Text style={{ fontWeight: "400", color: "#777", textDecorationLine: "underline" }}>({totalReviews} reviews)</Text>
+        <Text style={{ fontSize: 12, fontWeight: "bold", color: "#333" }}>
+            {avgRating} <Text style={{ fontWeight: "400", color: "#777", textDecorationLine: "underline" }}>({totalReviews} {t("product_details_reviews", "reviews")})</Text>
           </Text>
         </View>
-        <Text style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Sku: {product.sku || "N/A"}</Text>
+        <Text style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{t("product_details_sku", "Sku")}: {product.sku || t("product_details_na", "N/A")}</Text>
 
         {/* Price */}
         <Text style={{ fontSize: 22, fontWeight: "bold", color: "#2D8C8C", marginBottom: 10 }}>${product.price}</Text>
 
         {/* Description */}
-        <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 6 }}>Description</Text>
+        <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 6 }}>{t("product_details_description", "Description")}</Text>
         <Text style={{ fontSize: 13, color: "#666", lineHeight: 20, marginBottom: 20 }}>
-          {product.description || "No description available."}
+          {product.description || t("product_details_no_description", "No description available.")}
         </Text>
 
         {/* Specification Card - Only show if specs exist */}
         {specs.length > 0 && (
           <View style={{ marginBottom: 25, position: 'relative', marginTop: 10 }}>
             <View style={{ backgroundColor: "#FFF", borderRadius: 16, padding: 16, elevation: 3, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 5, shadowOffset: { width: 0, height: 2 } }}>
-              <Text style={{ fontSize: 16, fontWeight: "700", marginBottom: 15, color: "#333" }}>Specification</Text>
+              <Text style={{ fontSize: 16, fontWeight: "700", marginBottom: 15, color: "#333" }}>{t("product_details_specification", "Specification")}</Text>
               {specs.map((item, index) => (
                 <View key={index} style={[
                   { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#F0F0F0", alignItems: "center" },
@@ -252,7 +283,7 @@ const ProductDetails = () => {
         {/* Color Selection - Only show if product has colors */}
         {hasColors && (
           <>
-            <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 10 }}>Color</Text>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 10 }}>{t("product_details_color", "Color")}</Text>
             <View style={{ flexDirection: "row", marginBottom: 20, gap: 12 }}>
               <TouchableOpacity
                 onPress={() => setSelectedColor("Black")}
@@ -277,7 +308,7 @@ const ProductDetails = () => {
           alignItems: "center"
         }}>
 
-          <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 30 }}>Quantity</Text>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 30 }}>{t("product_details_quantity", "Quantity")}</Text>
           <View style={{ marginBottom: 20 }}>
             <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#EFF4F4", width: 120, borderRadius: 8, justifyContent: "space-between", padding: 4 }}>
               <TouchableOpacity onPress={() => setQuantity(Math.max(1, quantity - 1))} style={{ width: 32, height: 32, justifyContent: "center", alignItems: "center", backgroundColor: "#FFF", borderRadius: 6, shadowColor: "#000", shadowOpacity: 0.05, elevation: 1 }}>
@@ -288,20 +319,20 @@ const ProductDetails = () => {
                 <Text style={{ fontSize: 18, color: "#2D8C8C", fontWeight: "bold" }}>+</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 10, color: "#FF6B6B", marginTop: 6 }}>Minimum order quantity: 10</Text>
+            <Text style={{ fontSize: 10, color: "#FF6B6B", marginTop: 6 }}>{t("product_details_min_order_qty", "Minimum order quantity: 10")}</Text>
           </View>
         </View>
 
         {/* Coupon */}
         <View style={{ flexDirection: "row", marginBottom: 20, gap: 10 }}>
           <TextInput
-            placeholder="Add Coupon"
+            placeholder={t("product_details_add_coupon", "Add Coupon")}
             value={coupon}
             onChangeText={setCoupon}
             style={{ flex: 1, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#E0E0E0", borderRadius: 8, paddingHorizontal: 15, height: 44 }}
           />
           <TouchableOpacity style={{ backgroundColor: "#2D8C8C", borderRadius: 8, paddingHorizontal: 20, justifyContent: "center", alignItems: "center", height: 44 }}>
-            <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>Apply</Text>
+            <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 14 }}>{t("product_details_apply", "Apply")}</Text>
           </TouchableOpacity>
         </View>
 
@@ -310,7 +341,7 @@ const ProductDetails = () => {
           onPress={async () => {
             if (!product) return;
             if (!user) {
-              Alert.alert("Error", "Please login to add items to cart");
+              Alert.alert(t("error", "Error"), t("product_details_login_add_cart", "Please login to add items to cart"));
               return;
             }
             try {
@@ -318,17 +349,17 @@ const ProductDetails = () => {
                 productId: product._id || product.id,
                 quantity: quantity
               }).unwrap();
-              Alert.alert("Success", "Product added to cart!", [
-                { text: "OK", onPress: () => router.push("/(users)/cart") }
+              Alert.alert(t("success", "Success"), t("product_details_added_to_cart", "Product added to cart!"), [
+                { text: t("ok", "OK"), onPress: () => router.push("/(users)/cart") }
               ]);
             } catch (err: any) {
-              Alert.alert("Error", err?.data?.message || "Failed to add to cart");
+              Alert.alert(t("error", "Error"), err?.data?.message || t("product_details_failed_add_cart", "Failed to add to cart"));
             }
           }}
           style={[{ borderWidth: 1.5, borderColor: "#2D8C8C", borderRadius: 12, paddingVertical: 14, alignItems: "center", marginBottom: 12 }, isAdding && { opacity: 0.7 }]}
           disabled={isAdding}
         >
-          {isAdding ? <ActivityIndicator color="#2D8C8C" /> : <Text style={{ color: "#2D8C8C", fontWeight: "700", fontSize: 16 }}>Add To Cart</Text>}
+          {isAdding ? <ActivityIndicator color="#2D8C8C" /> : <Text style={{ color: "#2D8C8C", fontWeight: "700", fontSize: 16 }}>{t("product_details_add_to_cart", "Add To Cart")}</Text>}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -336,12 +367,12 @@ const ProductDetails = () => {
           onPress={handleBuyNow}
           disabled={isCreating}
         >
-          {isCreating ? <ActivityIndicator color="white" /> : <Text style={styles.buyBtnText}>Buy ${product.price}</Text>}
+          {isCreating ? <ActivityIndicator color="white" /> : <Text style={styles.buyBtnText}>{t("product_details_buy", "Buy")} ${product.price}</Text>}
         </TouchableOpacity>
 
         {/* Reviews */}
         <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#333", marginBottom: 15 }}>Customer Reviews</Text>
+          <Text style={{ fontSize: 16, fontWeight: "700", color: "#333", marginBottom: 15 }}>{t("product_details_customer_reviews", "Customer Reviews")}</Text>
 
           {isReviewsLoading ? (
             <ActivityIndicator color="#2D8C8C" style={{ marginVertical: 20 }} />
@@ -355,7 +386,7 @@ const ProductDetails = () => {
                   />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#333" }}>{review.user?.fullName || "Unknown User"}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: "#333" }}>{review.user?.fullName || t("product_details_unknown_user", "Unknown User")}</Text>
                       <Text style={{ fontSize: 12, color: "#999" }}>
                         {new Date(review.createdAt).toLocaleDateString()}
                       </Text>
@@ -374,7 +405,7 @@ const ProductDetails = () => {
             ))
           ) : (
             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-              <Text style={{ color: '#777' }}>No reviews yet for this product.</Text>
+              <Text style={{ color: '#777' }}>{t("product_details_no_reviews", "No reviews yet for this product.")}</Text>
             </View>
           )}
         </View>
@@ -391,13 +422,13 @@ const ProductDetails = () => {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: '#333' }}>Give a Review</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#333' }}>{t("product_details_give_review", "Give a Review")}</Text>
               <TouchableOpacity onPress={() => setIsReviewModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>Rating</Text>
+            <Text style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>{t("product_details_rating", "Rating")}</Text>
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => setUserRating(star)}>
@@ -410,11 +441,11 @@ const ProductDetails = () => {
               ))}
             </View>
 
-            <Text style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>Comment</Text>
+            <Text style={{ fontSize: 14, color: '#666', marginBottom: 10 }}>{t("product_details_comment", "Comment")}</Text>
             <TextInput
               multiline
               numberOfLines={4}
-              placeholder="Tell us what you think about this product..."
+              placeholder={t("product_details_comment_placeholder", "Tell us what you think about this product...")}
               value={userComment}
               onChangeText={setUserComment}
               style={{ backgroundColor: '#F8FBF9', borderRadius: 12, padding: 15, height: 100, textAlignVertical: 'top', borderWidth: 1, borderColor: '#EEE', marginBottom: 24 }}
@@ -428,7 +459,7 @@ const ProductDetails = () => {
               {isSubmittingReview ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 16 }}>Submit Review</Text>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 16 }}>{t("product_details_submit_review", "Submit Review")}</Text>
               )}
             </TouchableOpacity>
           </View>

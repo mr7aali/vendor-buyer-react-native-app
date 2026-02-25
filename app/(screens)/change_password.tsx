@@ -1,4 +1,5 @@
 import { useChangePasswordMutation } from '@/store/api/authApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -6,6 +7,7 @@ import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ChangePasswordScreen = () => {
+    const { t } = useTranslation();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +30,7 @@ const ChangePasswordScreen = () => {
                 <TouchableOpacity onPress={() => handleBack()}>
                     <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>Change Password</Text>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>{t("change_password", "Change Password")}</Text>
                 <View style={{ width: 24 }} />
             </View>
 
@@ -37,10 +39,10 @@ const ChangePasswordScreen = () => {
                 {/* Current Password Field */}
                 <View style={{ marginBottom: 20 }}>
                     <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 10 }}>
-                        Current Password
+                        {t("cp_current_password", "Current Password")}
                     </Text>
                     <TextInput
-                        placeholder="Enter old password"
+                        placeholder={t("cp_enter_old_password", "Enter old password")}
                         placeholderTextColor="#9CA3AF"
                         secureTextEntry
                         value={currentPassword}
@@ -61,10 +63,10 @@ const ChangePasswordScreen = () => {
                 {/* New Password Field */}
                 <View style={{ marginBottom: 20 }}>
                     <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 10 }}>
-                        New Password
+                        {t("cp_new_password", "New Password")}
                     </Text>
                     <TextInput
-                        placeholder="Enter new password"
+                        placeholder={t("cp_enter_new_password", "Enter new password")}
                         placeholderTextColor="#9CA3AF"
                         secureTextEntry
                         value={newPassword}
@@ -84,10 +86,10 @@ const ChangePasswordScreen = () => {
                 {/* Confirm Password Field */}
                 <View style={{ marginBottom: 40 }}>
                     <Text style={{ fontSize: 16, fontWeight: '600', color: '#1F2937', marginBottom: 10 }}>
-                        Conform Password
+                        {t("cp_confirm_password", "Confirm Password")}
                     </Text>
                     <TextInput
-                        placeholder="Re-enter new password"
+                        placeholder={t("cp_reenter_new_password", "Re-enter new password")}
                         placeholderTextColor="#9CA3AF"
                         secureTextEntry
                         value={confirmPassword}
@@ -121,7 +123,7 @@ const ChangePasswordScreen = () => {
                     }}
                     onPress={async () => {
                         if (newPassword !== confirmPassword) {
-                            Alert.alert('Error', 'New passwords do not match');
+                            Alert.alert(t("error", "Error"), t("cp_passwords_not_match", "New passwords do not match"));
                             return;
                         }
                         try {
@@ -130,18 +132,18 @@ const ChangePasswordScreen = () => {
                                 oldPassword: currentPassword,
                                 newPassword: newPassword
                             }).unwrap();
-                            Alert.alert('Success', 'Password updated successfully', [
-                                { text: 'OK', onPress: () => router.back() }
+                            Alert.alert(t("success", "Success"), t("cp_updated_successfully", "Password updated successfully"), [
+                                { text: t("ok", "OK"), onPress: () => router.back() }
                             ]);
                         } catch (error: any) {
                             console.error('Password update failed', error);
-                            const errorMessage = error?.data?.message || 'Failed to update password';
-                            Alert.alert('Error', errorMessage);
+                            const errorMessage = error?.data?.message || t("cp_failed_update", "Failed to update password");
+                            Alert.alert(t("error", "Error"), errorMessage);
                         }
                     }}
                 >
                     <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
-                        {isLoading ? "Updating..." : "Update password"}
+                        {isLoading ? t("cp_updating", "Updating...") : t("cp_update_password", "Update password")}
                     </Text>
                 </TouchableOpacity>
 

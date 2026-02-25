@@ -1,11 +1,13 @@
 
 
 import Slider from "@react-native-community/slider";
+import { useTranslation } from "@/hooks/use-translation";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { ChevronLeft, Keyboard, Minus, Plus } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Dimensions,
   StyleSheet,
   Text,
@@ -20,6 +22,7 @@ import { useConnectToVendorMutation } from "@/store/api/connectionApiSlice";
 const { width } = Dimensions.get("window");
 
 export default function ScanQRScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -41,10 +44,10 @@ export default function ScanQRScreen() {
     return (
       <View style={styles.container}>
         <Text style={{ textAlign: "center", marginBottom: 20 }}>
-          We need your permission to show the camera
+          {t("scan_need_camera_permission", "We need your permission to show the camera")}
         </Text>
         <TouchableOpacity onPress={requestPermission} style={styles.button}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
+          <Text style={styles.buttonText}>{t("scan_grant_permission", "Grant Permission")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -62,14 +65,15 @@ export default function ScanQRScreen() {
         router.push({
           pathname: "/(screens)/chat_box",
           params: {
+            role: "buyer",
             partnerId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
             conversationId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
-            name: res.data.vendorId?.storename || res.data.vendorId?.businessName || 'Vendor'
+            name: res.data.vendorId?.storename || res.data.vendorId?.businessName || t("scan_vendor", "Vendor")
           }
         });
       } catch (err: any) {
         console.error("QR Connection error:", err);
-        alert(err?.data?.message || "Failed to connect via QR code");
+        Alert.alert(t("error", "Error"), err?.data?.message || t("scan_failed_connect_qr", "Failed to connect via QR code"));
         // Reset scanned so they can try again
         setTimeout(() => setScanned(false), 2000);
       }
@@ -92,11 +96,11 @@ export default function ScanQRScreen() {
             onPress={() => router.back()}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scan QR Code</Text>
+        <Text style={styles.headerTitle}>{t("scan_qr_code", "Scan QR Code")}</Text>
         <View style={{ width: 28 }} />
       </View>
 
-      <Text style={styles.instructionText}>Scan for auto fill your info</Text>
+      <Text style={styles.instructionText}>{t("scan_autofill_info", "Scan for auto fill your info")}</Text>
 
       {/* Camera and Dynamic Focus Overlay */}
       <View style={styles.cameraWrapper}>
@@ -151,7 +155,7 @@ export default function ScanQRScreen() {
       </View>
 
       <Text style={styles.bottomHint}>
-        Point your camera at the vendor s QR code or barcode
+        {t("scan_point_camera_vendor_qr", "Point your camera at the vendor's QR code or barcode")}
       </Text>
 
       <TouchableOpacity
@@ -160,7 +164,7 @@ export default function ScanQRScreen() {
         onPress={() => setIsModalVisible(true)}
       >
         <Keyboard color="#4A4A4A" size={20} />
-        <Text style={styles.manualButtonText}>Enter Code Manually</Text>
+        <Text style={styles.manualButtonText}>{t("scan_enter_code_manually", "Enter Code Manually")}</Text>
       </TouchableOpacity>
 
       <VendorModal

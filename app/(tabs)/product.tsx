@@ -2,8 +2,11 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,15 +16,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../hooks/use-translation";
+import { useGetProfileQuery } from "../../store/api/authApiSlice";
+import { useDeleteCategoryMutation, useGetCategoriesByVendorQuery } from "../../store/api/categoryApiSlice";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 48) / 2;
 
-import { ActivityIndicator, Alert, RefreshControl } from "react-native";
-import { useGetProfileQuery } from "../../store/api/authApiSlice";
-import { useDeleteCategoryMutation, useGetCategoriesByVendorQuery } from "../../store/api/categoryApiSlice";
-
 const ProductScreen = () => {
+  const { language } = useTranslation();
   const { data: profileData } = useGetProfileQuery({});
   const vendorId = profileData?.data?.vendor?.id || profileData?.data?.vendor?._id;
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,6 +46,61 @@ const ProductScreen = () => {
 
   const [deleteCategory] = useDeleteCategoryMutation();
 
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        title: "מוצרים",
+        searchByCategory: "חיפוש לפי קטגוריה",
+        deleteCategory: "מחיקת קטגוריה",
+        deleteCategoryConfirm: (name: string) => `האם למחוק את "${name}"?`,
+        cancel: "ביטול",
+        delete: "מחיקה",
+        success: "הצלחה",
+        categoryDeleted: "הקטגוריה נמחקה בהצלחה",
+        error: "שגיאה",
+        failedDeleteCategory: "מחיקת הקטגוריה נכשלה",
+        completeVendorProfile: "נא להשלים פרופיל ספק כדי לראות קטגוריות.",
+        failedLoadCategories: "טעינת הקטגוריות נכשלה. נסה שוב.",
+        noCategoriesMatching: (query: string) => `אין קטגוריות שתואמות ל-\"${query}\"`,
+        noCategoriesFound: "לא נמצאו קטגוריות",
+      };
+    }
+    if (language === "hi") {
+      return {
+        title: "प्रोडक्ट",
+        searchByCategory: "कैटेगरी से खोजें",
+        deleteCategory: "कैटेगरी हटाएं",
+        deleteCategoryConfirm: (name: string) => `क्या आप "${name}" को हटाना चाहते हैं?`,
+        cancel: "रद्द करें",
+        delete: "हटाएं",
+        success: "सफलता",
+        categoryDeleted: "कैटेगरी सफलतापूर्वक हटाई गई",
+        error: "त्रुटि",
+        failedDeleteCategory: "कैटेगरी हटाना विफल रहा",
+        completeVendorProfile: "कैटेगरी देखने के लिए अपना vendor profile पूरा करें।",
+        failedLoadCategories: "कैटेगरी लोड नहीं हुई। कृपया फिर से कोशिश करें।",
+        noCategoriesMatching: (query: string) => `"${query}" से मेल खाती कोई कैटेगरी नहीं मिली`,
+        noCategoriesFound: "कोई कैटेगरी नहीं मिली",
+      };
+    }
+    return {
+      title: "Product",
+      searchByCategory: "Search by Category",
+      deleteCategory: "Delete Category",
+      deleteCategoryConfirm: (name: string) => `Are you sure you want to delete "${name}"?`,
+      cancel: "Cancel",
+      delete: "Delete",
+      success: "Success",
+      categoryDeleted: "Category deleted successfully",
+      error: "Error",
+      failedDeleteCategory: "Failed to delete category",
+      completeVendorProfile: "Please complete your vendor profile to see categories.",
+      failedLoadCategories: "Failed to load categories. Please try again.",
+      noCategoriesMatching: (query: string) => `No categories matching "${query}"`,
+      noCategoriesFound: "No categories found",
+    };
+  }, [language]);
+
   const categories = categoryResponse?.data || (Array.isArray(categoryResponse) ? categoryResponse : []);
 
   console.log('ProductScreen - categories length:', categories.length);
@@ -54,22 +112,22 @@ const ProductScreen = () => {
 
   const handleDelete = (id: string, name: string) => {
     Alert.alert(
-      "Delete Category",
-      `Are you sure you want to delete "${name}"?`,
+      ui.deleteCategory,
+      ui.deleteCategoryConfirm(name),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: ui.cancel, style: "cancel" },
         {
-          text: "Delete",
+          text: ui.delete,
           style: "destructive",
           onPress: async () => {
             console.log('ProductScreen - Deleting category ID:', id);
             try {
               const res = await deleteCategory(id).unwrap();
               console.log('ProductScreen - Delete response:', JSON.stringify(res));
-              Alert.alert("Success", "Category deleted successfully");
+              Alert.alert(ui.success, ui.categoryDeleted);
             } catch (err: any) {
               console.error('ProductScreen - Delete ERROR:', JSON.stringify(err));
-              Alert.alert("Error", err?.data?.message || "Failed to delete category");
+              Alert.alert(ui.error, err?.data?.message || ui.failedDeleteCategory);
             }
           }
         }
@@ -86,7 +144,7 @@ const ProductScreen = () => {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Product</Text>
+        <Text style={styles.headerTitle}>{ui.title}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => router.push("/(screens)/addCategory")}
@@ -104,7 +162,7 @@ const ProductScreen = () => {
           style={styles.searchIcon}
         />
         <TextInput
-          placeholder="Search by Category"
+          placeholder={ui.searchByCategory}
           placeholderTextColor="#999"
           style={styles.searchInput}
           value={searchQuery}
@@ -128,14 +186,14 @@ const ProductScreen = () => {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
               {(error as any)?.data?.message === "Vendor not found"
-                ? "Please complete your vendor profile to see categories."
-                : "Failed to load categories. Please try again."}
+                ? ui.completeVendorProfile
+                : ui.failedLoadCategories}
             </Text>
           </View>
         ) : filteredCategories.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {searchQuery ? `No categories matching "${searchQuery}"` : "No categories found"}
+              {searchQuery ? ui.noCategoriesMatching(searchQuery) : ui.noCategoriesFound}
             </Text>
           </View>
         ) : (

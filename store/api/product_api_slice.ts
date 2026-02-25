@@ -5,19 +5,39 @@ const toNumber = (value: any, fallback = 0) => {
     return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const toSpecObject = (items: any[]) =>
+    items.reduce((acc: any, item: any) => {
+        const key = item?.key || item?.label || item?.name;
+        const value = item?.value ?? item?.specificationValue ?? item?.content;
+        if (key) acc[String(key)] = value ?? '';
+        return acc;
+    }, {});
+
 const normalizeSpecification = (product: any) => {
-    // Backend may send specification object or array-like specifications entries.
-    if (product?.specification && typeof product.specification === 'object') {
+    // Common shape: object map, e.g. { brand: "JBL" }
+    if (
+        product?.specification &&
+        typeof product.specification === 'object' &&
+        !Array.isArray(product.specification)
+    ) {
         return product.specification;
     }
 
+    // Common shape: array entries, e.g. [{ label: "Brand", value: "JBL" }]
+    if (Array.isArray(product?.specification)) {
+        return toSpecObject(product.specification);
+    }
+
     if (Array.isArray(product?.specifications)) {
-        return product.specifications.reduce((acc: any, item: any) => {
-            const key = item?.key || item?.label || item?.name;
-            const value = item?.value;
-            if (key) acc[String(key)] = value ?? '';
-            return acc;
-        }, {});
+        return toSpecObject(product.specifications);
+    }
+
+    // Some backends return under these aliases.
+    if (Array.isArray(product?.productSpecifications)) {
+        return toSpecObject(product.productSpecifications);
+    }
+    if (Array.isArray(product?.specificationList)) {
+        return toSpecObject(product.specificationList);
     }
 
     return {};
@@ -86,6 +106,18 @@ export const productApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: (result, error, { id }) => [{ type: 'Product', id }, { type: 'Product', id: 'LIST' }],
         }),
+        createProductSpecification: builder.mutation<any, { productId: string; label: string; value: string }>({
+            query: ({ productId, label, value }) => ({
+                url: '/products/specification/create',
+                method: 'POST',
+                body: {
+                    productId: String(productId),
+                    label: String(label),
+                    value: String(value),
+                },
+            }),
+            invalidatesTags: (result, error, arg) => [{ type: 'Product', id: arg.productId }, { type: 'Product', id: 'LIST' }],
+        }),
         deleteProduct: builder.mutation({
             query: (id) => ({
                 url: `/products/${id}`,
@@ -102,5 +134,6 @@ export const {
     useGetProductByIdQuery,
     useCreateProductMutation,
     useUpdateProductMutation,
+    useCreateProductSpecificationMutation,
     useDeleteProductMutation,
 } = productApiSlice;

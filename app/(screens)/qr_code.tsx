@@ -1,6 +1,7 @@
 
 import { useGetProfileQuery } from '@/store/api/authApiSlice';
 import { useGetVendorQrQuery } from '@/store/api/connectionApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { useAppSelector } from '@/store/hooks';
 import { selectCurrentUser } from '@/store/slices/authSlice';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 
 const AbcdStoreCard = () => {
+    const { language } = useTranslation();
     const user = useAppSelector(selectCurrentUser);
     const { data: profileData } = useGetProfileQuery(undefined, { refetchOnFocus: true });
 
@@ -42,16 +44,56 @@ const AbcdStoreCard = () => {
     const storeUrl = `ABCD.store/v/${vendorCode}`;
     const qrDataUrl = qrData?.qrDataUrl;
 
+    const ui = React.useMemo(() => {
+        if (language === "he") {
+            return {
+                myQrCode: "קוד ה-QR שלי",
+                officialStoreLink: "קישור חנות רשמי",
+                shareQrCode: "שתף קוד QR",
+                vendorCode: "קוד ספק",
+                copy: "העתק",
+                copied: "הועתק",
+                linkCopied: "הקישור הועתק ללוח!",
+                shareMessage: `בדקו את החנות הרשמית שלנו: ${storeUrl}`,
+                qrFallback: "לא ניתן היה לטעון QR מהשרת. מוצג QR מקומי.",
+            };
+        }
+        if (language === "hi") {
+            return {
+                myQrCode: "मेरा QR कोड",
+                officialStoreLink: "ऑफिशियल स्टोर लिंक",
+                shareQrCode: "QR कोड शेयर करें",
+                vendorCode: "वेंडर कोड",
+                copy: "कॉपी करें",
+                copied: "कॉपी हुआ",
+                linkCopied: "लिंक क्लिपबोर्ड में कॉपी हो गया!",
+                shareMessage: `हमारे आधिकारिक स्टोर को देखें: ${storeUrl}`,
+                qrFallback: "सर्वर QR लोड नहीं हुआ। लोकल QR दिखाया जा रहा है।",
+            };
+        }
+        return {
+            myQrCode: "My QR Code",
+            officialStoreLink: "Official Store Link",
+            shareQrCode: "Share QR Code",
+            vendorCode: "Vendor Code",
+            copy: "Copy",
+            copied: "Copied",
+            linkCopied: "Link copied to clipboard!",
+            shareMessage: `Check out our official store: ${storeUrl}`,
+            qrFallback: "Could not load server QR. Showing local fallback QR.",
+        };
+    }, [language, storeUrl]);
+
     const copyToClipboard = async () => {
         await Clipboard.setStringAsync(storeUrl);
-        Alert.alert('Copied', 'Link copied to clipboard!');
+        Alert.alert(ui.copied, ui.linkCopied);
     };
 
     // Function for the Share button
     const onShare = async () => {
         try {
             await Share.share({
-                message: `Check out our official store: ${storeUrl}`,
+                message: ui.shareMessage,
             });
         } catch (error) {
             // Check if error is an instance of Error to access .message safely
@@ -76,7 +118,7 @@ const AbcdStoreCard = () => {
                 <TouchableOpacity onPress={() => router.back()}>
                     <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>My QR Code</Text>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>{ui.myQrCode}</Text>
                 <View style={{ width: 24 }} />
             </View>
 
@@ -106,7 +148,7 @@ const AbcdStoreCard = () => {
                     </Text>
 
                     <Text style={{ fontSize: 24, fontWeight: '600', color: '#328888', marginBottom: 24 }}>
-                        Official Store Link
+                        {ui.officialStoreLink}
                     </Text>
 
                     {/* QR Code Section */}
@@ -141,7 +183,7 @@ const AbcdStoreCard = () => {
                     </View>
                     {isQrError ? (
                         <Text style={{ color: '#B45309', fontSize: 12, marginBottom: 12 }}>
-                            Could not load server QR. Showing local fallback QR.
+                            {ui.qrFallback}
                         </Text>
                     ) : null}
 
@@ -159,13 +201,13 @@ const AbcdStoreCard = () => {
                             marginBottom: 24,
                         }}
                     >
-                        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>Share QR Code</Text>
+                        <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>{ui.shareQrCode}</Text>
                     </TouchableOpacity>
 
                     {/* Vendor Input Section */}
                     <View style={{ width: '100%' }}>
                         <Text style={{ fontSize: 16, color: '#444', fontWeight: '500', marginBottom: 10 }}>
-                            Vendor Code
+                            {ui.vendorCode}
                         </Text>
 
                         <View style={{
@@ -191,7 +233,7 @@ const AbcdStoreCard = () => {
                                     alignItems: 'center'
                                 }}
                             >
-                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>Copy</Text>
+                                <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '600' }}>{ui.copy}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

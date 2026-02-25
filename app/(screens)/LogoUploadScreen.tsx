@@ -1,6 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
+import { useTranslation } from "@/hooks/use-translation";
 import {
   Alert,
   Image,
@@ -14,17 +15,39 @@ import { useDispatch } from "react-redux";
 import { updateVendorRegistration } from "../../store/slices/registrationSlice";
 
 const LogoUploadScreen: React.FC = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const dispatch = useDispatch();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        uploadBusinessLogo: "העלה לוגו עסקי",
+        upload: "העלה",
+        submit: "שלח",
+      };
+    }
+    if (language === "hi") {
+      return {
+        uploadBusinessLogo: "अपना व्यवसाय लोगो अपलोड करें",
+        upload: "अपलोड",
+        submit: "सबमिट करें",
+      };
+    }
+    return {
+      uploadBusinessLogo: "Upload your business logo",
+      upload: "Upload",
+      submit: "Submit",
+    };
+  }, [language]);
 
   const handleImagePicker = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Denied",
-        "Sorry, we need camera roll permissions to make this work!"
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
       );
       return;
     }
@@ -41,7 +64,7 @@ const LogoUploadScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("ImagePicker Error: ", error);
-      Alert.alert("Error", "Something went wrong while picking the image.");
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image. Please try again."));
     }
   };
 
@@ -55,7 +78,7 @@ const LogoUploadScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.label}>Upload your business logo</Text>
+        <Text style={styles.label}>{ui.uploadBusinessLogo}</Text>
 
         <TouchableOpacity
           style={styles.uploadBox}
@@ -75,7 +98,7 @@ const LogoUploadScreen: React.FC = () => {
                 }}
                 style={styles.cameraIcon}
               />
-              <Text style={styles.uploadText}>Upload</Text>
+              <Text style={styles.uploadText}>{ui.upload}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -86,7 +109,7 @@ const LogoUploadScreen: React.FC = () => {
         onPress={handleSubmit}
         activeOpacity={0.8}
       >
-        <Text style={styles.submitText}>Submit</Text>
+        <Text style={styles.submitText}>{ui.submit}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );

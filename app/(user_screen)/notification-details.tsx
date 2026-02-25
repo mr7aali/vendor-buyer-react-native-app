@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useTranslation } from "@/hooks/use-translation";
 import React from "react";
 import {
   Image,
@@ -12,7 +13,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function NotificationDetailsScreen() {
+  const { t } = useTranslation();
   const params = useLocalSearchParams();
+  const title = typeof params.title === "string" ? params.title : "";
+  const message = typeof params.message === "string" ? params.message : "";
+  const createdAt = typeof params.createdAt === "string" ? params.createdAt : "";
+  const parsedDate = createdAt ? new Date(createdAt) : null;
+  const formattedTime =
+    parsedDate && !Number.isNaN(parsedDate.getTime())
+      ? parsedDate.toLocaleString()
+      : t("notif_just_now", "Just now");
 
   return (
     <SafeAreaView style={styles.container}>
@@ -21,7 +31,7 @@ export default function NotificationDetailsScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notification Details</Text>
+        <Text style={styles.headerTitle}>{t("notif_details_title", "Notification Details")}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -36,20 +46,22 @@ export default function NotificationDetailsScreen() {
 
         {/* Message Card */}
         <View style={styles.infoCard}>
-          <Text style={styles.statusBadge}>Delivery Update</Text>
+          <Text style={styles.statusBadge}>{t("notif_update_badge", "Delivery Update")}</Text>
           <Text style={styles.messageTitle}>
-            Your delivery has been successfully completed!!
+            {title || t("notif_default_title", "Your delivery has been successfully completed!!")}
           </Text>
           <Text style={styles.timeText}>
-            <Ionicons name="time-outline" size={14} /> 1 day ago
+            <Ionicons name="time-outline" size={14} /> {formattedTime}
           </Text>
 
           <View style={styles.divider} />
 
           <Text style={styles.description}>
-            Hello, your order #12345 has been delivered to your address. Thank
-            you for choosing our service! If you have any issues with your
-            delivery, please contact our support team within 24 hours.
+            {message ||
+              t(
+                "notif_default_message",
+                "Hello, your order has been delivered to your address. Thank you for choosing our service!"
+              )}
           </Text>
         </View>
 
@@ -58,7 +70,7 @@ export default function NotificationDetailsScreen() {
           style={styles.button}
           onPress={() => router.replace("/(users)")}
         >
-          <Text style={styles.buttonText}>Back to Home</Text>
+          <Text style={styles.buttonText}>{t("notif_back_home", "Back to Home")}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

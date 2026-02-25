@@ -5,8 +5,10 @@ import "react-native-reanimated";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { Provider, useSelector } from 'react-redux';
 import { SocketProvider } from "../context/SocketContext";
+import { registerForPushNotificationsAsync, syncPushTokenToBackend } from "../services/pushNotifications";
 import { useGetProfileQuery } from "../store/api/authApiSlice";
 import { setCredentials } from '../store/slices/authSlice';
+import { setLanguage } from '../store/slices/languageSlice';
 import { RootState, store } from '../store/store';
 import "./global.css";
 
@@ -15,6 +17,7 @@ const AuthSync = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.accessToken);
   const refreshToken = useSelector((state: RootState) => state.auth.refreshToken);
+  const syncedPushTokenRef = React.useRef<string | null>(null);
 
   const { data: profileData } = useGetProfileQuery(undefined, {
     skip: !token
@@ -40,6 +43,36 @@ const AuthSync = () => {
     }
   }, [profileData, token, refreshToken, dispatch, user]);
 
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const registerAndSyncPushToken = async () => {
+      try {
+        if (!token) return;
+
+        const tokens = await registerForPushNotificationsAsync();
+        if (!tokens || !isMounted) return;
+
+        const tokenKey = `${tokens.expoPushToken || ""}|${tokens.nativePushToken || ""}`;
+        if (!tokenKey.replace("|", "")) return;
+        if (tokenKey === syncedPushTokenRef.current) return;
+
+        const synced = await syncPushTokenToBackend(tokens, token);
+        if (synced && isMounted) {
+          syncedPushTokenRef.current = tokenKey;
+        }
+      } catch (error) {
+        console.warn("Push token registration/sync effect failed.", error);
+      }
+    };
+
+    registerAndSyncPushToken();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
   return null;
 };
 
@@ -47,22 +80,61 @@ export default function RootLayout() {
   const [isReady, setIsReady] = React.useState(false);
   const stripePublishableKey = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
 
-  // Auto-login logic
+  // Startup auth routing logic
   React.useEffect(() => {
     const checkLogin = async () => {
       let shouldRedirect = false;
       let targetPath = "/(onboarding)";
 
       try {
-        // Force startup flow to always begin from onboarding.
-        targetPath = "/(onboarding)";
+        const savedLanguage = await AsyncStorage.getItem("app_language");
+        if (savedLanguage === "en" || savedLanguage === "he" || savedLanguage === "hi") {
+          store.dispatch(setLanguage(savedLanguage));
+        }
+
+        const accessToken = await AsyncStorage.getItem("accessToken");
+        const refreshToken = await AsyncStorage.getItem("refreshToken");
+        const rawUser = await AsyncStorage.getItem("user");
+        const storedRole = (await AsyncStorage.getItem("userRole")) || "";
+
+        let parsedUser: any = null;
+        if (rawUser) {
+          try {
+            parsedUser = JSON.parse(rawUser);
+          } catch {
+            parsedUser = null;
+          }
+        }
+
+        if (accessToken && parsedUser) {
+          store.dispatch(
+            setCredentials({
+              user: parsedUser,
+              accessToken,
+              refreshToken: refreshToken || "",
+            })
+          );
+
+          const detectedRole = String(
+            parsedUser?.userType ||
+            parsedUser?.role ||
+            storedRole ||
+            (parsedUser?.vendor ? "vendor" : parsedUser?.buyer ? "buyer" : "")
+          ).toLowerCase();
+
+          targetPath = detectedRole === "vendor" ? "/(tabs)" : "/(users)";
+        } else {
+          // Not logged in -> onboarding/auth flow
+          targetPath = "/(onboarding)";
+        }
+
         shouldRedirect = true;
       } catch (e) {
         console.error('Auto-login failed:', e);
       } finally {
         setIsReady(true);
         // Delay redirect slightly so navigator is mounted before route change.
-        if (shouldRedirect) {
+        if (shouldRedirect && targetPath !== "/(onboarding)") {
           setTimeout(() => {
             router.replace(targetPath as any);
           }, 500);

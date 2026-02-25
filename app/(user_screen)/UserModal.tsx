@@ -45,6 +45,7 @@ const VendorModal: React.FC<VendorModalProps> = ({
       router.push({
         pathname: "/(screens)/chat_box",
         params: {
+          role: "buyer",
           partnerId: vendor.userId || vendor.id || res.id,
           conversationId: vendor.userId || vendor.id || res.id,
           name: vendor.businessName || vendor.name || 'Vendor'

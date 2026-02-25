@@ -1,10 +1,12 @@
 import { useGetProfileQuery, useUpdateProfileMutation } from "@/store/api/authApiSlice";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTranslation } from "@/hooks/use-translation";
+import { setCredentials } from "@/store/slices/authSlice";
+import { RootState } from "@/store/store";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,206 +20,207 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useDispatch, useSelector } from "react-redux";
 
 interface FormData {
   fullName: string;
   email: string;
-  password: string;
-  confirmPassword: string;
   phone: string;
   dob: Date;
-  category: string;
-  address: string;
+  gender: string;
 }
 
+const GENDER_OPTIONS = ["male", "female"] as const;
+const normalizeGender = (value?: string) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "male" || normalized === "female" ? normalized : "";
+};
+
 const EditProfileScreen = () => {
-  const { data: profileData } = useGetProfileQuery({});
+  const { t } = useTranslation();
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery({});
   const [updateProfile, { isLoading }] = useUpdateProfileMutation();
   const userData = profileData?.data;
+  const dispatch = useDispatch();
+  const authState = useSelector((state: RootState) => state.auth);
 
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     email: "",
-    password: "",
-    confirmPassword: "",
     phone: "",
     dob: new Date(),
-    category: "",
-    address: "",
+    gender: "",
   });
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showGenderModal, setShowGenderModal] = useState(false);
+
   useEffect(() => {
-    if (userData) {
-      setFormData((prev) => ({
-        ...prev,
-        fullName: userData.buyer.fullName || userData.name || "",
-        email: userData.email || "",
-        phone: userData.buyer.phone || userData.phoneNumber || "",
-        address: userData.buyer.address || "",
-        // Dates need parsing if string
-        // dob: userData.dob ? new Date(userData.dob) : new Date(), 
-      }));
-    }
+    if (!userData) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      fullName: userData?.buyer?.fullName || userData?.name || "",
+      email: userData?.email || "",
+      phone: userData?.buyer?.phone || userData?.phoneNumber || "",
+      gender: normalizeGender(userData?.buyer?.gender),
+      dob: userData?.buyer?.dob ? new Date(userData.buyer.dob) : prev.dob,
+    }));
   }, [userData]);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-
-  const categories = ["Business", "Personal", "Shopping", "Others"];
+  const ui = useMemo(
+    () => ({
+      editProfile: t("edit_profile", "Edit Profile"),
+      fullName: t("full_name", "Full name"),
+      email: t("email_address", "alice@example.com"),
+      phone: t("phone_number", "Phone number"),
+      date: t("date_placeholder", "mm/dd/yyyy"),
+      gender: t("gender", "Gender"),
+      chooseGender: t("choose_gender", "Choose Gender"),
+      save: t("save", "Save"),
+      saving: t("saving", "Saving..."),
+      profileSaved: t("profile_saved", "Profile information saved!"),
+      failedSave: t("failed_save", "Failed to save profile information"),
+    }),
+    [t]
+  );
 
   const handleChange = (name: keyof FormData, value: string | Date) => {
-    setFormData({ ...formData, [name]: value } as FormData);
+    setFormData((prev) => ({ ...prev, [name]: value } as FormData));
   };
 
-  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+  const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
-    if (selectedDate) {
-      handleChange("dob", selectedDate);
-    }
+    if (selectedDate) handleChange("dob", selectedDate);
   };
 
   const handleSave = async () => {
     try {
-      const updateData: any = {};
-
-      // Send only vendor table fields without nesting
-      if (formData.fullName) updateData.fullName = formData.fullName;
-      if (formData.phone) updateData.phone = formData.phone;
-      if (formData.address) updateData.address = formData.address;
+      const normalizedGender = normalizeGender(formData.gender);
+      const updateData: any = {
+        buyer: {
+          fullName: formData.fullName,
+          phone: formData.phone,
+          ...(normalizedGender ? { gender: normalizedGender } : {}),
+        },
+      };
 
       await updateProfile(updateData).unwrap();
-      Alert.alert("Success", "Profile information saved!");
+      await refetchProfile();
+
+      if (authState?.accessToken) {
+        const mergedUser = {
+          ...(authState.user || {}),
+          buyer: {
+            ...((authState.user as any)?.buyer || {}),
+            fullName: formData.fullName,
+            phone: formData.phone,
+            ...(normalizedGender ? { gender: normalizedGender } : {}),
+          },
+          fullName: formData.fullName || (authState.user as any)?.fullName,
+          phone: formData.phone || (authState.user as any)?.phone,
+        };
+
+        dispatch(
+          setCredentials({
+            user: mergedUser as any,
+            accessToken: authState.accessToken,
+            refreshToken: authState.refreshToken || "",
+          })
+        );
+        await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
+      }
+
+      Alert.alert(t("success", "Success"), ui.profileSaved);
       router.back();
     } catch (error) {
       console.error("Failed to update profile", error);
-      Alert.alert("Error", "Failed to save profile information");
+      Alert.alert(t("error", "Error"), ui.failedSave);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <MaterialCommunityIcons name="chevron-left" size={28} color="#333" />
+          <MaterialCommunityIcons name="chevron-left" size={30} color="#2F3437" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>{ui.editProfile}</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <InputGroup
-            label="Full name"
-            value={formData.fullName}
-            onChange={(val) => handleChange("fullName", val)}
-          />
-
-          <InputGroup
-            label="E-mail address"
-            value={formData.email}
-            keyboardType="email-address"
-            onChange={(val) => handleChange("email", val)}
-          />
-
-          {/* Password */}
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Password"
-              secureTextEntry={!showPassword}
-              value={formData.password}
-              onChangeText={(val) => handleChange("password", val)}
+              placeholder={ui.fullName}
+              value={formData.fullName}
+              onChangeText={(val) => handleChange("fullName", val)}
+              placeholderTextColor="#7C8585"
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <MaterialCommunityIcons
-                name={showPassword ? "eye-outline" : "eye-off-outline"}
-                size={20}
-                color="#AAA"
-              />
-            </TouchableOpacity>
           </View>
 
-          {/* Date Picker */}
-          <TouchableOpacity
-            style={styles.inputContainer}
-            onPress={() => setShowDatePicker(true)}
-          >
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={[styles.input, styles.readonlyInput]}
+              value={formData.email}
+              editable={false}
+              placeholder={ui.email}
+              placeholderTextColor="#7C8585"
+            />
+            <MaterialCommunityIcons name="lock-outline" size={20} color="#8B9494" />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={ui.phone}
+              value={formData.phone}
+              onChangeText={(val) => handleChange("phone", val)}
+              keyboardType="phone-pad"
+              placeholderTextColor="#7C8585"
+            />
+          </View>
+
+          <TouchableOpacity style={styles.inputContainer} onPress={() => setShowDatePicker(true)}>
             <Text style={styles.inputText}>
-              {formData.dob.toLocaleDateString()}
+              {formData.dob ? formData.dob.toLocaleDateString("en-US") : ui.date}
             </Text>
-            <MaterialCommunityIcons
-              name="calendar-month-outline"
-              size={20}
-              color="#AAA"
-            />
+            <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#8B9494" />
           </TouchableOpacity>
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={formData.dob}
-              mode="date"
-              onChange={onDateChange}
-            />
-          )}
+          {showDatePicker && <DateTimePicker value={formData.dob} mode="date" onChange={onDateChange} />}
 
-          {/* Category */}
-          <TouchableOpacity
-            style={styles.inputContainer}
-            onPress={() => setShowCategoryModal(true)}
-          >
-            <Text
-              style={[
-                styles.inputText,
-                { color: formData.category ? "#333" : "#999" },
-              ]}
-            >
-              {formData.category || "Select Category"}
+          <TouchableOpacity style={styles.inputContainer} onPress={() => setShowGenderModal(true)}>
+            <Text style={[styles.inputText, { color: formData.gender ? "#2F3437" : "#7C8585" }]}>
+              {formData.gender
+                ? formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1)
+                : ui.gender}
             </Text>
-            <MaterialCommunityIcons
-              name="chevron-down"
-              size={24}
-              color="#AAA"
-            />
+            <MaterialCommunityIcons name="chevron-down" size={24} color="#6A7474" />
           </TouchableOpacity>
 
-          <InputGroup
-            label="Business Address"
-            value={formData.address}
-            onChange={(val) => handleChange("address", val)}
-          />
-
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>{isLoading ? "Saving..." : "Save"}</Text>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isLoading}>
+            <Text style={styles.saveButtonText}>{isLoading ? ui.saving : ui.save}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Category Modal */}
-      <Modal visible={showCategoryModal} transparent animationType="slide">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          onPress={() => setShowCategoryModal(false)}
-        >
+      <Modal visible={showGenderModal} transparent animationType="slide">
+        <TouchableOpacity style={styles.modalOverlay} onPress={() => setShowGenderModal(false)}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Choose Category</Text>
-            {categories.map((item) => (
+            <Text style={styles.modalTitle}>{ui.chooseGender}</Text>
+            {GENDER_OPTIONS.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={styles.modalItem}
                 onPress={() => {
-                  handleChange("category", item);
-                  setShowCategoryModal(false);
+                  handleChange("gender", item);
+                  setShowGenderModal(false);
                 }}
               >
-                <Text style={styles.modalItemText}>{item}</Text>
+                <Text style={styles.modalItemText}>{item.charAt(0).toUpperCase() + item.slice(1)}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -227,63 +230,43 @@ const EditProfileScreen = () => {
   );
 };
 
-interface InputGroupProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  keyboardType?: "default" | "email-address" | "numeric" | "phone-pad";
-}
-
-const InputGroup: React.FC<InputGroupProps> = ({
-  label,
-  value,
-  onChange,
-  keyboardType = "default",
-}) => (
-  <View style={styles.inputContainer}>
-    <TextInput
-      style={styles.input}
-      placeholder={label}
-      value={value}
-      onChangeText={onChange}
-      keyboardType={keyboardType}
-    />
-  </View>
-);
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAF9" },
+  container: { flex: 1, backgroundColor: "#EEF2F1" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    height: 60,
-    marginBottom: 40,
+    height: 64,
+    marginBottom: 18,
   },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
-  backBtn: { backgroundColor: "#F0F2F1", borderRadius: 10, padding: 5 },
+  headerTitle: { fontSize: 32 / 2, fontWeight: "700", color: "#2F3437" },
+  backBtn: { padding: 2 },
+  headerSpacer: { width: 30 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EBF2F0",
+    backgroundColor: "#DDE4E3",
     borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 55,
-    marginBottom: 15,
+    paddingHorizontal: 14,
+    height: 54,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#D6DEDD",
   },
-  input: { flex: 1, fontSize: 15, color: "#333" },
-  inputText: { flex: 1, fontSize: 15, color: "#333" },
+  input: { flex: 1, fontSize: 28 / 2, color: "#2F3437" },
+  readonlyInput: { color: "#7A8484" },
+  inputText: { flex: 1, fontSize: 28 / 2, color: "#2F3437" },
   saveButton: {
-    backgroundColor: "#2D8282",
-    height: 55,
+    backgroundColor: "#2D8A8A",
+    height: 54,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 12,
   },
-  saveButtonText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
+  saveButtonText: { color: "#FFF", fontSize: 34 / 2, fontWeight: "700" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -297,12 +280,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 15,
+    fontWeight: "700",
+    marginBottom: 12,
     textAlign: "center",
   },
   modalItem: {
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderBottomWidth: 0.5,
     borderBottomColor: "#EEE",
   },

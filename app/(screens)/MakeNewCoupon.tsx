@@ -1,4 +1,5 @@
 import { useCreateCouponMutation } from "@/store/api/couponApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter } from "expo-router";
@@ -18,8 +19,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MakeNewCoupon: React.FC = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
-  const [createCoupon, { isLoading }] = useCreateCouponMutation();
+  const [createCoupon] = useCreateCouponMutation();
 
   // State for form fields
   const [name, setName] = useState("");
@@ -31,6 +33,70 @@ const MakeNewCoupon: React.FC = () => {
   const [validUntil, setValidUntil] = useState(new Date());
   const [usageLimit, setUsageLimit] = useState("");
   const [showDatePicker, setShowDatePicker] = useState<"from" | "until" | null>(null);
+
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        makeNewCoupon: "צור קופון חדש",
+        couponName: "שם קופון (לדוגמה: Summer Sale)",
+        couponCode: "קוד קופון (לדוגמה: SAVE10)",
+        percentage: "אחוזים",
+        fixedAmount: "סכום קבוע",
+        discountPercentage: "הנחה % (לדוגמה: 10)",
+        discountAmount: "סכום הנחה (לדוגמה: 50)",
+        minPurchase: "סכום רכישה מינימלי (אופציונלי)",
+        usageLimit: "מגבלת שימוש (אופציונלי)",
+        validFrom: "בתוקף מתאריך",
+        validUntil: "בתוקף עד",
+        createCoupon: "צור קופון",
+        pleaseEnterName: "נא להזין שם קופון",
+        pleaseEnterCode: "נא להזין קוד קופון",
+        pleaseEnterValidDiscount: "נא להזין ערך הנחה תקין",
+        couponCreated: "הקופון נוצר בהצלחה!",
+        failedCreateCoupon: "יצירת הקופון נכשלה. נסה שוב.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        makeNewCoupon: "नया कूपन बनाएं",
+        couponName: "कूपन नाम (जैसे, Summer Sale)",
+        couponCode: "कूपन कोड (जैसे, SAVE10)",
+        percentage: "प्रतिशत",
+        fixedAmount: "फिक्स्ड राशि",
+        discountPercentage: "डिस्काउंट % (जैसे, 10)",
+        discountAmount: "डिस्काउंट राशि (जैसे, 50)",
+        minPurchase: "न्यूनतम खरीद राशि (वैकल्पिक)",
+        usageLimit: "उपयोग सीमा (वैकल्पिक)",
+        validFrom: "वैध प्रारंभ",
+        validUntil: "वैध समाप्ति",
+        createCoupon: "कूपन बनाएं",
+        pleaseEnterName: "कृपया कूपन नाम दर्ज करें",
+        pleaseEnterCode: "कृपया कूपन कोड दर्ज करें",
+        pleaseEnterValidDiscount: "कृपया मान्य डिस्काउंट दर्ज करें",
+        couponCreated: "कूपन सफलतापूर्वक बन गया!",
+        failedCreateCoupon: "कूपन बनाना विफल रहा। कृपया फिर से प्रयास करें।",
+      };
+    }
+    return {
+      makeNewCoupon: "Make a New Coupon",
+      couponName: "Coupon Name (e.g., Summer Sale)",
+      couponCode: "Coupon Code (e.g., SAVE10)",
+      percentage: "Percentage",
+      fixedAmount: "Fixed Amount",
+      discountPercentage: "Discount % (e.g., 10)",
+      discountAmount: "Discount Amount (e.g., 50)",
+      minPurchase: "Min. Purchase Amount (optional)",
+      usageLimit: "Usage Limit (optional)",
+      validFrom: "Valid From",
+      validUntil: "Valid Until",
+      createCoupon: "Create a coupon",
+      pleaseEnterName: "Please enter a coupon name",
+      pleaseEnterCode: "Please enter a coupon code",
+      pleaseEnterValidDiscount: "Please enter a valid discount value",
+      couponCreated: "Coupon created successfully!",
+      failedCreateCoupon: "Failed to create coupon. Please try again.",
+    };
+  }, [language]);
 
   // Date format korar function
   const formatDate = (date: Date) => {
@@ -56,15 +122,15 @@ const MakeNewCoupon: React.FC = () => {
   const handleCreateCoupon = async () => {
     // Validation
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a coupon name");
+      Alert.alert(t("error", "Error"), ui.pleaseEnterName);
       return;
     }
     if (!code.trim()) {
-      Alert.alert("Error", "Please enter a coupon code");
+      Alert.alert(t("error", "Error"), ui.pleaseEnterCode);
       return;
     }
     if (!discountValue || parseFloat(discountValue) <= 0) {
-      Alert.alert("Error", "Please enter a valid discount value");
+      Alert.alert(t("error", "Error"), ui.pleaseEnterValidDiscount);
       return;
     }
 
@@ -80,11 +146,11 @@ const MakeNewCoupon: React.FC = () => {
         usageLimit: usageLimit ? parseInt(usageLimit) : undefined,
       }).unwrap();
 
-      Alert.alert("Success", "Coupon created successfully!");
+      Alert.alert(t("success", "Success"), ui.couponCreated);
       router.replace("/(screens)/MakeCoupon");
     } catch (error: any) {
       console.error("Failed to create coupon:", error);
-      Alert.alert("Error", error?.data?.message || "Failed to create coupon. Please try again.");
+      Alert.alert(t("error", "Error"), error?.data?.message || ui.failedCreateCoupon);
     }
   };
 
@@ -97,7 +163,7 @@ const MakeNewCoupon: React.FC = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Make a New Coupon</Text>
+        <Text style={styles.headerTitle}>{ui.makeNewCoupon}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -113,7 +179,7 @@ const MakeNewCoupon: React.FC = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Coupon Name (e.g., Summer Sale)"
+              placeholder={ui.couponName}
               value={name}
               onChangeText={setName}
               placeholderTextColor="#99ABB3"
@@ -123,7 +189,7 @@ const MakeNewCoupon: React.FC = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Coupon Code (e.g., SAVE10)"
+              placeholder={ui.couponCode}
               value={code}
               onChangeText={setCode}
               placeholderTextColor="#99ABB3"
@@ -138,13 +204,13 @@ const MakeNewCoupon: React.FC = () => {
                 style={[styles.typeBtn, discountType === 'percentage' && styles.typeBtnActive]}
                 onPress={() => setDiscountType('percentage')}
               >
-                <Text style={[styles.typeBtnText, discountType === 'percentage' && styles.typeBtnTextActive]}>Percentage</Text>
+                <Text style={[styles.typeBtnText, discountType === 'percentage' && styles.typeBtnTextActive]}>{ui.percentage}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.typeBtn, discountType === 'fixed' && styles.typeBtnActive]}
                 onPress={() => setDiscountType('fixed')}
               >
-                <Text style={[styles.typeBtnText, discountType === 'fixed' && styles.typeBtnTextActive]}>Fixed Amount</Text>
+                <Text style={[styles.typeBtnText, discountType === 'fixed' && styles.typeBtnTextActive]}>{ui.fixedAmount}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -152,7 +218,7 @@ const MakeNewCoupon: React.FC = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder={discountType === 'percentage' ? "Discount % (e.g., 10)" : "Discount Amount (e.g., 50)"}
+              placeholder={discountType === 'percentage' ? ui.discountPercentage : ui.discountAmount}
               value={discountValue}
               onChangeText={setDiscountValue}
               keyboardType="numeric"
@@ -163,7 +229,7 @@ const MakeNewCoupon: React.FC = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Min. Purchase Amount (optional)"
+              placeholder={ui.minPurchase}
               value={minTransaction}
               onChangeText={setMinTransaction}
               keyboardType="numeric"
@@ -174,7 +240,7 @@ const MakeNewCoupon: React.FC = () => {
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
-              placeholder="Usage Limit (optional)"
+              placeholder={ui.usageLimit}
               value={usageLimit}
               onChangeText={setUsageLimit}
               keyboardType="numeric"
@@ -197,7 +263,7 @@ const MakeNewCoupon: React.FC = () => {
                 },
               ]}
             >
-              Valid From: {formatDate(validFrom)}
+              {`${ui.validFrom}: ${formatDate(validFrom)}`}
             </Text>
           </TouchableOpacity>
 
@@ -216,7 +282,7 @@ const MakeNewCoupon: React.FC = () => {
                 },
               ]}
             >
-              Valid Until: {formatDate(validUntil)}
+              {`${ui.validUntil}: ${formatDate(validUntil)}`}
             </Text>
           </TouchableOpacity>
 
@@ -237,7 +303,7 @@ const MakeNewCoupon: React.FC = () => {
             style={styles.createBtn}
             onPress={handleCreateCoupon}
           >
-            <Text style={styles.createBtnText}>Create a coupon</Text>
+            <Text style={styles.createBtnText}>{ui.createCoupon}</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

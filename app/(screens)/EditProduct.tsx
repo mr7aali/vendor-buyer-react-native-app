@@ -1,5 +1,6 @@
 import { useGetCategoriesByVendorQuery } from '@/store/api/categoryApiSlice';
-import { useCreateProductMutation, useGetProductByIdQuery, useUpdateProductMutation } from '@/store/api/product_api_slice';
+import { useCreateProductMutation, useCreateProductSpecificationMutation, useGetProductByIdQuery, useUpdateProductMutation } from '@/store/api/product_api_slice';
+import { useTranslation } from '@/hooks/use-translation';
 import { useAppSelector } from '@/store/hooks';
 import { selectCurrentUser } from '@/store/slices/authSlice';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,11 +10,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type SpecItem = { label: string; value: string };
+type SpecItem = { label: string; value: string; isExisting?: boolean };
 
 const getEntityId = (entity: any) => entity?.id || entity?._id;
 
+const getProductIdFromResponse = (response: any) =>
+  response?.id ||
+  response?._id ||
+  response?.data?.id ||
+  response?.data?._id ||
+  response?.data?.data?.id ||
+  response?.data?.data?._id ||
+  '';
+
 export default function EditProduct() {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const { id, categoryId: categoryIdParam } = useLocalSearchParams();
   const productId = id ? String(id) : '';
@@ -29,6 +40,7 @@ export default function EditProduct() {
   const { data: productData, isLoading: isLoadingProduct } = useGetProductByIdQuery(productId, { skip: !productId });
   const [createProduct, { isLoading: isCreating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: isUpdating }] = useUpdateProductMutation();
+  const [createProductSpecification] = useCreateProductSpecificationMutation();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -45,6 +57,100 @@ export default function EditProduct() {
   const [newSpecLabel, setNewSpecLabel] = useState('');
   const [newSpecValue, setNewSpecValue] = useState('');
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+
+  const ui = useMemo(() => {
+    if (language === 'he') {
+      return {
+        editProduct: 'עריכת מוצר',
+        media: 'מדיה',
+        productDetails: 'פרטי מוצר',
+        quantity: 'כמות',
+        pricing: 'תמחור',
+        price: 'מחיר',
+        addCategory: 'הוסף קטגוריה',
+        settings: 'הגדרות',
+        save: 'שמור',
+        saveLoading: 'שומר...',
+        specification: 'מפרט',
+        addSpecification: 'הוסף מפרט',
+        noSpecAddedYet: 'עדיין לא נוסף מפרט.',
+        missingFields: 'שדות חסרים',
+        missingFieldsMsg: 'נא למלא שם מוצר, מחיר, כמות וקטגוריה.',
+        missingMedia: 'מדיה חסרה',
+        missingMediaMsg: 'נא להוסיף לפחות תמונת מוצר אחת.',
+        limitReached: 'הגעת למגבלה',
+        maxImagesMsg: 'ניתן להעלות עד 5 תמונות.',
+        permissionRequired: 'נדרשת הרשאה',
+        photoPermissionRequired: 'נדרשת הרשאת גלריה.',
+        specMissingFields: 'חסרים שדות',
+        specMissingFieldsMsg: 'נא להזין מפתח וערך למפרט.',
+        successUpdated: 'המוצר עודכן בהצלחה.',
+        successCreated: 'המוצר נוצר בהצלחה.',
+        failedSaveProduct: 'שמירת המוצר נכשלה.',
+        selectCategory: 'בחר קטגוריה',
+      };
+    }
+    if (language === 'hi') {
+      return {
+        editProduct: 'प्रोडक्ट एडिट करें',
+        media: 'मीडिया',
+        productDetails: 'प्रोडक्ट विवरण',
+        quantity: 'मात्रा',
+        pricing: 'प्राइसिंग',
+        price: 'कीमत',
+        addCategory: 'कैटेगरी जोड़ें',
+        settings: 'सेटिंग्स',
+        save: 'सेव करें',
+        saveLoading: 'सेव हो रहा है...',
+        specification: 'स्पेसिफिकेशन',
+        addSpecification: 'स्पेसिफिकेशन जोड़ें',
+        noSpecAddedYet: 'अभी तक कोई स्पेसिफिकेशन नहीं जोड़ा गया।',
+        missingFields: 'फ़ील्ड्स अधूरे हैं',
+        missingFieldsMsg: 'कृपया प्रोडक्ट नाम, कीमत, मात्रा और कैटेगरी भरें।',
+        missingMedia: 'मीडिया नहीं है',
+        missingMediaMsg: 'कृपया कम से कम एक प्रोडक्ट इमेज जोड़ें।',
+        limitReached: 'सीमा पूरी हुई',
+        maxImagesMsg: 'आप अधिकतम 5 इमेज अपलोड कर सकते हैं।',
+        permissionRequired: 'अनुमति आवश्यक',
+        photoPermissionRequired: 'फोटो लाइब्रेरी अनुमति आवश्यक है।',
+        specMissingFields: 'फ़ील्ड्स अधूरे हैं',
+        specMissingFieldsMsg: 'कृपया स्पेसिफिकेशन key और value दोनों भरें।',
+        successUpdated: 'प्रोडक्ट सफलतापूर्वक अपडेट हो गया।',
+        successCreated: 'प्रोडक्ट सफलतापूर्वक बनाया गया।',
+        failedSaveProduct: 'प्रोडक्ट सेव करना विफल रहा।',
+        selectCategory: 'कैटेगरी चुनें',
+      };
+    }
+    return {
+      editProduct: 'Edit Product',
+      media: 'Media',
+      productDetails: 'Product details',
+      quantity: 'Quantity',
+      pricing: 'Pricing',
+      price: 'Price',
+      addCategory: 'Add Category',
+      settings: 'Settings',
+      save: 'Save',
+      saveLoading: 'Saving...',
+      specification: 'Specification',
+      addSpecification: 'Add Specification',
+      noSpecAddedYet: 'No specification added yet.',
+      missingFields: 'Missing fields',
+      missingFieldsMsg: 'Please fill product name, price, quantity and category.',
+      missingMedia: 'Missing media',
+      missingMediaMsg: 'Please add at least one product image.',
+      limitReached: 'Limit Reached',
+      maxImagesMsg: 'You can upload up to 5 images.',
+      permissionRequired: 'Permission Required',
+      photoPermissionRequired: 'Photo library permission is required.',
+      specMissingFields: 'Missing fields',
+      specMissingFieldsMsg: 'Please enter both specification key and value.',
+      successUpdated: 'Product updated successfully.',
+      successCreated: 'Product created successfully.',
+      failedSaveProduct: 'Failed to save product.',
+      selectCategory: 'Select Category',
+    };
+  }, [language]);
 
   useEffect(() => {
     if (!productData) return;
@@ -65,6 +171,7 @@ export default function EditProduct() {
             .map(([key, value]) => ({
               label: key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1'),
               value: Array.isArray(value) ? value.join(', ') : String(value),
+              isExisting: true,
             }))
         : [];
     setSpecifications(mappedSpecs);
@@ -82,12 +189,12 @@ export default function EditProduct() {
 
   const pickImage = async () => {
     if (selectedImages.length >= 5) {
-      Alert.alert('Limit Reached', 'You can upload up to 5 images.');
+      Alert.alert(ui.limitReached, ui.maxImagesMsg);
       return;
     }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Photo library permission is required.');
+      Alert.alert(ui.permissionRequired, ui.photoPermissionRequired);
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -108,10 +215,10 @@ export default function EditProduct() {
     const label = newSpecLabel.trim();
     const value = newSpecValue.trim();
     if (!label || !value) {
-      Alert.alert('Missing fields', 'Please enter both specification key and value.');
+      Alert.alert(ui.specMissingFields, ui.specMissingFieldsMsg);
       return;
     }
-    setSpecifications((prev) => [...prev, { label, value }]);
+    setSpecifications((prev) => [...prev, { label, value, isExisting: false }]);
     setNewSpecLabel('');
     setNewSpecValue('');
     setIsSpecModalVisible(false);
@@ -123,11 +230,11 @@ export default function EditProduct() {
 
   const handleSave = async () => {
     if (!name.trim() || !price.trim() || !stockQuantity.trim() || !selectedCategoryId) {
-      Alert.alert('Missing fields', 'Please fill product name, price, quantity and category.');
+      Alert.alert(ui.missingFields, ui.missingFieldsMsg);
       return;
     }
     if (!selectedImages.length) {
-      Alert.alert('Missing media', 'Please add at least one product image.');
+      Alert.alert(ui.missingMedia, ui.missingMediaMsg);
       return;
     }
 
@@ -153,20 +260,46 @@ export default function EditProduct() {
       }
     });
 
-    // Keep specs client-side display only until backend supports this field.
-    // This ensures "only added specs are shown" behavior in UI.
+    // Create only newly added specs to avoid duplicate records on edit.
+
+    const specsToCreate = specifications
+      .filter((spec) => !spec.isExisting)
+      .map((spec) => ({ label: spec.label.trim(), value: spec.value.trim() }))
+      .filter((spec) => spec.label && spec.value)
+      .filter((spec, index, self) => self.findIndex((s) => s.label.toLowerCase() === spec.label.toLowerCase() && s.value === spec.value) === index);
 
     try {
-      if (productId) {
-        await updateProduct({ id: productId, formData }).unwrap();
-        Alert.alert('Success', 'Product updated successfully.');
+      let savedProductId = productId;
+      const isEditing = !!productId;
+
+      if (isEditing) {
+        const updated = await updateProduct({ id: productId, formData }).unwrap();
+        savedProductId = productId || getProductIdFromResponse(updated);
       } else {
-        await createProduct(formData).unwrap();
-        Alert.alert('Success', 'Product created successfully.');
+        const created = await createProduct(formData).unwrap();
+        savedProductId = getProductIdFromResponse(created);
       }
+
+      if (specsToCreate.length > 0 && !savedProductId) {
+        throw new Error('Product saved but no product id returned for specification create.');
+      }
+
+      if (savedProductId && specsToCreate.length > 0) {
+        await Promise.all(
+          specsToCreate.map((spec) =>
+            createProductSpecification({
+              productId: String(savedProductId),
+              label: spec.label,
+              value: spec.value,
+            }).unwrap(),
+          ),
+        );
+      }
+
+      Alert.alert(t('success', 'Success'), isEditing ? ui.successUpdated : ui.successCreated);
       router.back();
     } catch (error: any) {
-      Alert.alert('Error', error?.data?.message || 'Failed to save product.');
+      Alert.alert(t('error', 'Error'), error?.data?.message || ui.failedSaveProduct);
     }
   };
 
@@ -185,14 +318,14 @@ export default function EditProduct() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#1F2A30" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{productId ? 'Edit Product' : 'Add Product'}</Text>
+        <Text style={styles.headerTitle}>{productId ? ui.editProduct : t('add_product', 'Add Product')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
           <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Media</Text>
+            <Text style={styles.sectionTitle}>{ui.media}</Text>
             <Text style={styles.mediaCount}>{selectedImages.length}/5</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
@@ -213,30 +346,30 @@ export default function EditProduct() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Product details</Text>
-          <Text style={styles.inputLabel}>Product Name</Text>
-          <TextInput style={styles.input} placeholder="e.g. Headphones" value={name} onChangeText={setName} />
-          <Text style={styles.inputLabel}>Description</Text>
-          <TextInput style={[styles.input, styles.textArea]} placeholder="Describe your product..." multiline value={description} onChangeText={setDescription} />
-          <Text style={styles.inputLabel}>Category</Text>
+          <Text style={styles.sectionTitle}>{ui.productDetails}</Text>
+          <Text style={styles.inputLabel}>{t('product_name_required', 'Product Name *')}</Text>
+          <TextInput style={styles.input} placeholder={t('enter_product_name', 'Enter product name')} value={name} onChangeText={setName} />
+          <Text style={styles.inputLabel}>{t('description_required', 'Description *')}</Text>
+          <TextInput style={[styles.input, styles.textArea]} placeholder={t('enter_product_description', 'Enter product description')} multiline value={description} onChangeText={setDescription} />
+          <Text style={styles.inputLabel}>{t('category', 'Category')}</Text>
           <TouchableOpacity style={styles.inputPicker} onPress={() => setIsCategoryModalVisible(true)}>
-            <Text style={{ color: selectedCategoryName ? '#1F2A30' : '#8A969D' }}>{selectedCategoryName || 'Add Category'}</Text>
+            <Text style={{ color: selectedCategoryName ? '#1F2A30' : '#8A969D' }}>{selectedCategoryName || ui.addCategory}</Text>
           </TouchableOpacity>
-          <Text style={styles.inputLabel}>Quantity</Text>
+          <Text style={styles.inputLabel}>{ui.quantity}</Text>
           <TextInput style={styles.input} placeholder="123" keyboardType="numeric" value={stockQuantity} onChangeText={setStockQuantity} />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Pricing</Text>
-          <Text style={styles.inputLabel}>Price</Text>
-          <TextInput style={styles.input} placeholder="e.g. $20" keyboardType="numeric" value={price} onChangeText={(text) => setPrice(text.replace('$', ''))} />
+          <Text style={styles.sectionTitle}>{ui.pricing}</Text>
+          <Text style={styles.inputLabel}>{ui.price}</Text>
+          <TextInput style={styles.input} placeholder={t('price_placeholder', '0.00')} keyboardType="numeric" value={price} onChangeText={(text) => setPrice(text.replace('$', ''))} />
         </View>
 
         <View style={styles.card}>
           <View style={styles.rowBetween}>
-            <Text style={styles.sectionTitle}>Specification</Text>
+            <Text style={styles.sectionTitle}>{ui.specification}</Text>
             <TouchableOpacity onPress={() => setIsSpecModalVisible(true)}>
-              <Text style={styles.addSpec}>Add Specification</Text>
+              <Text style={styles.addSpec}>{ui.addSpecification}</Text>
             </TouchableOpacity>
           </View>
           {specifications.map((spec, index) => (
@@ -250,15 +383,15 @@ export default function EditProduct() {
               </TouchableOpacity>
             </View>
           ))}
-          {specifications.length === 0 ? <Text style={styles.emptySpec}>No specification added yet.</Text> : null}
+          {specifications.length === 0 ? <Text style={styles.emptySpec}>{ui.noSpecAddedYet}</Text> : null}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>{ui.settings}</Text>
           <View style={styles.rowBetween}>
             <View>
-              <Text style={styles.activeLabel}>Active Status</Text>
-              <Text style={styles.activeSub}>Product will be visible in store</Text>
+              <Text style={styles.activeLabel}>{t('active_status', 'Active Status')}</Text>
+              <Text style={styles.activeSub}>{t('show_product_in_store', 'Show product in store')}</Text>
             </View>
             <Switch trackColor={{ false: '#D8E0E4', true: '#2E908F' }} thumbColor="#FFF" value={isActive} onValueChange={setIsActive} />
           </View>
@@ -266,10 +399,10 @@ export default function EditProduct() {
 
         <View style={styles.footerRow}>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>{t('cancel', 'Cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isCreating || isUpdating}>
-            {isCreating || isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>Save</Text>}
+            {isCreating || isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveText}>{ui.save}</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -278,7 +411,7 @@ export default function EditProduct() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Specification</Text>
+              <Text style={styles.modalTitle}>{ui.addSpecification}</Text>
               <TouchableOpacity onPress={() => setIsSpecModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#003D4D" />
               </TouchableOpacity>
@@ -289,10 +422,10 @@ export default function EditProduct() {
             </View>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setIsSpecModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>{t('cancel', 'Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSave} onPress={addSpec}>
-                <Text style={styles.modalSaveText}>Save</Text>
+                <Text style={styles.modalSaveText}>{ui.save}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -303,7 +436,7 @@ export default function EditProduct() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Category</Text>
+              <Text style={styles.modalTitle}>{ui.selectCategory}</Text>
               <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#003D4D" />
               </TouchableOpacity>

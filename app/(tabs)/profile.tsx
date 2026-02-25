@@ -5,8 +5,9 @@ import {
   useCreateVendorAccountMutation,
   useGetVendorAccountStatusQuery,
 } from "@/store/api/paymentApiSlice";
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectCurrentUser } from "@/store/slices/authSlice";
+import { logOut, selectCurrentAccessToken, selectCurrentUser } from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -29,10 +30,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../hooks/use-translation";
 
 const ProfileScreen = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
+  const accessToken = useAppSelector(selectCurrentAccessToken);
   const [isBusinessProfile, setIsBusinessProfile] = useState(false);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -91,6 +95,8 @@ const ProfileScreen = () => {
   const onLogout = async () => {
     setShowLogoutModal(false);
     try {
+      await unregisterPushTokenFromBackend(accessToken);
+
       // Clear AsyncStorage
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
@@ -178,7 +184,7 @@ const ProfileScreen = () => {
               }}
               onPress={onClose}
             >
-              <Text style={{ color: "#333", fontWeight: "bold" }}>Cancel</Text>
+              <Text style={{ color: "#333", fontWeight: "bold" }}>{t("cancel", "Cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{
@@ -263,7 +269,7 @@ const ProfileScreen = () => {
               marginBottom: 20,
             }}
           >
-            Account Information
+            {t("account_information", "Account Information")}
           </Text>
 
           {/* Personal Info Link */}
@@ -291,7 +297,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Personal info
+                {t("personal_info", "Personal info")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -322,7 +328,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Business info
+                {t("business_info", "Business info")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -351,7 +357,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Transaction History
+                {t("transaction_history", "Transaction History")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -386,7 +392,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Make a coupon
+                {t("make_coupon", "Make a coupon")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -415,14 +421,14 @@ const ProfileScreen = () => {
               marginBottom: 20,
             }}
           >
-            Payout Settings
+            {t("payout_settings", "Payout Settings")}
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <MaterialCommunityIcons name="bank-transfer" size={26} color="#4B5563" />
               <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
-                Stripe Connect
+                {t("stripe_connect", "Stripe Connect")}
               </Text>
             </View>
 
@@ -431,7 +437,7 @@ const ProfileScreen = () => {
             ) : isStripeConnected ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
                 <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
-                <Text style={{ color: '#4CAF50', fontWeight: 'bold', marginLeft: 5, fontSize: 12 }}>Connected</Text>
+                <Text style={{ color: '#4CAF50', fontWeight: 'bold', marginLeft: 5, fontSize: 12 }}>{t("connected", "Connected")}</Text>
               </View>
             ) : (
               <TouchableOpacity
@@ -450,7 +456,7 @@ const ProfileScreen = () => {
                   <ActivityIndicator size="small" color="#FFF" />
                 ) : (
                   <>
-                    <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 12 }}>Connect</Text>
+                    <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 12 }}>{t("connect", "Connect")}</Text>
                     <MaterialIcons name="arrow-forward" size={12} color="#FFF" style={{ marginLeft: 4 }} />
                   </>
                 )}
@@ -459,7 +465,7 @@ const ProfileScreen = () => {
           </View>
           {!isStripeConnected && !isStripeLoading && (
             <Text style={{ fontSize: 12, color: '#666', marginTop: 10, fontStyle: 'italic' }}>
-              Connect your Stripe account to receive payouts.
+              {t("stripe_connect_hint", "Connect your Stripe account to receive payouts.")}
             </Text>
           )}
         </View>
@@ -486,7 +492,7 @@ const ProfileScreen = () => {
               marginBottom: 20,
             }}
           >
-            Setting
+            {t("setting", "Setting")}
           </Text>
 
           {/* Switch Profile */}
@@ -513,7 +519,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Switch profile
+                {t("switch_profile", "Switch profile")}
               </Text>
             </View>
             <Switch
@@ -550,7 +556,7 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Permission
+                {t("permission", "Permission")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -580,7 +586,36 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Settings
+                {t("settings", "Settings")}
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/(screens)/language")}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 14,
+              }}
+            >
+              <Ionicons name="language-outline" size={26} color="#4B5563" />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#4B5563",
+                  marginLeft: 14,
+                  fontWeight: "500",
+                }}
+              >
+                {t("language", "Language")}
               </Text>
             </View>
             <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
@@ -612,7 +647,7 @@ const ProfileScreen = () => {
               fontWeight: "600",
             }}
           >
-            Log Out
+            {t("logout", "Log Out")}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -622,9 +657,9 @@ const ProfileScreen = () => {
         visible={showSwitchModal}
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
-        title="Switch Profile?"
-        subtitle={`Are you sure you want to switch to ${isBusinessProfile ? "Personal" : "Business"} profile?`}
-        confirmText="Confirm"
+        title={t("switch_profile_q", "Switch Profile?")}
+        subtitle={isBusinessProfile ? t("switch_profile_desc_personal", "Are you sure you want to switch to Personal profile?") : t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
+        confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />
 
@@ -633,9 +668,9 @@ const ProfileScreen = () => {
         visible={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
         onConfirm={onLogout}
-        title="Log Out?"
-        subtitle="Are you sure you want to log out?"
-        confirmText="Log Out"
+        title={t("logout_q", "Log Out?")}
+        subtitle={t("logout_desc", "Are you sure you want to log out?")}
+        confirmText={t("logout", "Log Out")}
         confirmColor="#FF3B30"
       />
     </SafeAreaView>

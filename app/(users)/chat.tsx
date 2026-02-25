@@ -1,4 +1,5 @@
 import { supportTickets } from '@/constants/common';
+import { useTranslation } from '@/hooks/use-translation';
 import { useGetConversationsQuery, useMarkAsReadMutation } from '@/store/api/chatApiSlice';
 import { RootState } from '@/store/store';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ const formatTime = (value: any) => {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = normalizeId(user?.userId || user?.id || (user as any)?._id);
   const [activeTab, setActiveTab] = useState<'chat' | 'support'>('chat');
@@ -51,7 +53,7 @@ export default function ChatScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Chat</Text>
+        <Text style={styles.headerTitle}>{t('chat_title', 'Chat')}</Text>
       </View>
 
       <View style={styles.searchWrap}>
@@ -59,7 +61,7 @@ export default function ChatScreen() {
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search by name"
+          placeholder={t('chat_search_by_name', 'Search by name')}
           placeholderTextColor="#9CA3AF"
           style={styles.searchInput}
         />
@@ -67,10 +69,10 @@ export default function ChatScreen() {
 
       <View style={styles.tabRow}>
         <TouchableOpacity style={[styles.tab, activeTab === 'chat' && styles.tabActive]} onPress={() => setActiveTab('chat')}>
-          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>Chat</Text>
+          <Text style={[styles.tabText, activeTab === 'chat' && styles.tabTextActive]}>{t('chat_tab_chat', 'Chat')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.tab, activeTab === 'support' && styles.tabActive]} onPress={() => setActiveTab('support')}>
-          <Text style={[styles.tabText, activeTab === 'support' && styles.tabTextActive]}>Support</Text>
+          <Text style={[styles.tabText, activeTab === 'support' && styles.tabTextActive]}>{t('chat_tab_support', 'Support')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -78,12 +80,12 @@ export default function ChatScreen() {
         {activeTab === 'chat' ? (
           <View style={styles.listWrap}>
             {isLoading ? (
-              <Text style={styles.emptyText}>Loading conversations...</Text>
+              <Text style={styles.emptyText}>{t('chat_loading_conversations', 'Loading conversations...')}</Text>
             ) : filteredRows.length ? (
               filteredRows.map((conversation: any, index: number) => {
                 const partner = conversation?.partner || {};
                 const partnerId = normalizeId(conversation?.partnerId || partner?.id || partner?._id || partner?.userId);
-                const displayName = partner?.fullName || partner?.businessName || partner?.storename || partner?.email || 'User';
+                const displayName = partner?.fullName || partner?.businessName || partner?.storename || partner?.email || t('chat_user_fallback', 'User');
                 const avatar = partner?.avatar || partner?.logoUrl || 'https://via.placeholder.com/48';
                 const unreadCount = Number(conversation?.unreadCount || 0);
                 const messageId = conversation?.lastMessage?.id || conversation?.lastMessage?._id;
@@ -102,6 +104,7 @@ export default function ChatScreen() {
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {
+                          role: 'buyer',
                           partnerId,
                           conversationId: normalizeId(conversation?.id || conversation?._id || partnerId),
                           fullname: displayName,
@@ -113,7 +116,7 @@ export default function ChatScreen() {
                     <View style={styles.middle}>
                       <Text style={styles.name}>{displayName}</Text>
                       <Text style={styles.preview} numberOfLines={1}>
-                        {conversation?.lastMessage?.messageText || 'No messages yet'}
+                        {conversation?.lastMessage?.messageText || t('chat_no_messages_yet', 'No messages yet')}
                       </Text>
                     </View>
                     <View style={styles.right}>
@@ -130,7 +133,7 @@ export default function ChatScreen() {
                 );
               })
             ) : (
-              <Text style={styles.emptyText}>No conversations found.</Text>
+              <Text style={styles.emptyText}>{t('chat_no_conversations_found', 'No conversations found.')}</Text>
             )}
           </View>
         ) : (

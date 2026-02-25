@@ -1,4 +1,5 @@
 import { useGetOrdersQuery } from '@/store/api/orderApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
@@ -24,18 +25,18 @@ const getCoverImage = (order: any) => {
 
 const getDisplayAddress = (order: any) => {
   if (typeof order?.shippingAddress === 'string' && order.shippingAddress.trim()) return order.shippingAddress;
-  return 'Address unavailable';
+  return '';
 };
 
 const getTitleName = (order: any) => {
-  return order?.vendor?.fullName || order?.vendor?.storename || order?.buyer?.fullName || 'Customer';
+  return order?.vendor?.fullName || order?.vendor?.storename || order?.buyer?.fullName || '';
 };
 
-const getItemSummary = (order: any) => {
+const getItemSummary = (order: any, t: (key: string, fallback?: string) => string) => {
   const items = getItems(order);
-  if (!items.length) return '0 items';
-  const firstName = items[0]?.product?.name || 'Item';
-  return `${items.length} items - ${firstName}`;
+  if (!items.length) return `0 ${t('orders_items_label', 'items')}`;
+  const firstName = items[0]?.product?.name || t('orders_item_label', 'Item');
+  return `${items.length} ${t('orders_items_label', 'items')} - ${firstName}`;
 };
 
 const statusPillStyle = (status: string) => {
@@ -53,6 +54,7 @@ const statusPillStyle = (status: string) => {
 const FILTERS = ['all', 'delivered', 'processing', 'shipped', 'cancelled'];
 
 export default function OrderTabs() {
+  const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -87,14 +89,14 @@ export default function OrderTabs() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={22} color="#202427" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Orders</Text>
+        <Text style={styles.headerTitle}>{t('orders_title', 'Orders')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={20} color="#66737D" />
         <TextInput
-          placeholder="Search by name"
+          placeholder={t('orders_search_by_name', 'Search by name')}
           placeholderTextColor="#8A949B"
           style={styles.searchInput}
           value={searchQuery}
@@ -113,7 +115,7 @@ export default function OrderTabs() {
                 onPress={() => setActiveFilter(f)}
               >
                 <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
+                  {t(`orders_filter_${f}`, f.charAt(0).toUpperCase() + f.slice(1))}
                 </Text>
               </TouchableOpacity>
             );
@@ -143,22 +145,24 @@ export default function OrderTabs() {
                     <Text style={styles.orderNumber}>#{order?.orderNumber || order?.id}</Text>
                     <View style={[styles.statusPill, { backgroundColor: pill.bg }]}>
                       <Text style={[styles.statusPillText, { color: pill.text }]}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {t(`orders_filter_${status}`, status.charAt(0).toUpperCase() + status.slice(1))}
                       </Text>
                     </View>
                   </View>
-                  <Text numberOfLines={1} style={styles.addressText}>{getDisplayAddress(order)}</Text>
+                  <Text numberOfLines={1} style={styles.addressText}>
+                    {getDisplayAddress(order) || t('orders_address_unavailable', 'Address unavailable')}
+                  </Text>
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={14} color="#F0B429" />
-                    <Text style={styles.ratingText}>4.8 (1.2k)</Text>
+                    <Text style={styles.ratingText}>4.8 ({t('orders_rating_sample', '1.2k')})</Text>
                   </View>
                 </View>
               </View>
 
               <View style={styles.cardBottom}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.customerName}>{getTitleName(order)}</Text>
-                  <Text numberOfLines={1} style={styles.summaryText}>{getItemSummary(order)}</Text>
+                  <Text style={styles.customerName}>{getTitleName(order) || t('orders_customer_fallback', 'Customer')}</Text>
+                  <Text numberOfLines={1} style={styles.summaryText}>{getItemSummary(order, t)}</Text>
                 </View>
                 <Text style={styles.priceText}>{formatMoney(order?.totalAmount || order?.totalPrice)}</Text>
               </View>
@@ -166,7 +170,7 @@ export default function OrderTabs() {
           );
         })}
         {!filteredOrders.length && (
-          <Text style={styles.emptyText}>No orders found.</Text>
+          <Text style={styles.emptyText}>{t('orders_no_orders_found', 'No orders found.')}</Text>
         )}
       </ScrollView>
     </SafeAreaView>

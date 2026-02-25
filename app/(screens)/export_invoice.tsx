@@ -1,4 +1,5 @@
 import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { MaterialIcons } from '@expo/vector-icons';
 import { printToFileAsync } from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,6 +19,7 @@ const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const getItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
 
 export default function ExportInvoice() {
+  const { language, t } = useTranslation();
   const { id } = useLocalSearchParams();
   const { data: order, isLoading } = useGetOrderByIdQuery(id as string, { skip: !id });
   const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -29,13 +31,100 @@ export default function ExportInvoice() {
   const shipping = toNumber(order?.shippingCost, 0);
   const discount = toNumber(order?.discountAmount);
   const total = toNumber(order?.totalAmount);
+  const ui = useMemo(() => {
+    if (language === "he") {
+      return {
+        exportInvoice: "ייצוא חשבונית",
+        vendor: "ספק",
+        addressUnavailable: "כתובת לא זמינה",
+        addressNotAvailable: "כתובת לא זמינה",
+        invoiceId: "מזהה חשבונית",
+        orderId: "מזהה הזמנה",
+        orderItems: "פריטי הזמנה",
+        paymentDetails: "פרטי תשלום",
+        subtotal: "סכום ביניים",
+        tax: "מס",
+        shipping: "משלוח",
+        discount: "הנחה",
+        total: "סה\"כ",
+        invoiceTotal: "סה\"כ חשבונית",
+        dateIssued: "תאריך הנפקה",
+        from: "מאת",
+        billTo: "חיוב אל",
+        paymentDate: "תאריך תשלום",
+        customer: "לקוח",
+        product: "מוצר",
+        orderNotFound: "ההזמנה לא נמצאה",
+        downloadInvoice: "הורד חשבונית",
+        downloadInvoiceQ: "להוריד חשבונית?",
+        generatePdfNow: "צור PDF ושתף את החשבונית עכשיו.",
+        nA: "לא זמין",
+      };
+    }
+    if (language === "hi") {
+      return {
+        exportInvoice: "इनवॉइस एक्सपोर्ट",
+        vendor: "वेंडर",
+        addressUnavailable: "पता उपलब्ध नहीं",
+        addressNotAvailable: "पता उपलब्ध नहीं",
+        invoiceId: "इनवॉइस आईडी",
+        orderId: "ऑर्डर आईडी",
+        orderItems: "ऑर्डर आइटम्स",
+        paymentDetails: "भुगतान विवरण",
+        subtotal: "उपकुल",
+        tax: "टैक्स",
+        shipping: "शिपिंग",
+        discount: "छूट",
+        total: "कुल",
+        invoiceTotal: "इनवॉइस कुल",
+        dateIssued: "जारी तिथि",
+        from: "से",
+        billTo: "बिल टू",
+        paymentDate: "भुगतान तिथि",
+        customer: "ग्राहक",
+        product: "प्रोडक्ट",
+        orderNotFound: "ऑर्डर नहीं मिला",
+        downloadInvoice: "इनवॉइस डाउनलोड करें",
+        downloadInvoiceQ: "इनवॉइस डाउनलोड करें?",
+        generatePdfNow: "PDF बनाकर अभी यह इनवॉइस शेयर करें।",
+        nA: "N/A",
+      };
+    }
+    return {
+      exportInvoice: "Export invoice",
+      vendor: "Vendor",
+      addressUnavailable: "Address unavailable",
+      addressNotAvailable: "Address not available",
+      invoiceId: "Invoice ID",
+      orderId: "Order ID",
+      orderItems: "Order items",
+      paymentDetails: "Payment details",
+      subtotal: "Subtotal",
+      tax: "Tax",
+      shipping: "Shipping",
+      discount: "Discount",
+      total: "Total",
+      invoiceTotal: "Invoice Total",
+      dateIssued: "Date Issued",
+      from: "From",
+      billTo: "Bill to",
+      paymentDate: "Payment Date",
+      customer: "Customer",
+      product: "Product",
+      orderNotFound: "Order not found",
+      downloadInvoice: "Download Invoice",
+      downloadInvoiceQ: "Download Invoice?",
+      generatePdfNow: "Generate PDF and share this invoice now.",
+      nA: "N/A",
+    };
+  }, [language]);
 
   const invoiceId = `INV-${String(order?.id || '').slice(-6).toUpperCase() || '000001'}`;
 
   const makeHtml = () => {
     const itemRows = items
       .map((item: any) => {
-        const name = item?.product?.name || 'Product';
+        const name = item?.product?.name || ui.product;
         const price = formatMoney(item?.unitPrice || item?.totalPrice);
         const qty = item?.quantity || 1;
         return `
@@ -62,24 +151,24 @@ export default function ExportInvoice() {
         </style>
       </head>
       <body>
-        <div class="title">Export invoice</div>
+        <div class="title">${ui.exportInvoice}</div>
         <div class="card">
-          <div style="font-weight:700;">${order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</div>
-          <div class="muted">${order?.shippingAddress || 'Address not available'}</div>
-          <div class="row" style="margin-top:10px;"><span class="muted">Invoice ID</span><span>${invoiceId}</span></div>
-          <div class="row"><span class="muted">Order ID</span><span>${order?.orderNumber || order?.id}</span></div>
+          <div style="font-weight:700;">${order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</div>
+          <div class="muted">${order?.shippingAddress || ui.addressNotAvailable}</div>
+          <div class="row" style="margin-top:10px;"><span class="muted">${ui.invoiceId}</span><span>${invoiceId}</span></div>
+          <div class="row"><span class="muted">${ui.orderId}</span><span>${order?.orderNumber || order?.id}</span></div>
         </div>
         <div class="card">
-          <div style="font-weight:700;margin-bottom:8px;">Order items</div>
+          <div style="font-weight:700;margin-bottom:8px;">${ui.orderItems}</div>
           <table>${itemRows}</table>
         </div>
         <div class="card">
-          <div style="font-weight:700;margin-bottom:8px;">Payment details</div>
-          <div class="row"><span>Subtotal</span><span>${formatMoney(subtotal)}</span></div>
-          <div class="row"><span>Tax</span><span>${formatMoney(tax)}</span></div>
-          <div class="row"><span>Shipping</span><span>${formatMoney(shipping)}</span></div>
-          <div class="row"><span>Discount</span><span>${formatMoney(discount)}</span></div>
-          <div class="row total"><span>Total</span><span>${formatMoney(total)}</span></div>
+          <div style="font-weight:700;margin-bottom:8px;">${ui.paymentDetails}</div>
+          <div class="row"><span>${ui.subtotal}</span><span>${formatMoney(subtotal)}</span></div>
+          <div class="row"><span>${ui.tax}</span><span>${formatMoney(tax)}</span></div>
+          <div class="row"><span>${ui.shipping}</span><span>${formatMoney(shipping)}</span></div>
+          <div class="row"><span>${ui.discount}</span><span>${formatMoney(discount)}</span></div>
+          <div class="row total"><span>${ui.total}</span><span>${formatMoney(total)}</span></div>
         </div>
       </body>
       </html>
@@ -111,7 +200,7 @@ export default function ExportInvoice() {
   if (!order) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text>Order not found</Text>
+        <Text>{ui.orderNotFound}</Text>
       </SafeAreaView>
     );
   }
@@ -122,7 +211,7 @@ export default function ExportInvoice() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#1f2a30" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Export invoice</Text>
+        <Text style={styles.headerTitle}>{ui.exportInvoice}</Text>
         <View style={{ width: 20 }} />
       </View>
 
@@ -130,48 +219,48 @@ export default function ExportInvoice() {
         <View style={styles.vendorCard}>
           <Image source={{ uri: order?.vendor?.logoUrl || IMAGE_FALLBACK }} style={styles.vendorLogo} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.vendorTitle}>{order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</Text>
-            <Text style={styles.vendorSub}>{order?.shippingAddress || 'Address unavailable'}</Text>
+            <Text style={styles.vendorTitle}>{order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</Text>
+            <Text style={styles.vendorSub}>{order?.shippingAddress || ui.addressUnavailable}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.smallMuted}>Invoice Total</Text>
+            <Text style={styles.smallMuted}>{ui.invoiceTotal}</Text>
             <Text style={styles.totalStrong}>{formatMoney(total)}</Text>
           </View>
         </View>
 
         <View style={styles.metaCard}>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>Date Issued</Text>
-            <Text style={styles.metaValue}>{order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</Text>
+            <Text style={styles.metaLabel}>{ui.dateIssued}</Text>
+            <Text style={styles.metaValue}>{order?.createdAt ? new Date(order.createdAt).toLocaleDateString() : ui.nA}</Text>
             <Text style={styles.metaValue}>{order?.createdAt ? new Date(order.createdAt).toLocaleTimeString() : ''}</Text>
           </View>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>From</Text>
-            <Text style={styles.metaValue}>{order?.vendor?.storename || order?.vendor?.fullName || 'Vendor'}</Text>
-            <Text style={styles.metaValue} numberOfLines={2}>{order?.vendor?.address || 'N/A'}</Text>
+            <Text style={styles.metaLabel}>{ui.from}</Text>
+            <Text style={styles.metaValue}>{order?.vendor?.storename || order?.vendor?.fullName || ui.vendor}</Text>
+            <Text style={styles.metaValue} numberOfLines={2}>{order?.vendor?.address || ui.nA}</Text>
           </View>
         </View>
 
         <View style={styles.metaCard}>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>Bill to</Text>
-            <Text style={styles.metaValue}>{order?.buyer?.fullName || 'Customer'}</Text>
+            <Text style={styles.metaLabel}>{ui.billTo}</Text>
+            <Text style={styles.metaValue}>{order?.buyer?.fullName || ui.customer}</Text>
             <Text style={styles.metaValue}>{order?.buyer?.phone || ''}</Text>
           </View>
           <View style={styles.metaCol}>
-            <Text style={styles.metaLabel}>Order ID</Text>
+            <Text style={styles.metaLabel}>{ui.orderId}</Text>
             <Text style={styles.metaValue}>{order?.orderNumber || order?.id}</Text>
-            <Text style={styles.metaLabel}>Payment Date</Text>
-            <Text style={styles.metaValue}>{order?.payment?.createdAt ? new Date(order.payment.createdAt).toLocaleString() : 'N/A'}</Text>
+            <Text style={styles.metaLabel}>{ui.paymentDate}</Text>
+            <Text style={styles.metaValue}>{order?.payment?.createdAt ? new Date(order.payment.createdAt).toLocaleString() : ui.nA}</Text>
           </View>
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Order items</Text>
+          <Text style={styles.sectionTitle}>{ui.orderItems}</Text>
           {items.map((item: any) => (
             <View key={item?.id} style={styles.lineItem}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{item?.product?.name || 'Product'}</Text>
+                <Text style={styles.itemName}>{item?.product?.name || ui.product}</Text>
                 <Text style={styles.itemMeta}>x{item?.quantity || 1}</Text>
               </View>
               <Text style={styles.itemPrice}>{formatMoney(item?.unitPrice || item?.totalPrice)}</Text>
@@ -180,32 +269,32 @@ export default function ExportInvoice() {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Payment details</Text>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Subtotal</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Tax</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Shipping</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Discount</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
+          <Text style={styles.sectionTitle}>{ui.paymentDetails}</Text>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{ui.subtotal}</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{ui.tax}</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{ui.shipping}</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{ui.discount}</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
           <View style={styles.dashed} />
-          <View style={styles.paymentRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalLabel}>{formatMoney(total)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.totalLabel}>{ui.total}</Text><Text style={styles.totalLabel}>{formatMoney(total)}</Text></View>
         </View>
 
         <TouchableOpacity style={styles.downloadBtn} onPress={() => setShowDownloadModal(true)}>
           <MaterialIcons name="download" size={18} color="#FFFFFF" />
-          <Text style={styles.downloadBtnText}>Download Invoice</Text>
+          <Text style={styles.downloadBtnText}>{ui.downloadInvoice}</Text>
         </TouchableOpacity>
       </ScrollView>
 
       <Modal visible={showDownloadModal} transparent animationType="fade" onRequestClose={() => setShowDownloadModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Download Invoice?</Text>
-            <Text style={styles.modalSub}>Generate PDF and share this invoice now.</Text>
+            <Text style={styles.modalTitle}>{ui.downloadInvoiceQ}</Text>
+            <Text style={styles.modalSub}>{ui.generatePdfNow}</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalGhost} onPress={() => setShowDownloadModal(false)}>
-                <Text style={styles.modalGhostText}>Cancel</Text>
+                <Text style={styles.modalGhostText}>{t("cancel", "Cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSolid} onPress={onConfirmDownload} disabled={isGenerating}>
-                {isGenerating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>Confirm</Text>}
+                {isGenerating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>{t("confirm", "Confirm")}</Text>}
               </TouchableOpacity>
             </View>
           </View>
