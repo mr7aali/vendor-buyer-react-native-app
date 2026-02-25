@@ -383,18 +383,8 @@ import {
   View,
 } from "react-native";
 import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
-import { Dropdown } from "react-native-element-dropdown";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
-
-const stateData = [
-  { label: "New York", value: "NY" },
-  { label: "California", value: "CA" },
-  { label: "Texas", value: "TX" },
-  { label: "Florida", value: "FL" },
-  { label: "New Jersey", value: "NJ" },
-  { label: "Washington", value: "WA" },
-];
 
 export default function InformationScreen() {
   const { t } = useTranslation();
@@ -411,7 +401,7 @@ export default function InformationScreen() {
   const [address2, setAddress2] = useState("");
   const [city, setCity] = useState("");
   const [zipCode, setZipCode] = useState("");
-  const [stateValue, setStateValue] = useState<string | null>(null);
+  const [stateValue, setStateValue] = useState<string>("");
 
   // Country Picker States
   const [countryCode, setCountryCode] = useState<CountryCode>('US');
@@ -639,17 +629,11 @@ export default function InformationScreen() {
 
             <View style={[styles.formGroup, { flex: 1.2, marginRight: 8 }]}>
               <Text style={styles.label}>{t("info_state", "State")}</Text>
-              <Dropdown
-                style={styles.dropdown}
-                placeholderStyle={styles.placeholderStyle}
-                selectedTextStyle={styles.selectedTextStyle}
-                data={stateData}
-                maxHeight={300}
-                labelField="label"
-                valueField="value"
-                placeholder={t("info_select", "Select")}
+              <TextInput
+                style={styles.input}
                 value={stateValue}
-                onChange={item => setStateValue(item.value)}
+                onChangeText={setStateValue}
+                placeholder={t("info_state", "State")}
               />
             </View>
             <View style={[styles.formGroup, { flex: 0.8 }]}>
@@ -738,16 +722,6 @@ const styles = StyleSheet.create({
   },
   inputText: { fontSize: 14, color: "#333" },
   row: { flexDirection: "row" },
-  dropdown: {
-    backgroundColor: "#F5F7F6",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 50,
-    borderWidth: 1,
-    borderColor: "#EAEAEA",
-  },
-  placeholderStyle: { fontSize: 14, color: "#999" },
-  selectedTextStyle: { fontSize: 14, color: "#333" },
   continueButton: {
     backgroundColor: "#2A8383",
     borderRadius: 15,

@@ -4,7 +4,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const MyCart: React.FC = () => {
@@ -59,8 +59,6 @@ const MyCart: React.FC = () => {
       image: item.product?.images?.[0] || item.product?.imageUrl || item.productId?.images?.[0] || item.productId?.image || item.image || "https://via.placeholder.com/150",
     }));
   }, [rawItems, t]);
-
-  const [isModalVisible, setIsModalVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -168,11 +166,6 @@ const MyCart: React.FC = () => {
   const tax: number = subtotal * TAX_RATE;
   const total: number = Math.max(0, subtotal + tax + SHIPPING_FEE - appliedDiscount);
 
-  const handleConfirmPurchase = () => {
-    setIsModalVisible(false);
-    router.push("/(users)/Information" as any);
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -184,37 +177,6 @@ const MyCart: React.FC = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
-
-      <Modal
-        transparent={true}
-        visible={isModalVisible}
-        animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {t("cart_confirm_buy_q", "Are you sure you want to buy this product?")}
-            </Text>
-
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={styles.noBtn}
-                onPress={() => setIsModalVisible(false)}
-              >
-                <Text style={styles.noBtnText}>{t("cart_no", "NO")}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.yesBtn}
-                onPress={handleConfirmPurchase}
-              >
-                <Text style={styles.yesBtnText}>{t("cart_yes", "Yes")}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -346,7 +308,7 @@ const MyCart: React.FC = () => {
 
           <TouchableOpacity
             style={styles.checkoutBtn}
-            onPress={() => setIsModalVisible(true)}
+            onPress={() => router.push("/(users)/Information" as any)}
           >
             <Text style={styles.checkoutBtnText}>
               {t("cart_checkout", "Checkout")} (${total.toFixed(2)})
@@ -505,61 +467,6 @@ const styles = StyleSheet.create({
   },
   checkoutBtnText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
 
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "85%",
-    backgroundColor: "#FFF",
-    borderRadius: 25,
-    padding: 25,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 30,
-    lineHeight: 28,
-  },
-  modalButtonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  noBtn: {
-    flex: 1,
-    height: 50,
-    borderWidth: 1.5,
-    borderColor: "#FF6B6B",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  noBtnText: {
-    color: "#FF6B6B",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  yesBtn: {
-    flex: 1,
-    height: 50,
-    backgroundColor: "#349488",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10,
-  },
-  yesBtnText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
 });
 
 export default MyCart;

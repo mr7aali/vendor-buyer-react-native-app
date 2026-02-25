@@ -201,7 +201,7 @@ export default function StripePaymentScreen() {
             <Text style={styles.rowValue}>-{formatMoney(couponAmount)}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{t('stripe_total_payable', 'Total Payable')}</Text>
+            <Text style={styles.totalLabel}>{t('chat_total_label', 'Total')}</Text>
             <Text style={styles.totalValue}>{formatMoney(totalPayable)}</Text>
           </View>
         </View>

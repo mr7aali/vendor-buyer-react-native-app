@@ -1,10 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import { useTranslation } from "@/hooks/use-translation";
 import { Tabs } from "expo-router";
 import React from "react";
 
 export default function TabLayout() {
+  const { t } = useTranslation();
+
   return (
     <Tabs
       screenOptions={{
@@ -31,7 +34,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: t("tab_home", "Home"),
           tabBarIcon: ({ color }: { color: string }) => (
             <Feather name="home" size={24} color={color} />
           ),
@@ -40,7 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="product"
         options={{
-          title: "Product",
+          title: t("tab_product", "Product"),
           tabBarIcon: ({ color }: { color: string }) => (
             <Feather name="shopping-cart" size={24} color={color} />
           ),
@@ -49,7 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="order"
         options={{
-          title: "Order",
+          title: t("tab_order", "Order"),
           tabBarIcon: ({ color }: { color: string }) => (
             <Feather name="package" size={24} color={color} />
           ),
@@ -58,7 +61,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="chat"
         options={{
-          title: "Chat",
+          title: t("tab_chat", "Chat"),
           tabBarIcon: ({ color }: { color: string }) => (
             <AntDesign name="message" size={24} color={color} />
           ),
@@ -67,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("tab_profile", "Profile"),
           tabBarIcon: ({ color }: { color: string }) => (
             <FontAwesome5 name="user-circle" size={24} color={color} />
           ),
@@ -76,7 +79,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="electronics-products"
         options={{
-          title: "Electronics",
+          title: t("tab_electronics", "Electronics"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
           tabBarStyle: {
