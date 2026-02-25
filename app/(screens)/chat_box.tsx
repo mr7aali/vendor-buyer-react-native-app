@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,10 +20,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 interface CouponData {
@@ -44,6 +42,23 @@ interface CustomChatMessage {
   type: "text" | "image" | "file" | "coupon";
   couponDetails?: CouponData;
 }
+
+const normalizeId = (value: any): string => {
+  if (value === undefined || value === null) return "";
+  return String(value);
+};
+
+const resolveEntityId = (entity: any): string => {
+  return normalizeId(
+    entity?.userId ??
+    entity?._id ??
+    entity?.id ??
+    entity?.user?.userId ??
+    entity?.user?._id ??
+    entity?.user?.id ??
+    entity
+  );
+};
 
 // Removed hardcoded coupons - now fetched from API
 
@@ -144,8 +159,9 @@ const CouponModal = ({ visible, onClose, onSelect, coupons, labels }: any) => (
 
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const user = useSelector((state: RootState) => state.auth.user);
-  const currentUserId = user?.userId || user?.id || (user as any)?._id;
+  const currentUserId = resolveEntityId(user);
   const router = useRouter();
   const { conversationId, name, fullname, partnerId: partnerIdParam, role: roleParam } = useLocalSearchParams();
   const paramConversationId = (conversationId as string) || "";
@@ -306,25 +322,29 @@ const ChatBox: React.FC = () => {
     if (!Array.isArray(messagesData)) {
       return [];
     }
+    const myId = normalizeId(currentUserId);
     return messagesData.map((msg: any) => ({
       id: msg._id || msg.id,
       text: msg.messageText || msg.text || "",
       timestamp: msg.createdAt,
-      isOwn: msg.senderId === user?.userId || msg.senderId === user?.id || (msg.sender?._id || msg.sender?.id || msg.sender) === (user?.userId || user?.id),
+      isOwn:
+        normalizeId(resolveEntityId(msg?.senderId)) === myId ||
+        normalizeId(resolveEntityId(msg?.sender)) === myId ||
+        normalizeId(msg?.senderId) === myId,
       type: msg.type || "text",
       couponDetails: msg.couponDetails,
     }));
-  }, [messagesData, user?.id, user?.userId]);
+  }, [messagesData, currentUserId]);
 
   React.useEffect(() => {
     if (!Array.isArray(messagesData) || !currentUserId) return;
 
     const unreadIncoming = messagesData.filter((msg: any) => {
-      const receiverId = msg?.receiverId?.id || msg?.receiverId?._id || msg?.receiverId;
-      const senderId = msg?.senderId?.id || msg?.senderId?._id || msg?.senderId;
+      const receiverId = resolveEntityId(msg?.receiverId);
+      const senderId = resolveEntityId(msg?.senderId);
       return (
-        String(receiverId || "") === String(currentUserId) &&
-        String(senderId || "") === String(activePartnerId) &&
+        normalizeId(receiverId) === normalizeId(currentUserId) &&
+        normalizeId(senderId) === normalizeId(activePartnerId) &&
         !msg?.isRead
       );
     });
@@ -568,6 +588,8 @@ const ChatBox: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.chatList}
             renderItem={renderMessage}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
         );
@@ -580,50 +602,49 @@ const ChatBox: React.FC = () => {
       {renderTabs()}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={{ flex: 1 }}>
-            {renderContent()}
+        <View style={{ flex: 1 }}>
+          {renderContent()}
 
-            {activeTab === "chat" && (
-              <>
-                {showOptions && (
-                  <View style={styles.attachmentMenu}>
-                    <View style={styles.attachmentRow}>
-                      <AttachmentBtn icon="image" label={t("chat_attachment_photo", "Photo")} onPress={() => { }} />
-                      <AttachmentBtn icon="camera-alt" label={t("chat_attachment_camera", "camera")} onPress={() => { }} />
-                      <AttachmentBtn icon="location-on" label={t("chat_attachment_location", "Location")} onPress={() => { }} />
-                      {isVendorSide && (
-                        <AttachmentBtn icon="confirmation-number" label={t("chat_attachment_coupon", "Coupon")} onPress={() => setShowCouponModal(true)} />
-                      )}
-                    </View>
+          {activeTab === "chat" && (
+            <>
+              {showOptions && (
+                <View style={styles.attachmentMenu}>
+                  <View style={styles.attachmentRow}>
+                    <AttachmentBtn icon="image" label={t("chat_attachment_photo", "Photo")} onPress={() => { }} />
+                    <AttachmentBtn icon="camera-alt" label={t("chat_attachment_camera", "camera")} onPress={() => { }} />
+                    <AttachmentBtn icon="location-on" label={t("chat_attachment_location", "Location")} onPress={() => { }} />
+                    {isVendorSide && (
+                      <AttachmentBtn icon="confirmation-number" label={t("chat_attachment_coupon", "Coupon")} onPress={() => setShowCouponModal(true)} />
+                    )}
                   </View>
-                )}
-
-                <View style={styles.inputArea}>
-                  <TouchableOpacity onPress={() => setShowOptions(!showOptions)} style={styles.plusBtn}>
-                    <Feather name={showOptions ? "x" : "plus"} size={28} color="#2A8383" />
-                  </TouchableOpacity>
-                  <TextInput
-                    placeholder={t("chat_type_message", "Type a message...")}
-                    style={styles.textInput}
-                    value={messageText}
-                    onChangeText={setMessageText}
-                    multiline
-                  />
-                  <TouchableOpacity onPress={() => handleSendMessage(messageText)}>
-                    <View style={[styles.sendBtn, !messageText.trim() && { backgroundColor: "#DDD" }]}>
-                      <Ionicons name="send" size={18} color="white" />
-                    </View>
-                  </TouchableOpacity>
                 </View>
-              </>
-            )}
-          </View>
-        </TouchableWithoutFeedback>
+              )}
+
+              <View style={[styles.inputArea, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+                <TouchableOpacity onPress={() => setShowOptions(!showOptions)} style={styles.plusBtn}>
+                  <Feather name={showOptions ? "x" : "plus"} size={28} color="#2A8383" />
+                </TouchableOpacity>
+                <TextInput
+                  placeholder={t("chat_type_message", "Type a message...")}
+                  style={styles.textInput}
+                  value={messageText}
+                  onChangeText={setMessageText}
+                  multiline
+                  blurOnSubmit={false}
+                />
+                <TouchableOpacity onPress={() => handleSendMessage(messageText)}>
+                  <View style={[styles.sendBtn, !messageText.trim() && { backgroundColor: "#DDD" }]}>
+                    <Ionicons name="send" size={18} color="white" />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
       </KeyboardAvoidingView>
 
       <CouponModal
