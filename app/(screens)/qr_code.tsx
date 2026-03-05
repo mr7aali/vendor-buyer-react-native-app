@@ -1,4 +1,4 @@
-
+﻿
 import { useGetProfileQuery } from '@/store/api/authApiSlice';
 import { useGetVendorQrQuery } from '@/store/api/connectionApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
@@ -13,6 +13,18 @@ import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6';
+
+const normalizeVendorCode = (rawCode: string) => {
+    const trimmed = (rawCode || '').trim();
+    if (!trimmed) return '';
+
+    // Accept values like full URL, "v.CODE", "/v/CODE", ".CODE" and normalize to only CODE.
+    return trimmed
+        .replace(/^https?:\/\/[^/]+\/v[/.]/i, '')
+        .replace(/^v[/.]/i, '')
+        .replace(/^[./]+/, '');
+};
 
 const AbcdStoreCard = () => {
     const { language } = useTranslation();
@@ -23,9 +35,7 @@ const AbcdStoreCard = () => {
         (profileData as any)?.data?.vendor?.id ||
         (profileData as any)?.data?.vendor?._id ||
         (user as any)?.vendor?.id ||
-        (user as any)?.vendor?._id ||
-        (user as any)?.id ||
-        (user as any)?._id;
+        (user as any)?.vendor?._id;
 
     const {
         data: qrData,
@@ -33,42 +43,59 @@ const AbcdStoreCard = () => {
         isError: isQrError,
     } = useGetVendorQrQuery(vendorId, { skip: !vendorId });
 
-    const vendorCode =
+    const displayUser = (profileData as any)?.data || user;
+    const rawVendorCode =
         qrData?.vendorCode ||
-        (user as any)?.vendorCode ||
-        (user as any)?.vendor_code ||
-        (user as any)?.vendorID ||
-        (user as any)?.code ||
-        "N/A";
-    const businessName = user?.businessName || user?.storename || "Your Store";
-    const storeUrl = `ABCD.store/v/${vendorCode}`;
-    const qrDataUrl = qrData?.qrDataUrl;
+        (displayUser as any)?.vendorCode ||
+        (displayUser as any)?.vendor_code ||
+        (displayUser as any)?.vendor?.vendorCode ||
+        (displayUser as any)?.vendor?.vendor_code ||
+        (displayUser as any)?.vendorID ||
+        (displayUser as any)?.code ||
+        "";
+    const vendorCode = normalizeVendorCode(rawVendorCode);
+    const businessName =
+        (displayUser as any)?.vendor?.businessName ||
+        (displayUser as any)?.vendor?.storename ||
+        (displayUser as any)?.businessName ||
+        (displayUser as any)?.storename ||
+        "Your Store";
+    const avatarUri =
+        (displayUser as any)?.vendor?.logoUrl ||
+        (displayUser as any)?.vendor?.logo ||
+        (displayUser as any)?.logo ||
+        (displayUser as any)?.image ||
+        (displayUser as any)?.avatar ||
+        DEFAULT_AVATAR;
+    const hasVendorCode = Boolean(vendorCode);
+    const storeUrl = hasVendorCode ? `https://abcd.store/v/${vendorCode}` : "";
+    const qrDataUrl = qrData?.qrDataUrl || qrData?.qrUrl || qrData?.qrImageUrl;
 
     const ui = React.useMemo(() => {
         if (language === "he") {
             return {
-                myQrCode: "קוד ה-QR שלי",
-                officialStoreLink: "קישור חנות רשמי",
-                shareQrCode: "שתף קוד QR",
-                vendorCode: "קוד ספק",
-                copy: "העתק",
-                copied: "הועתק",
-                linkCopied: "הקישור הועתק ללוח!",
-                shareMessage: `בדקו את החנות הרשמית שלנו: ${storeUrl}`,
-                qrFallback: "לא ניתן היה לטעון QR מהשרת. מוצג QR מקומי.",
+                myQrCode: "×§×•×“ ×”-QR ×©×œ×™",
+                officialStoreLink: "×§×™×©×•×¨ ×—× ×•×ª ×¨×©×ž×™",
+                shareQrCode: "×©×ª×£ ×§×•×“ QR",
+                vendorCode: "×§×•×“ ×¡×¤×§",
+                copy: "×”×¢×ª×§",
+                copied: "×”×•×¢×ª×§",
+                codeCopied: "Vendor code copied to clipboard!",
+                shareMessage: `×‘×“×§×• ××ª ×”×—× ×•×ª ×”×¨×©×ž×™×ª ×©×œ× ×•: ${storeUrl}`,
+                qrFallback: "×œ× × ×™×ª×Ÿ ×”×™×” ×œ×˜×¢×•×Ÿ QR ×ž×”×©×¨×ª. ×ž×•×¦×’ QR ×ž×§×•×ž×™.",
             };
         }
         if (language === "hi") {
             return {
-                myQrCode: "मेरा QR कोड",
-                officialStoreLink: "ऑफिशियल स्टोर लिंक",
-                shareQrCode: "QR कोड शेयर करें",
-                vendorCode: "वेंडर कोड",
-                copy: "कॉपी करें",
-                copied: "कॉपी हुआ",
-                linkCopied: "लिंक क्लिपबोर्ड में कॉपी हो गया!",
-                shareMessage: `हमारे आधिकारिक स्टोर को देखें: ${storeUrl}`,
-                qrFallback: "सर्वर QR लोड नहीं हुआ। लोकल QR दिखाया जा रहा है।",
+                myQrCode: "à¤®à¥‡à¤°à¤¾ QR à¤•à¥‹à¤¡",
+                officialStoreLink: "à¤‘à¤«à¤¿à¤¶à¤¿à¤¯à¤² à¤¸à¥à¤Ÿà¥‹à¤° à¤²à¤¿à¤‚à¤•",
+                shareQrCode: "QR à¤•à¥‹à¤¡ à¤¶à¥‡à¤¯à¤° à¤•à¤°à¥‡à¤‚",
+                vendorCode: "à¤µà¥‡à¤‚à¤¡à¤° à¤•à¥‹à¤¡",
+                copy: "à¤•à¥‰à¤ªà¥€ à¤•à¤°à¥‡à¤‚",
+                copied: "à¤•à¥‰à¤ªà¥€ à¤¹à¥à¤†",
+                codeCopied: "Vendor code copied to clipboard!",
+                shareMessage: `à¤¹à¤®à¤¾à¤°à¥‡ à¤†à¤§à¤¿à¤•à¤¾à¤°à¤¿à¤• à¤¸à¥à¤Ÿà¥‹à¤° à¤•à¥‹ à¤¦à¥‡à¤–à¥‡à¤‚: ${storeUrl}`,
+                qrFallback: "à¤¸à¤°à¥à¤µà¤° QR à¤²à¥‹à¤¡ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤ à¤²à¥‹à¤•à¤² QR à¤¦à¤¿à¤–à¤¾à¤¯à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤",
             };
         }
         return {
@@ -78,20 +105,28 @@ const AbcdStoreCard = () => {
             vendorCode: "Vendor Code",
             copy: "Copy",
             copied: "Copied",
-            linkCopied: "Link copied to clipboard!",
+            codeCopied: "Vendor code copied to clipboard!",
             shareMessage: `Check out our official store: ${storeUrl}`,
             qrFallback: "Could not load server QR. Showing local fallback QR.",
         };
     }, [language, storeUrl]);
 
     const copyToClipboard = async () => {
-        await Clipboard.setStringAsync(storeUrl);
-        Alert.alert(ui.copied, ui.linkCopied);
+        if (!vendorCode) {
+            Alert.alert("Unavailable", "Vendor code not found yet.");
+            return;
+        }
+        await Clipboard.setStringAsync(vendorCode);
+        Alert.alert(ui.copied, ui.codeCopied);
     };
 
     // Function for the Share button
     const onShare = async () => {
         try {
+            if (!vendorCode) {
+                Alert.alert("Unavailable", "Vendor code not found yet.");
+                return;
+            }
             await Share.share({
                 message: ui.shareMessage,
             });
@@ -138,7 +173,7 @@ const AbcdStoreCard = () => {
                 }}>
                     <View style={{ marginBottom: 16 }}>
                         <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6' }}
+                            source={{ uri: avatarUri }}
                             style={{ width: 100, height: 100, borderRadius: 50 }}
                         />
                     </View>
@@ -174,7 +209,7 @@ const AbcdStoreCard = () => {
                             />
                         ) : (
                             <QRCode
-                                value={storeUrl}
+                                value={storeUrl || "https://abcd.store"}
                                 size={180}
                                 color="#000"
                                 backgroundColor="#FFFFFF"
@@ -220,7 +255,7 @@ const AbcdStoreCard = () => {
                             overflow: 'hidden'
                         }}>
                             <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 16, backgroundColor: '#F9F9F9' }}>
-                                <Text style={{ color: '#666', fontSize: 15 }}>{vendorCode}</Text>
+                                <Text style={{ color: '#666', fontSize: 15 }}>{vendorCode || "-"}</Text>
                             </View>
 
                             <TouchableOpacity
@@ -245,3 +280,5 @@ const AbcdStoreCard = () => {
 };
 
 export default AbcdStoreCard;
+
+
