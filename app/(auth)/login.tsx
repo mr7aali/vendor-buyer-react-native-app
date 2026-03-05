@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
     height: 58,
   },
   lockIcon: { marginRight: 12 },
-  passwordInput: { flex: 1, height: "100%", fontSize: 16 },
+  passwordInput: { flex: 1, height: "100%", fontSize: 16, color: "#000" },
   optionsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 15 },
   checkboxContainer: { flexDirection: "row", alignItems: "center" },
   checkbox: {

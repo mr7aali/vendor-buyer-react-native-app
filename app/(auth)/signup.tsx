@@ -34,6 +34,8 @@ const SignUpScreen: React.FC = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [isSocialLoading, setIsSocialLoading] = useState<boolean>(false);
   const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").trim();
@@ -370,23 +372,41 @@ const SignUpScreen: React.FC = () => {
               onChangeText={setEmail}
             />
 
-            <TextInput
-              style={styles.input}
-              placeholder={ui.password}
-              placeholderTextColor="#999"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
+            <View style={styles.passwordInputContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder={ui.password}
+                placeholderTextColor="#999"
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+              />
+              <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color="#7C7C7C"
+                />
+              </TouchableOpacity>
+            </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder={ui.confirmPassword}
-              placeholderTextColor="#999"
-              secureTextEntry
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-            />
+            <View style={styles.passwordInputContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder={ui.confirmPassword}
+                placeholderTextColor="#999"
+                secureTextEntry={!showConfirmPassword}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+              />
+              <TouchableOpacity onPress={() => setShowConfirmPassword((prev) => !prev)}>
+                <Ionicons
+                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color="#7C7C7C"
+                />
+              </TouchableOpacity>
+            </View>
 
             {/* Terms and Conditions */}
             <TouchableOpacity
@@ -471,6 +491,21 @@ const styles = StyleSheet.create({
     borderColor: "#E2E2E2", // Image-er moto light border
     borderRadius: 10, // Rounded corners
     paddingHorizontal: 16,
+    fontSize: 16,
+    color: "#000",
+  },
+  passwordInputContainer: {
+    height: 58,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E2E2E2",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  passwordInput: {
+    flex: 1,
     fontSize: 16,
     color: "#000",
   },
