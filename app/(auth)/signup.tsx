@@ -22,7 +22,7 @@ import {
 import { useAppleAuthMutation, useGoogleAuthMutation, useRegisterMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
 import { useAppDispatch } from "@/store/hooks";
-import { setCredentials } from "@/store/slices/authSlice";
+import { logOut, setCredentials } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Apple, Chrome } from "lucide-react-native";
@@ -269,6 +269,11 @@ const SignUpScreen: React.FC = () => {
       return;
     }
 
+    // Prevent stale logged-in session data from leaking into a fresh signup flow.
+    dispatch(logOut());
+    dispatch(apiSlice.util.resetApiState());
+    await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user", "userRole"]);
+
     try {
       let resolvedAddress = "N/A";
       if (locationData) {
@@ -313,10 +318,8 @@ const SignUpScreen: React.FC = () => {
         await AsyncStorage.setItem('user', JSON.stringify(user));
 
         // Save role to AsyncStorage for role-based UI
-        const userType = user?.userType;
-        if (userType) {
-          await AsyncStorage.setItem('userRole', userType);
-        }
+        const userType = user?.userType || "user";
+        await AsyncStorage.setItem('userRole', userType);
 
         console.log('Signup successful, redirecting to role selection. UserType:', userType);
         router.replace("/(onboarding)/user-selection");

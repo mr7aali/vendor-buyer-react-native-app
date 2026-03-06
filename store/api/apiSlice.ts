@@ -13,7 +13,22 @@ if (!apiUrl) {
 
 const baseQuery = fetchBaseQuery({
     baseUrl: apiUrl,
-    prepareHeaders: async (headers, { getState }) => {
+    prepareHeaders: async (headers, { getState, endpoint }) => {
+        const publicAuthEndpoints = new Set([
+            'register',
+            'login',
+            'googleAuth',
+            'appleAuth',
+            'ForgotPasswordScreen',
+            'OTPVerification',
+            'SetNewPasswordScreen',
+        ]);
+
+        if (publicAuthEndpoints.has(String(endpoint || ''))) {
+            headers.delete('Authorization');
+            return headers;
+        }
+
         const state = getState() as any;
         const reduxToken = state.auth?.accessToken;
         const persistedToken = await AsyncStorage.getItem('accessToken');
