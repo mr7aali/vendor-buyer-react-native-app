@@ -15,6 +15,7 @@ import { RootState } from "@/store/store";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
@@ -483,7 +484,12 @@ const ChatBox: React.FC = () => {
         // Fallback to current user id match.
         return !!myId && senderId === myId;
       })(),
-      type: msg.type || "text",
+      type:
+        msg.type ||
+        (String(msg.messageText || msg.text || "").startsWith("data:image/") ||
+        String(msg.messageText || msg.text || "").startsWith("file://")
+          ? "image"
+          : "text"),
       couponDetails: msg.couponDetails,
     }));
   }, [messagesData, currentUserId, activePartnerId]);
@@ -612,6 +618,39 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  const handlePickPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          t("permission_required", "Permission Required"),
+          t("need_photos_permission", "Please grant photo library permission."),
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.35,
+        base64: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || "image/jpeg";
+      const imagePayload = asset.base64
+        ? `data:${mimeType};base64,${asset.base64}`
+        : asset.uri || "";
+
+      if (!imagePayload) return;
+      await handleSendMessage(imagePayload, "image");
+    } catch (error) {
+      console.error("Photo pick/send failed", error);
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
+    }
+  };
+
   const formatTime = (dateStr: string) => {
     if (!dateStr) return "";
     return new Date(dateStr).toLocaleTimeString("en-US", {
@@ -661,6 +700,20 @@ const ChatBox: React.FC = () => {
                 defaultDiscount: t("chat_coupon_default_discount", "10%"),
               }}
             />
+          ) : msg.type === "image" ? (
+            <View
+              style={[
+                styles.bubble,
+                msg.isOwn ? styles.myBubble : styles.otherBubble,
+                styles.imageBubble,
+              ]}
+            >
+              <Image
+                source={{ uri: msg.text }}
+                style={styles.chatImage}
+                resizeMode="cover"
+              />
+            </View>
           ) : (
             <View
               style={[
@@ -903,17 +956,7 @@ const ChatBox: React.FC = () => {
                     <AttachmentBtn
                       icon="image"
                       label={t("chat_attachment_photo", "Photo")}
-                      onPress={() => {}}
-                    />
-                    <AttachmentBtn
-                      icon="camera-alt"
-                      label={t("chat_attachment_camera", "camera")}
-                      onPress={() => {}}
-                    />
-                    <AttachmentBtn
-                      icon="location-on"
-                      label={t("chat_attachment_location", "Location")}
-                      onPress={() => {}}
+                      onPress={handlePickPhoto}
                     />
                     {isVendorSide && (
                       <AttachmentBtn
@@ -1081,6 +1124,8 @@ const styles = StyleSheet.create({
   },
   myBubble: { backgroundColor: "#2A8383", borderBottomRightRadius: 2 },
   otherBubble: { backgroundColor: "#fff", borderBottomLeftRadius: 2 },
+  imageBubble: { padding: 4, overflow: "hidden" },
+  chatImage: { width: 180, height: 180, borderRadius: 12, backgroundColor: "#E5E7EB" },
   msgText: { fontSize: 14, lineHeight: 20 },
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
