@@ -749,9 +749,6 @@ const ChatBox: React.FC = () => {
             </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.moreBtn}>
-          <MaterialIcons name="more-horiz" size={24} color="#666" />
-        </TouchableOpacity>
       </View>
     );
   };
@@ -1053,7 +1050,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   activeTab: { backgroundColor: "#2A8383", borderColor: "#2A8383" },
-  tabText: { fontSize: 17, color: "#2F3437", fontWeight: "500" },
+  tabText: { fontSize: 13, color: "#2F3437", fontWeight: "500" },
   activeTabText: { color: "#FFF" },
 
   chatList: { padding: 16, flexGrow: 1, backgroundColor: "#F9FAFB" },

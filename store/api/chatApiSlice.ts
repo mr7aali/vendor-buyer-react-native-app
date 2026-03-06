@@ -24,12 +24,50 @@ const resolveMessageSideId = (value: any): string | undefined => {
     return normalizeId(value);
 };
 
-const normalizeConversation = (conv: any) => {
-    const partner = conv?.partner || conv?.participant || null;
-    const partnerId =
+const toEntityList = (value: any): any[] => {
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
+};
+
+const normalizeConversation = (conv: any, currentUserId?: string) => {
+    const participantCandidates = [
+        ...toEntityList(conv?.partner),
+        ...toEntityList(conv?.participant),
+        ...toEntityList(conv?.participants),
+        ...toEntityList(conv?.users),
+        ...toEntityList(conv?.members),
+    ].filter(Boolean);
+
+    const selectedPartner =
+        participantCandidates.find((p: any) => {
+            const id = resolveEntityId(p);
+            return !!id && (!currentUserId || id !== currentUserId);
+        }) ||
+        participantCandidates[0] ||
+        conv?.partner ||
+        conv?.participant ||
+        null;
+
+    let partnerId =
         normalizeId(conv?.partnerId) ||
-        resolveEntityId(partner) ||
-        normalizeId(conv?.conversationPartnerId);
+        resolveEntityId(selectedPartner) ||
+        normalizeId(conv?.conversationPartnerId) ||
+        resolveEntityId(conv?.vendorId) ||
+        resolveEntityId(conv?.vendor) ||
+        resolveEntityId(conv?.buyerId) ||
+        resolveEntityId(conv?.buyer) ||
+        resolveEntityId(conv?.userId) ||
+        resolveEntityId(conv?.user);
+
+    // If fallback resolved own id, try another participant.
+    if (partnerId && currentUserId && partnerId === currentUserId) {
+        const other = participantCandidates.find((p: any) => {
+            const id = resolveEntityId(p);
+            return !!id && id !== currentUserId;
+        });
+        const otherId = resolveEntityId(other);
+        if (otherId) partnerId = otherId;
+    }
 
     const lastMessage = conv?.lastMessage
         ? {
@@ -43,8 +81,8 @@ const normalizeConversation = (conv: any) => {
         ...conv,
         id: conv?.id || conv?._id || partnerId,
         partnerId,
-        partner,
-        participant: partner,
+        partner: selectedPartner,
+        participant: selectedPartner,
         lastMessage,
         unreadCount: Number(conv?.unreadCount || 0),
     };
@@ -55,9 +93,9 @@ export const chatApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getConversations: builder.query<any, string | undefined>({
             query: () => '/messages/conversations',
-            transformResponse: (response: { data: any[] }) => {
+            transformResponse: (response: { data: any[] }, _meta, currentUserId) => {
                 const raw = Array.isArray(response?.data) ? response.data : [];
-                return raw.map(normalizeConversation);
+                return raw.map((conv: any) => normalizeConversation(conv, currentUserId));
             },
             providesTags: ['Chat'],
             async onCacheEntryAdded(

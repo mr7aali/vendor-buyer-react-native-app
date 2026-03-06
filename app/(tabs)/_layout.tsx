@@ -4,9 +4,21 @@ import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
 import { useTranslation } from "@/hooks/use-translation";
 import { Tabs } from "expo-router";
 import React from "react";
+import { Image, View } from "react-native";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const user = useSelector((state: RootState) => state.auth.user as any);
+  const profileImageUri =
+    user?.vendor?.logoUrl ||
+    user?.vendor?.logo ||
+    user?.logo ||
+    user?.avatar ||
+    user?.image ||
+    user?.profilePhotoUrl ||
+    "";
 
   return (
     <Tabs
@@ -71,9 +83,26 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: t("tab_profile", "Profile"),
-          tabBarIcon: ({ color }: { color: string }) => (
-            <FontAwesome5 name="user-circle" size={24} color={color} />
-          ),
+          tabBarIcon: ({ color }: { color: string }) =>
+            profileImageUri ? (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: color,
+                }}
+              >
+                <Image
+                  source={{ uri: profileImageUri }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </View>
+            ) : (
+              <FontAwesome5 name="user-circle" size={24} color={color} />
+            ),
         }}
       />
       <Tabs.Screen

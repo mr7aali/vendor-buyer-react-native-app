@@ -1,6 +1,7 @@
 import { supportTickets } from '@/constants/common';
 import { useTranslation } from '@/hooks/use-translation';
 import { useGetConversationsQuery, useMarkAsReadMutation } from '@/store/api/chatApiSlice';
+import { useGetMyConnectionsQuery } from '@/store/api/connectionApiSlice';
 import { RootState } from '@/store/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -10,6 +11,49 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 const normalizeId = (value: any) => (value === undefined || value === null ? '' : String(value));
+const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
+const resolveEntityId = (entity: any) =>
+  normalizeId(
+    entity?.userId ??
+      entity?._id ??
+      entity?.id ??
+      entity?.user?.userId ??
+      entity?.user?._id ??
+      entity?.user?.id ??
+      entity,
+  );
+const toAbsoluteImageUri = (value: any) => {
+  const raw = normalizeId(value).trim();
+  if (!raw) return '';
+  if (
+    raw.startsWith('http://') ||
+    raw.startsWith('https://') ||
+    raw.startsWith('file://') ||
+    raw.startsWith('content://') ||
+    raw.startsWith('data:')
+  ) {
+    return raw;
+  }
+  if (raw.startsWith('/') && apiBaseUrl) {
+    return `${apiBaseUrl}${raw}`;
+  }
+  return raw;
+};
+const resolveAvatarUri = (partner: any) =>
+  toAbsoluteImageUri(
+    partner?.buyer?.profilePhotoUrl ||
+      partner?.buyer?.avatar ||
+      partner?.vendor?.logoUrl ||
+      partner?.vendor?.logo ||
+      partner?.profilePhotoUrl ||
+      partner?.avatar ||
+      partner?.logoUrl ||
+      partner?.logo ||
+      partner?.image ||
+      partner?.photoUrl ||
+      partner?.profileImage ||
+      '',
+  ) || 'https://via.placeholder.com/48';
 const formatTime = (value: any) => {
   if (!value) return '';
   const date = new Date(value);
@@ -29,11 +73,65 @@ export default function ChatScreen() {
     skip: !currentUserId,
     refetchOnMountOrArgChange: true,
   });
+  const { data: connectionsData = [] } = useGetMyConnectionsQuery(currentUserId, {
+    skip: !currentUserId,
+    refetchOnMountOrArgChange: true,
+  });
   const [markAsRead] = useMarkAsReadMutation();
+
+  const mergedRows = useMemo(() => {
+    const conversationRows = Array.isArray(conversationsData) ? conversationsData : [];
+    const rawConnections = Array.isArray((connectionsData as any)?.data)
+      ? (connectionsData as any).data
+      : Array.isArray(connectionsData)
+        ? (connectionsData as any)
+        : [];
+
+    const byPartnerId = new Map<string, any>();
+
+    conversationRows.forEach((row: any) => {
+      const partner = row?.partner || row?.participant || {};
+      const partnerId = normalizeId(
+        row?.partnerId ||
+        resolveEntityId(partner) ||
+        resolveEntityId(row?.participant) ||
+        resolveEntityId(row?.vendorId) ||
+        resolveEntityId(row?.vendor),
+      );
+      if (partnerId) byPartnerId.set(partnerId, row);
+    });
+
+    rawConnections.forEach((conn: any) => {
+      const vendor = conn?.vendor || conn?.vendorId || {};
+      const partnerId = normalizeId(
+        resolveEntityId(vendor) ||
+        resolveEntityId(conn?.vendorId) ||
+        conn?.vendorUserId ||
+        conn?.vendorId,
+      );
+      if (!partnerId || byPartnerId.has(partnerId)) return;
+
+      byPartnerId.set(partnerId, {
+        id: normalizeId(conn?._id || conn?.id || partnerId),
+        partnerId,
+        partner: vendor,
+        participant: vendor,
+        unreadCount: 0,
+        // Connected vendor with no chat yet should still appear in list.
+        lastMessage: {
+          id: '',
+          messageText: t('chat_no_messages_yet', 'No messages yet'),
+          createdAt: conn?.createdAt || conn?.updatedAt || null,
+        },
+      });
+    });
+
+    return Array.from(byPartnerId.values());
+  }, [conversationsData, connectionsData, t]);
 
   const filteredRows = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const rows = Array.isArray(conversationsData) ? conversationsData : [];
+    const rows = Array.isArray(mergedRows) ? mergedRows : [];
     if (!q) return rows;
     return rows.filter((row: any) => {
       const partner = row?.partner || {};
@@ -41,7 +139,7 @@ export default function ChatScreen() {
       const preview = row?.lastMessage?.messageText || '';
       return String(name).toLowerCase().includes(q) || String(preview).toLowerCase().includes(q);
     });
-  }, [conversationsData, searchQuery]);
+  }, [mergedRows, searchQuery]);
 
   const filteredTickets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -83,10 +181,34 @@ export default function ChatScreen() {
               <Text style={styles.emptyText}>{t('chat_loading_conversations', 'Loading conversations...')}</Text>
             ) : filteredRows.length ? (
               filteredRows.map((conversation: any, index: number) => {
-                const partner = conversation?.partner || {};
-                const partnerId = normalizeId(conversation?.partnerId || partner?.id || partner?._id || partner?.userId);
+                const partner = conversation?.partner || conversation?.participant || conversation?.vendor || conversation?.buyer || {};
+                const participantList = Array.isArray(conversation?.participants)
+                  ? conversation.participants
+                  : Array.isArray(conversation?.users)
+                    ? conversation.users
+                    : [];
+                const participantOther = participantList.find((p: any) => resolveEntityId(p) && resolveEntityId(p) !== currentUserId);
+                const lastSenderId = resolveEntityId(conversation?.lastMessage?.senderId || conversation?.lastMessage?.sender);
+                const lastReceiverId = resolveEntityId(conversation?.lastMessage?.receiverId || conversation?.lastMessage?.receiver);
+                const lastMessageOtherId =
+                  lastSenderId && lastSenderId !== currentUserId
+                    ? lastSenderId
+                    : lastReceiverId && lastReceiverId !== currentUserId
+                      ? lastReceiverId
+                      : '';
+                const partnerId = normalizeId(
+                  conversation?.partnerId ||
+                    resolveEntityId(partner) ||
+                    resolveEntityId(conversation?.participant) ||
+                    resolveEntityId(participantOther) ||
+                    lastMessageOtherId ||
+                    resolveEntityId(conversation?.vendorId) ||
+                    resolveEntityId(conversation?.vendor) ||
+                    resolveEntityId(conversation?.buyerId) ||
+                    resolveEntityId(conversation?.buyer),
+                );
                 const displayName = partner?.fullName || partner?.businessName || partner?.storename || partner?.email || t('chat_user_fallback', 'User');
-                const avatar = partner?.avatar || partner?.logoUrl || 'https://via.placeholder.com/48';
+                const avatar = resolveAvatarUri(partner);
                 const unreadCount = Number(conversation?.unreadCount || 0);
                 const messageId = conversation?.lastMessage?.id || conversation?.lastMessage?._id;
 

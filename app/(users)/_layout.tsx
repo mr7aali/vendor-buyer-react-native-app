@@ -8,9 +8,21 @@ import {
 } from "lucide-react-native";
 import { useTranslation } from "@/hooks/use-translation";
 import React from "react";
+import { Image, View } from "react-native";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store/store";
 
 export default function UsersLayout() {
   const { t } = useTranslation();
+  const user = useSelector((state: RootState) => state.auth.user as any);
+  const profileImageUri =
+    user?.buyer?.profilePhotoUrl ||
+    user?.buyer?.avatar ||
+    user?.avatar ||
+    user?.image ||
+    user?.logo ||
+    user?.profilePhotoUrl ||
+    "";
 
   return (
     <Tabs
@@ -67,7 +79,26 @@ export default function UsersLayout() {
         name="profile"
         options={{
           title: t("tab_profile", "Profile"),
-          tabBarIcon: ({ color }) => <User size={24} color={color} />,
+          tabBarIcon: ({ color }) =>
+            profileImageUri ? (
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  borderWidth: 1,
+                  borderColor: color,
+                }}
+              >
+                <Image
+                  source={{ uri: profileImageUri }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </View>
+            ) : (
+              <User size={24} color={color} />
+            ),
         }}
       />
 
