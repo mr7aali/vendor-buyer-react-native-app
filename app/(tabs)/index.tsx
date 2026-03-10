@@ -570,7 +570,17 @@ export default function HomeScreen() {
                                 marginBottom: 8,
                               }}
                             >
-                              <Text style={{ color: "#2B2B2B", fontSize: 16 }}>
+                              <Text
+                                style={{
+                                  color: "#2B2B2B",
+                                  fontSize: 16,
+                                  flex: 1,
+                                  flexShrink: 1,
+                                  marginRight: 8,
+                                }}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
                                 {order?.orderNumber || `#${orderId}`}
                               </Text>
                               <View
@@ -609,7 +619,11 @@ export default function HomeScreen() {
                               }}
                             >
                               <Ionicons name="star" size={12} color="#FFC107" />
-                              <Text style={{ fontSize: 12, marginLeft: 4 }}>
+                              <Text
+                                style={{ fontSize: 12, marginLeft: 4, flex: 1, flexShrink: 1 }}
+                                numberOfLines={2}
+                                ellipsizeMode="tail"
+                              >
                                 {customerId}
                               </Text>
                             </View>

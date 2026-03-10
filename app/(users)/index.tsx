@@ -589,7 +589,9 @@ const Dashboard: React.FC = () => {
                 />
                 <View style={styles.orderInfoContainer}>
                   <View style={styles.orderHeaderRow}>
-                    <Text style={styles.orderIdText}>{order?.orderNumber || `#${orderId}`}</Text>
+                    <Text style={styles.orderIdText} numberOfLines={1} ellipsizeMode="tail">
+                      {order?.orderNumber || `#${orderId}`}
+                    </Text>
                     <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}>
                       <Text style={[styles.statusText, { color: statusTheme.text }]}>{toTitle(status)}</Text>
                     </View>
@@ -601,7 +603,7 @@ const Dashboard: React.FC = () => {
 
                   <View style={styles.ratingRow}>
                     <Star color="#FFD700" size={16} fill="#FFD700" />
-                    <Text style={styles.ratingText}>
+                    <Text style={styles.ratingText} numberOfLines={2} ellipsizeMode="tail">
                       {" 4.5 "}
                       <Text style={styles.reviewCount}>({order?.buyer?.id || order?.vendor?.id || "N/A"})</Text>
                     </Text>
@@ -747,17 +749,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
   orderIdText: {
     fontSize: 16,
     fontWeight: "700",
     color: "#333",
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   statusBadge: {
     backgroundColor: "#E8F0FE",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 0,
+    alignSelf: "flex-start",
   },
   statusText: {
     fontSize: 11,
@@ -777,6 +785,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#333",
+    flex: 1,
+    flexShrink: 1,
   },
   reviewCount: {
     fontWeight: "400",
