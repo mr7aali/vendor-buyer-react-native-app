@@ -203,6 +203,7 @@
 //     flexGrow: 1,
 //   },
 //   header: {
+//     direction: 'ltr',
 //     alignItems: "center",
 //     marginBottom: 40,
 //   },
@@ -630,6 +631,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
+    direction: 'ltr',
     alignItems: "center",
     marginBottom: 40,
   },

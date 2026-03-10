@@ -351,6 +351,7 @@ const ElectronicsScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F7FAF8" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

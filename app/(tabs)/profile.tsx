@@ -300,7 +300,7 @@ const ProfileScreen = () => {
                 {t("personal_info", "Personal info")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
 
           {/* Business Info Link */}
@@ -331,7 +331,7 @@ const ProfileScreen = () => {
                 {t("business_info", "Business info")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push("/(screens)/transaction_history")}
@@ -360,7 +360,7 @@ const ProfileScreen = () => {
                 {t("transaction_history", "Transaction History")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           {/* Make a coupon Section */}
           <TouchableOpacity
@@ -395,7 +395,7 @@ const ProfileScreen = () => {
                 {t("make_coupon", "Make a coupon")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 
@@ -457,7 +457,7 @@ const ProfileScreen = () => {
                 ) : (
                   <>
                     <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 12 }}>{t("connect", "Connect")}</Text>
-                    <MaterialIcons name="arrow-forward" size={12} color="#FFF" style={{ marginLeft: 4 }} />
+                    <MaterialIcons name="arrow-back" size={12} color="#FFF" style={{ marginLeft: 4 }} />
                   </>
                 )}
               </TouchableOpacity>
@@ -559,7 +559,7 @@ const ProfileScreen = () => {
                 {t("permission", "Permission")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           {/* Settings Link */}
           <TouchableOpacity
@@ -589,7 +589,7 @@ const ProfileScreen = () => {
                 {t("settings", "Settings")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push("/(screens)/language")}
@@ -618,7 +618,7 @@ const ProfileScreen = () => {
                 {t("language", "Language")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 

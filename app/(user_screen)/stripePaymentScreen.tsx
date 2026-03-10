@@ -247,6 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    direction: 'ltr',
     height: 58,
     flexDirection: 'row',
     alignItems: 'center',

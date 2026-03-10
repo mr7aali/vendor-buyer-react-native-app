@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { syncRTLForLanguage } from "@/constants/rtl";
 import { translations, type LanguageCode } from "@/constants/translations";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { selectLanguage, setLanguage } from "@/store/slices/languageSlice";
@@ -13,6 +14,7 @@ export const useTranslation = () => {
     translations[language][key] || fallback || key;
 
   const setAppLanguage = async (next: LanguageCode) => {
+    syncRTLForLanguage(next);
     dispatch(setLanguage(next));
     await AsyncStorage.setItem(STORAGE_KEY, next);
   };

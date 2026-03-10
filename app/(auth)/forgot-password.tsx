@@ -168,6 +168,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

@@ -323,6 +323,7 @@ const MyCart: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F8FBFB" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

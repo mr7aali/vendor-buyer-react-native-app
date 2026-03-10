@@ -4,7 +4,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/100';
@@ -328,7 +328,7 @@ const OrderDetails = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F7F6' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F7F6' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1C252B', flex: 1, textAlign: 'center', marginHorizontal: 8 },
   downloadBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#2A8C8B', justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: 14, paddingBottom: 18 },
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 13, fontWeight: '600', color: '#1F2A30' },
   itemPrice: { fontSize: 13, fontWeight: '700', color: '#1F2A30' },
   itemDesc: { fontSize: 11, color: '#7C8991', marginTop: 2, marginRight: 30 },
-  itemQty: { textAlign: 'right', fontSize: 11, color: '#6D7A83', marginTop: 2 },
+  itemQty: { textAlign: I18nManager.isRTL ? 'left' : 'right', fontSize: 11, color: '#6D7A83', marginTop: 2 },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   paymentLabel: { fontSize: 13, color: '#6D7A83' },
   paymentValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600' },

@@ -3,7 +3,7 @@ import { useGetOrderByIdQuery, useUpdateOrderStatusMutation } from '@/store/api/
 import { AntDesign, Feather, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/72';
@@ -257,7 +257,7 @@ export default function OrderDetails() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#202427', flex: 1, textAlign: 'center', marginHorizontal: 8 },
   downloadFab: { backgroundColor: '#278687', width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '600', color: '#222C31', flex: 1, paddingRight: 8 },
   itemPrice: { fontSize: 14, fontWeight: '700', color: '#222C31' },
   itemDesc: { fontSize: 11, color: '#7B868D', marginTop: 2 },
-  itemQty: { textAlign: 'right', marginTop: 5, fontSize: 11, color: '#65727A' },
+  itemQty: { textAlign: I18nManager.isRTL ? 'left' : 'right', marginTop: 5, fontSize: 11, color: '#65727A' },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   paymentLabel: { color: '#66737C', fontSize: 13 },
   paymentValue: { color: '#222C31', fontSize: 13, fontWeight: '600' },

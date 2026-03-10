@@ -233,6 +233,7 @@ const EditProfileScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#EEF2F1" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

@@ -181,7 +181,7 @@ const ProfileScreen = () => {
                 {t("personal_info", "Personal info")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push("/(user_screen)/BuyerTransactionHistoryScreen")}
@@ -210,7 +210,7 @@ const ProfileScreen = () => {
                 {t("transaction_history", "Transaction History")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 
@@ -305,7 +305,7 @@ const ProfileScreen = () => {
                 {t("permission", "Permission")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           {/* Settings Link */}
           <TouchableOpacity
@@ -335,7 +335,7 @@ const ProfileScreen = () => {
                 {t("settings", "Settings")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push("/(screens)/language")}
@@ -364,7 +364,7 @@ const ProfileScreen = () => {
                 {t("language", "Language")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 

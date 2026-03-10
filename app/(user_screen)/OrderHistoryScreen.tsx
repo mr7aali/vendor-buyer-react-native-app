@@ -209,6 +209,7 @@ export default function OrderHistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FBF9" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 16,

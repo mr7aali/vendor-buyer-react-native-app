@@ -220,6 +220,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7FBF9",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

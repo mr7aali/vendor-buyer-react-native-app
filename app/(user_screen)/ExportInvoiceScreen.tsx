@@ -272,7 +272,7 @@ const ExportInvoiceScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F7F6' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F7F6' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1C252B' },
   content: { paddingHorizontal: 14, paddingBottom: 24 },
   card: { backgroundColor: '#FFF', borderRadius: 12, borderWidth: 1, borderColor: '#E0E8EB', padding: 12, marginBottom: 10 },

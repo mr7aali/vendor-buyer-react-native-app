@@ -293,6 +293,7 @@
 // const styles = StyleSheet.create({
 //   container: { flex: 1, backgroundColor: "#F8FBF9" },
 //   header: {
+//     direction: 'ltr',
 //     flexDirection: "row",
 //     alignItems: "center",
 //     justifyContent: "space-between",
@@ -670,6 +671,7 @@ export default function InformationScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

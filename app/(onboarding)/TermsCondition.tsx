@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
     maxHeight: "85%",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 15,

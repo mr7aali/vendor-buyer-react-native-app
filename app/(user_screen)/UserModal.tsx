@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

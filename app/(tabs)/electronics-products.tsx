@@ -221,7 +221,7 @@ export default function ElectronicsProducts() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   headerTitle: { fontSize: 24, fontWeight: '700', color: '#1F2A30' },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
   searchBox: { height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#DCE4E8', backgroundColor: '#FFF', paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row', marginBottom: 12 },

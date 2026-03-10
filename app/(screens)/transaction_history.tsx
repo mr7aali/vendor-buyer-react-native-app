@@ -167,6 +167,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FBF9', // Light greenish background
   },
   header: {
+    direction: 'ltr',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

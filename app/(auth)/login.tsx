@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FBFB" },
   backButton: { paddingHorizontal: 20, paddingTop: 10 },
   scrollContent: { paddingHorizontal: 25, paddingBottom: 20 },
-  header: { marginTop: 20, marginBottom: 30 },
+  header: { direction: 'ltr', marginTop: 20, marginBottom: 30 },
   welcomeText: { fontSize: 28, fontWeight: "bold", color: "#1A1A1A" },
   subText: { fontSize: 16, color: "#7C7C7C", marginTop: 5 },
   form: { width: "100%" },

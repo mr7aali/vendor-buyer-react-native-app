@@ -1033,8 +1033,9 @@ const ChatBox: React.FC = () => {
 // Helpers moved to top
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#fff" },
+  safeArea: { flex: 1, backgroundColor: "#fff", direction: "ltr" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
@@ -1075,6 +1076,7 @@ const styles = StyleSheet.create({
   moreBtn: { padding: 4 },
 
   tabsContainer: {
+    direction: "ltr",
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 14,

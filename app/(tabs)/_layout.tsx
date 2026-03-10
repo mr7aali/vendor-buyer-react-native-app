@@ -30,6 +30,7 @@ export default function TabLayout() {
           paddingRight: 20,
           paddingTop: 10,
           height: 85,
+          direction: "ltr",
           borderTopWidth: 0,
           elevation: 10,
           shadowColor: "#000",

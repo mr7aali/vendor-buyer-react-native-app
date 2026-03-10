@@ -180,7 +180,7 @@ export default function OrderTabs() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5', paddingHorizontal: 16 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: '#1F2A30' },
   searchWrap: {
     backgroundColor: '#FFFFFF',

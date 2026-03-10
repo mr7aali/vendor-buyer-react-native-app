@@ -225,6 +225,7 @@
 //     paddingBottom: 40,
 //   },
 //   header: {
+//     direction: 'ltr',
 //     marginTop: 40,
 //     marginBottom: 30,
 //     alignItems: "center",
@@ -644,6 +645,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
+    direction: 'ltr',
     marginTop: 20,
     marginBottom: 30,
     alignItems: "center",

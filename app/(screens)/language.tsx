@@ -1,18 +1,19 @@
 import { useTranslation } from "@/hooks/use-translation";
+import { getLayoutDirection } from "@/constants/rtl";
 import { Entypo, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 const LanguageScreen = () => {
   const { language, setAppLanguage, t } = useTranslation();
+  const isRTL = getLayoutDirection(language) === "rtl";
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           justifyContent: "space-between",
           paddingVertical: 12,
@@ -30,7 +31,7 @@ const LanguageScreen = () => {
         <TouchableOpacity
           onPress={async () => setAppLanguage("en")}
           style={{
-            flexDirection: "row",
+            flexDirection: isRTL ? "row-reverse" : "row",
             justifyContent: "space-between",
             alignItems: "center",
             paddingVertical: 20,
@@ -43,7 +44,7 @@ const LanguageScreen = () => {
         <TouchableOpacity
           onPress={async () => setAppLanguage("he")}
           style={{
-            flexDirection: "row",
+            flexDirection: isRTL ? "row-reverse" : "row",
             justifyContent: "space-between",
             alignItems: "center",
             paddingVertical: 20,
@@ -56,7 +57,7 @@ const LanguageScreen = () => {
         <TouchableOpacity
           onPress={async () => setAppLanguage("hi")}
           style={{
-            flexDirection: "row",
+            flexDirection: isRTL ? "row-reverse" : "row",
             justifyContent: "space-between",
             alignItems: "center",
             paddingVertical: 20,

@@ -232,6 +232,7 @@ const EditPersonalInfoScreen = () => {
                 name="arrow-back-ios-new"
                 size={24}
                 color="black"
+               
               />
             </TouchableOpacity>
             <Text style={{ fontSize: 18, fontWeight: "600" }}>

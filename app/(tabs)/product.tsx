@@ -250,6 +250,7 @@ const ProductScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FBFB" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",

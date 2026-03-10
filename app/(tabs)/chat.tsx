@@ -167,8 +167,9 @@ export default function ChatTabs() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F6F5' },
+  container: { flex: 1, backgroundColor: '#F2F6F5', direction: 'ltr' },
   header: {
+    direction: 'ltr',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -204,6 +205,7 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#FFFFFF' },
   listWrap: { paddingHorizontal: 20, paddingTop: 12 },
   row: {
+    direction: 'ltr',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
@@ -211,11 +213,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#DEE5EA',
   },
   avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#CCEFDB' },
-  middle: { flex: 1, marginLeft: 12, marginRight: 8 },
-  name: { fontSize: 31 / 2, fontWeight: '600', color: '#263238' },
-  preview: { fontSize: 29 / 2, color: '#4B5563', marginTop: 2 },
-  right: { alignItems: 'flex-end', minWidth: 64 },
-  time: { fontSize: 14, color: '#4B5563' },
+  middle: { flex: 1, marginLeft: 12, marginRight: 8, direction: 'ltr' },
+  name: { fontSize: 31 / 2, fontWeight: '600', color: '#263238', textAlign: 'left' },
+  preview: { fontSize: 29 / 2, color: '#4B5563', marginTop: 2, textAlign: 'left' },
+  right: { alignItems: 'flex-start', minWidth: 64, direction: 'ltr' },
+  time: { fontSize: 14, color: '#4B5563', textAlign: 'left' },
   timeActive: { color: '#1E8A8D' },
   badge: {
     marginTop: 6,

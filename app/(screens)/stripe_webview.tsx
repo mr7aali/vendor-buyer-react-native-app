@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
+    direction: 'ltr',
     height: 52,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

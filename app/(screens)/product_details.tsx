@@ -4,7 +4,7 @@ import { useTranslation } from '@/hooks/use-translation';
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const FALLBACK = 'https://via.placeholder.com/200';
@@ -290,7 +290,7 @@ export default function ProductDetails() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1F2A30' },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
   card: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DDE6EA', borderRadius: 12, padding: 12, marginBottom: 10 },
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   specRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9 },
   specBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
   specLabel: { fontSize: 13, color: '#6E7B84' },
-  specValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  specValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600', maxWidth: '55%', textAlign: I18nManager.isRTL ? 'left' : 'right' },
   reviewRow: { paddingVertical: 10 },
   reviewBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
   reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

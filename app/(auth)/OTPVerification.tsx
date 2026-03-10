@@ -197,6 +197,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAF9",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

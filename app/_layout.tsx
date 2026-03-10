@@ -4,11 +4,14 @@ import React from 'react';
 import "react-native-reanimated";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { Provider, useSelector } from 'react-redux';
+import { View } from 'react-native';
+import { useAppSelector } from '@/store/hooks';
 import { SocketProvider } from "../context/SocketContext";
+import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
 import { registerForPushNotificationsAsync, syncPushTokenToBackend } from "../services/pushNotifications";
 import { useGetProfileQuery } from "../store/api/authApiSlice";
 import { setCredentials } from '../store/slices/authSlice';
-import { setLanguage } from '../store/slices/languageSlice';
+import { selectLanguage, setLanguage } from '../store/slices/languageSlice';
 import { RootState, store } from '../store/store';
 import "./global.css";
 
@@ -76,6 +79,24 @@ const AuthSync = () => {
   return null;
 };
 
+const AppNavigator = () => {
+  const language = useAppSelector(selectLanguage);
+  const isRTL = getLayoutDirection(language) === "rtl";
+
+  return (
+    <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
+      <Stack key={isRTL ? "rtl" : "ltr"} initialRouteName="(onboarding)">
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+        <Stack.Screen name="(users)" options={{ headerShown: false }} />
+        <Stack.Screen name="(user_screen)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(screens)" options={{ headerShown: false }} />
+      </Stack>
+    </View>
+  );
+};
+
 export default function RootLayout() {
   const [isReady, setIsReady] = React.useState(false);
   const stripePublishableKey = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim();
@@ -89,6 +110,7 @@ export default function RootLayout() {
       try {
         const savedLanguage = await AsyncStorage.getItem("app_language");
         if (savedLanguage === "en" || savedLanguage === "he" || savedLanguage === "hi") {
+          syncRTLForLanguage(savedLanguage);
           store.dispatch(setLanguage(savedLanguage));
         }
 
@@ -158,27 +180,7 @@ export default function RootLayout() {
       >
         <AuthSync />
         <SocketProvider>
-          {/* <ThemeProvider
-        value={colorScheme === "dark" ? DarkTheme : CustomLightTheme}
-      > */}
-          <Stack initialRouteName="(onboarding)">
-            <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-            <Stack.Screen name="(users)" options={{ headerShown: false }} />
-            <Stack.Screen name="(user_screen)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(screens)" options={{ headerShown: false }} />
-            {/* <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", title: "Modal" }}
-          /> */}
-          </Stack>
-          {/* <StatusBar
-        barStyle={colorScheme === "dark" ? "light-content" : "dark-content"}
-        backgroundColor="transparent"
-        translucent
-        /> */}
-          {/* </ThemeProvider> */}
+          <AppNavigator />
         </SocketProvider>
       </StripeProvider>
     </Provider >
