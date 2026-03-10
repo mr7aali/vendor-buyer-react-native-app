@@ -69,7 +69,7 @@ const AbcdStoreCard = () => {
         DEFAULT_AVATAR;
     const hasVendorCode = Boolean(vendorCode);
     const storeUrl = hasVendorCode ? `https://abcd.store/v/${vendorCode}` : "";
-    const qrDataUrl = qrData?.qrDataUrl || qrData?.qrUrl || qrData?.qrImageUrl;
+    const qrValue = vendorCode || storeUrl || "https://abcd.store";
 
     const ui = React.useMemo(() => {
         if (language === "he") {
@@ -201,15 +201,9 @@ const AbcdStoreCard = () => {
                             <View style={{ width: 180, height: 180, justifyContent: 'center', alignItems: 'center' }}>
                                 <ActivityIndicator size="large" color="#328888" />
                             </View>
-                        ) : qrDataUrl ? (
-                            <Image
-                                source={{ uri: qrDataUrl }}
-                                style={{ width: 180, height: 180 }}
-                                resizeMode="contain"
-                            />
                         ) : (
                             <QRCode
-                                value={storeUrl || "https://abcd.store"}
+                                value={qrValue}
                                 size={180}
                                 color="#000"
                                 backgroundColor="#FFFFFF"

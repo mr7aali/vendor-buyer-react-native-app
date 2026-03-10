@@ -18,6 +18,54 @@ interface VendorModalProps {
   onConnect: (code: string) => void;
 }
 
+const normalizeVendorCode = (rawCode: string) => {
+  const trimmed = String(rawCode || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return normalizeVendorCode(parsed);
+    }
+    if (parsed?.vendorCode) {
+      return normalizeVendorCode(parsed.vendorCode);
+    }
+    if (parsed?.code) {
+      return normalizeVendorCode(parsed.code);
+    }
+    if (parsed?.url) {
+      return normalizeVendorCode(parsed.url);
+    }
+  } catch {
+    // Not JSON, continue with string parsing.
+  }
+
+  const withoutQuery = trimmed.split("?")[0].split("#")[0];
+  const normalized = withoutQuery
+    .replace(/^https?:\/\/[^/]+\/v\//i, "")
+    .replace(/^https?:\/\/[^/]+\/v\./i, "")
+    .replace(/^yozietranceapp:\/\/v\//i, "")
+    .replace(/^v\//i, "")
+    .replace(/^v\./i, "")
+    .replace(/^[./]+/, "");
+
+  return normalized.split("/").filter(Boolean).pop() || normalized;
+};
+
+const buildVendorCodeCandidates = (rawCode: string) => {
+  const raw = String(rawCode || "").trim();
+  const normalized = normalizeVendorCode(raw);
+  const decoded = normalized ? decodeURIComponent(normalized) : "";
+
+  return Array.from(
+    new Set(
+      [normalized, decoded, raw, raw.toUpperCase(), raw.toLowerCase(), decoded.toUpperCase(), decoded.toLowerCase()]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
 const VendorModal: React.FC<VendorModalProps> = ({
   isVisible,
   onClose,
@@ -27,15 +75,35 @@ const VendorModal: React.FC<VendorModalProps> = ({
   const [connectToVendor, { isLoading }] = useConnectToVendorMutation();
 
   const handleConnect = async () => {
-    if (!vendorCode) {
+    const vendorCodeCandidates = buildVendorCodeCandidates(vendorCode);
+
+    if (!vendorCodeCandidates.length) {
       alert("Please enter a vendor code");
       return;
     }
 
     try {
-      const res = await connectToVendor({ vendorCode }).unwrap();
+      let res: any = null;
+      let lastError: any = null;
+
+      for (const candidate of vendorCodeCandidates) {
+        try {
+          res = await connectToVendor({ vendorCode: candidate }).unwrap();
+          onConnect(candidate);
+          break;
+        } catch (error: any) {
+          lastError = error;
+          if (error?.status && error.status !== 404) {
+            throw error;
+          }
+        }
+      }
+
+      if (!res) {
+        throw lastError || new Error("Failed to connect to vendor");
+      }
+
       // alert("Connected successfully!"); // Optional: Feedback is good
-      onConnect(vendorCode);
       onClose();
       // Navigate to ChatDetailsScreen with vendor details from response
       // Assuming res contains the vendor object or connection object with vendor details

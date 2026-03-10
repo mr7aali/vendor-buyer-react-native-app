@@ -21,6 +21,54 @@ import { useConnectToVendorMutation } from "@/store/api/connectionApiSlice";
 
 const { width } = Dimensions.get("window");
 
+const normalizeVendorCode = (rawCode: string) => {
+  const trimmed = String(rawCode || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return normalizeVendorCode(parsed);
+    }
+    if (parsed?.vendorCode) {
+      return normalizeVendorCode(parsed.vendorCode);
+    }
+    if (parsed?.code) {
+      return normalizeVendorCode(parsed.code);
+    }
+    if (parsed?.url) {
+      return normalizeVendorCode(parsed.url);
+    }
+  } catch {
+    // Not JSON, continue with string parsing.
+  }
+
+  const withoutQuery = trimmed.split("?")[0].split("#")[0];
+  const normalized = withoutQuery
+    .replace(/^https?:\/\/[^/]+\/v\//i, "")
+    .replace(/^https?:\/\/[^/]+\/v\./i, "")
+    .replace(/^yozietranceapp:\/\/v\//i, "")
+    .replace(/^v\//i, "")
+    .replace(/^v\./i, "")
+    .replace(/^[./]+/, "");
+
+  return normalized.split("/").filter(Boolean).pop() || normalized;
+};
+
+const buildVendorCodeCandidates = (rawCode: string) => {
+  const raw = String(rawCode || "").trim();
+  const normalized = normalizeVendorCode(raw);
+  const decoded = normalized ? decodeURIComponent(normalized) : "";
+
+  return Array.from(
+    new Set(
+      [normalized, decoded, raw, raw.toUpperCase(), raw.toLowerCase(), decoded.toUpperCase(), decoded.toLowerCase()]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
 export default function ScanQRScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -57,8 +105,28 @@ export default function ScanQRScreen() {
     if (!scanned) {
       setScanned(true);
       try {
-        // Assuming data is the vendor code
-        const res = await connectToVendor({ vendorCode: data }).unwrap();
+        const vendorCodeCandidates = buildVendorCodeCandidates(data);
+        if (!vendorCodeCandidates.length) {
+          throw new Error(t("scan_invalid_qr_code", "Invalid vendor QR code"));
+        }
+        let res: any = null;
+        let lastError: any = null;
+
+        for (const vendorCode of vendorCodeCandidates) {
+          try {
+            res = await connectToVendor({ vendorCode }).unwrap();
+            break;
+          } catch (error: any) {
+            lastError = error;
+            if (error?.status && error.status !== 404) {
+              throw error;
+            }
+          }
+        }
+
+        if (!res) {
+          throw lastError || new Error(t("scan_failed_connect_qr", "Failed to connect via QR code"));
+        }
 
         const vendor = res.vendor || res.connection?.vendor || {};
 
@@ -111,25 +179,23 @@ export default function ScanQRScreen() {
           barcodeScannerSettings={{
             barcodeTypes: ["qr"],
           }}
-        >
-          <View style={styles.overlayContainer}>
-            <View style={styles.maskOutter}>
-              <View
-                style={{
-                  width: dynamicSize,
-                  height: dynamicSize,
-                  position: "relative",
-                  transitionDuration: "0.1s",
-                }}
-              >
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
-              </View>
+        />
+        <View pointerEvents="none" style={styles.overlayContainer}>
+          <View style={styles.maskOutter}>
+            <View
+              style={{
+                width: dynamicSize,
+                height: dynamicSize,
+                position: "relative",
+              }}
+            >
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
             </View>
           </View>
-        </CameraView>
+        </View>
       </View>
 
       {/* Zoom Controls */}
@@ -203,7 +269,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#000",
   },
-  overlayContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   maskOutter: {
     flex: 1,
     width: "100%",
