@@ -322,7 +322,7 @@
 
 // export default Dashboard;
 
-import { useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
+import { useGetProfileQuery, useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
@@ -351,6 +351,22 @@ const toNumber = (value: any, fallback = 0) => {
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || "pending").toLowerCase();
 const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+const toAbsoluteImageUri = (value: any) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (
+    raw.startsWith("http://") ||
+    raw.startsWith("https://") ||
+    raw.startsWith("file://") ||
+    raw.startsWith("content://") ||
+    raw.startsWith("data:")
+  ) {
+    return raw;
+  }
+  if (raw.startsWith("/") && apiBaseUrl) return `${apiBaseUrl}${raw}`;
+  return raw;
+};
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -359,37 +375,57 @@ const Dashboard: React.FC = () => {
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
+  const { data: profileData } = useGetProfileQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
   const { data: ordersData = [] } = useGetOrdersQuery(undefined, {
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
 
+  const buyerProfile = React.useMemo(() => {
+    const profileRoot = (profileData as any)?.data;
+    const reduxRoot = user as any;
+    return (
+      profileRoot?.buyer ||
+      (String(profileRoot?.userType || "").toLowerCase() === "buyer" ? profileRoot : null) ||
+      reduxRoot?.buyer ||
+      (String(reduxRoot?.userType || "").toLowerCase() === "buyer" ? reduxRoot : null) ||
+      null
+    );
+  }, [profileData, user]);
+
   const userName = React.useMemo(() => {
     const displayName =
+      (buyerProfile as any)?.fullName ||
+      (buyerProfile as any)?.fulllName ||
+      (buyerProfile as any)?.name ||
       (user as any)?.fullName ||
       (user as any)?.fulllName ||
-      (user as any)?.name ||
-      (user as any)?.buyer?.fullName ||
-      (user as any)?.vendor?.fullName ||
-      (user as any)?.storename ||
-      (user as any)?.businessName;
+      (user as any)?.name;
 
     if (displayName && String(displayName).trim()) return String(displayName).trim();
 
-    const email = (user as any)?.email;
+    const email = (buyerProfile as any)?.email || (user as any)?.email;
     if (email && String(email).includes("@")) return String(email).split("@")[0];
 
     return "User";
-  }, [user]);
+  }, [buyerProfile, user]);
 
-  const avatarUri =
-    (user as any)?.buyer?.profilePhotoUrl ||
-    (user as any)?.vendor?.logoUrl ||
-    (user as any)?.vendor?.logo ||
-    (user as any)?.avatar ||
-    (user as any)?.image ||
-    (user as any)?.logo ||
-    "https://xsgames.co/randomusers/assets/avatars/male/74.jpg";
+  const avatarUri = React.useMemo(
+    () =>
+      toAbsoluteImageUri(
+        (buyerProfile as any)?.profilePhotoUrl ||
+          (buyerProfile as any)?.avatar ||
+          (buyerProfile as any)?.image ||
+          (buyerProfile as any)?.photoUrl ||
+          (user as any)?.profilePhotoUrl ||
+          (user as any)?.avatar ||
+          (user as any)?.image,
+      ) || "https://xsgames.co/randomusers/assets/avatars/male/74.jpg",
+    [buyerProfile, user],
+  );
 
   const statsCards = React.useMemo(() => {
     const role = String(statsData?.role || "").toLowerCase();
