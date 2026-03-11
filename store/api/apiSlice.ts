@@ -87,7 +87,8 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
                     api.dispatch(setCredentials({
                         user,
                         accessToken: data.accessToken,
-                        refreshToken: data.refreshToken
+                        refreshToken: data.refreshToken,
+                        availableProfiles: (api.getState() as any).auth.availableProfiles ?? null,
                     }));
 
                     result = await baseQuery(args, api, extraOptions);

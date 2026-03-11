@@ -8,6 +8,7 @@ import { View } from 'react-native';
 import { useAppSelector } from '@/store/hooks';
 import { SocketProvider } from "../context/SocketContext";
 import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
+import { loadAvailableProfiles } from "../services/authStorage";
 import { registerForPushNotificationsAsync, syncPushTokenToBackend } from "../services/pushNotifications";
 import { useGetProfileQuery } from "../store/api/authApiSlice";
 import { setCredentials } from '../store/slices/authSlice';
@@ -20,6 +21,7 @@ const AuthSync = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.accessToken);
   const refreshToken = useSelector((state: RootState) => state.auth.refreshToken);
+  const availableProfiles = useSelector((state: RootState) => state.auth.availableProfiles);
   const syncedPushTokenRef = React.useRef<string | null>(null);
 
   const { data: profileData } = useGetProfileQuery(undefined, {
@@ -41,10 +43,11 @@ const AuthSync = () => {
       dispatch(setCredentials({
         user: updatedUser,
         accessToken: token,
-        refreshToken: refreshToken || ''
+        refreshToken: refreshToken || '',
+        availableProfiles,
       }));
     }
-  }, [profileData, token, refreshToken, dispatch, user]);
+  }, [profileData, token, refreshToken, dispatch, user, availableProfiles]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -117,6 +120,7 @@ export default function RootLayout() {
         const accessToken = await AsyncStorage.getItem("accessToken");
         const refreshToken = await AsyncStorage.getItem("refreshToken");
         const rawUser = await AsyncStorage.getItem("user");
+        const availableProfiles = await loadAvailableProfiles();
         const storedRole = (await AsyncStorage.getItem("userRole")) || "";
 
         let parsedUser: any = null;
@@ -134,6 +138,7 @@ export default function RootLayout() {
               user: parsedUser,
               accessToken,
               refreshToken: refreshToken || "",
+              availableProfiles,
             })
           );
 

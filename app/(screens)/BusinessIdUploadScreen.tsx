@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { useRegisterVendorMutation } from "../../store/api/authApiSlice";
+import { persistAuthState } from "@/services/authStorage";
 import { setCredentials } from "../../store/slices/authSlice";
 import { updateVendorRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
@@ -220,18 +221,26 @@ const BusinessIdUploadScreen: React.FC = () => {
 
       if (updatedUser) {
         const mergedUser = { ...updatedUser, userType: "vendor" };
-        // Update Redux
         const accessToken = await AsyncStorage.getItem('accessToken');
         const refreshToken = await AsyncStorage.getItem('refreshToken');
+        const availableProfiles = {
+          buyer: !!(auth.availableProfiles?.buyer || (auth.user as any)?.buyer || (auth.user as any)?.userType === "buyer"),
+          vendor: true,
+        };
+        // Update Redux
         dispatch(setCredentials({
           user: mergedUser,
           accessToken: accessToken || '',
-          refreshToken: refreshToken || ''
+          refreshToken: refreshToken || '',
+          availableProfiles,
         }));
 
-        // Update AsyncStorage
-        await AsyncStorage.setItem('user', JSON.stringify(mergedUser));
-        await AsyncStorage.setItem('userRole', 'vendor');
+        await persistAuthState({
+          accessToken: accessToken || '',
+          refreshToken: refreshToken || '',
+          user: mergedUser,
+          availableProfiles,
+        });
       }
 
       Alert.alert(t("success", "Success"), ui.vendorRegistered, [

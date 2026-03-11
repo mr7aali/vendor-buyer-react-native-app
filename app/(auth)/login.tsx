@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppleAuthMutation, useGoogleAuthMutation, useLoginMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
+import { persistAuthState } from "@/services/authStorage";
 import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
 
@@ -137,19 +138,21 @@ export default function LoginScreen() {
         : (storedRole === 'buyer' || storedRole === 'vendor' ? storedRole : 'user');
 
     const normalizedUser = { ...payload.user, userType: effectiveRole };
+    const availableProfiles = payload.availableProfiles || null;
 
-    await AsyncStorage.setItem('accessToken', payload.accessToken);
-    if (payload.refreshToken) {
-      await AsyncStorage.setItem('refreshToken', payload.refreshToken);
-    }
-    await AsyncStorage.setItem('user', JSON.stringify(normalizedUser));
-    await AsyncStorage.setItem('userRole', effectiveRole);
+    await persistAuthState({
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken || null,
+      user: normalizedUser,
+      availableProfiles,
+    });
 
     dispatch(apiSlice.util.resetApiState());
     dispatch(setCredentials({
       user: normalizedUser,
       accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken || null
+      refreshToken: payload.refreshToken || null,
+      availableProfiles,
     }));
 
     if (payload?.isNewUser === true) {
@@ -264,13 +267,6 @@ export default function LoginScreen() {
 
       console.log('User data from response:', JSON.stringify(data.user, null, 2));
 
-      // Save to AsyncStorage
-      await AsyncStorage.setItem('accessToken', data.accessToken);
-      await AsyncStorage.setItem('refreshToken', data.refreshToken);
-      if (data.user) {
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      }
-
       // Auto-navigate based on registered role
       const userType = data.user?.userType;
       const storedRole = await AsyncStorage.getItem('userRole');
@@ -281,14 +277,20 @@ export default function LoginScreen() {
       console.log('User type detected:', userType);
 
       const normalizedUser = { ...data.user, userType: effectiveRole };
+      const availableProfiles = data.availableProfiles || null;
       dispatch(apiSlice.util.resetApiState());
-      dispatch(setCredentials({ user: normalizedUser, accessToken: data.accessToken, refreshToken: data.refreshToken }));
-      await AsyncStorage.setItem('user', JSON.stringify(normalizedUser));
-
-      // Save role to AsyncStorage for role-based UI
-      if (effectiveRole) {
-        await AsyncStorage.setItem('userRole', effectiveRole);
-      }
+      dispatch(setCredentials({
+        user: normalizedUser,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        availableProfiles,
+      }));
+      await persistAuthState({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: normalizedUser,
+        availableProfiles,
+      });
 
       if (effectiveRole === 'vendor') {
         console.log('Redirecting vendor to (tabs)...');

@@ -21,6 +21,7 @@ import {
 
 import { useAppleAuthMutation, useGoogleAuthMutation, useRegisterMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
+import { persistAuthState } from "@/services/authStorage";
 import { useAppDispatch } from "@/store/hooks";
 import { logOut, setCredentials } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
@@ -140,19 +141,21 @@ const SignUpScreen: React.FC = () => {
           : "user";
 
     const normalizedUser = { ...payload.user, userType: effectiveRole };
+    const availableProfiles = payload.availableProfiles || null;
 
-    await AsyncStorage.setItem("accessToken", payload.accessToken);
-    if (payload.refreshToken) {
-      await AsyncStorage.setItem("refreshToken", payload.refreshToken);
-    }
-    await AsyncStorage.setItem("user", JSON.stringify(normalizedUser));
-    await AsyncStorage.setItem("userRole", effectiveRole);
+    await persistAuthState({
+      accessToken: payload.accessToken,
+      refreshToken: payload.refreshToken || null,
+      user: normalizedUser,
+      availableProfiles,
+    });
 
     dispatch(apiSlice.util.resetApiState());
     dispatch(setCredentials({
       user: normalizedUser,
       accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken || null
+      refreshToken: payload.refreshToken || null,
+      availableProfiles,
     }));
 
     if (payload?.isNewUser === true) {
@@ -272,7 +275,7 @@ const SignUpScreen: React.FC = () => {
     // Prevent stale logged-in session data from leaking into a fresh signup flow.
     dispatch(logOut());
     dispatch(apiSlice.util.resetApiState());
-    await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user", "userRole"]);
+    await AsyncStorage.multiRemove(["accessToken", "refreshToken", "user", "userRole", "availableProfiles"]);
 
     try {
       let resolvedAddress = "N/A";
@@ -310,18 +313,17 @@ const SignUpScreen: React.FC = () => {
         const accessToken = data.accessToken;
         const refreshToken = data.refreshToken || response.refreshToken || null;
 
-        dispatch(setCredentials({ user, accessToken, refreshToken }));
+        const normalizedUser = { ...user, userType: user?.userType || "user" };
+        const availableProfiles = data.availableProfiles || null;
+        dispatch(setCredentials({ user: normalizedUser, accessToken, refreshToken, availableProfiles }));
+        await persistAuthState({
+          accessToken,
+          refreshToken,
+          user: normalizedUser,
+          availableProfiles,
+        });
 
-        // Save to AsyncStorage for persistence
-        await AsyncStorage.setItem('accessToken', accessToken);
-        if (refreshToken) await AsyncStorage.setItem('refreshToken', refreshToken);
-        await AsyncStorage.setItem('user', JSON.stringify(user));
-
-        // Save role to AsyncStorage for role-based UI
-        const userType = user?.userType || "user";
-        await AsyncStorage.setItem('userRole', userType);
-
-        console.log('Signup successful, redirecting to role selection. UserType:', userType);
+        console.log('Signup successful, redirecting to role selection. UserType:', normalizedUser.userType);
         router.replace("/(onboarding)/user-selection");
       } else {
         console.error("Signup response missing data/token", response);

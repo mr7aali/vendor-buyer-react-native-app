@@ -1,7 +1,9 @@
 import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
-import { useGetProfileQuery } from "@/store/api/authApiSlice";
-import { useAppDispatch } from "@/store/hooks";
-import { logOut } from "@/store/slices/authSlice";
+import { persistAuthState } from "@/services/authStorage";
+import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
+import { apiSlice } from "@/store/api/apiSlice";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logOut, selectAvailableProfiles, setCredentials } from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -11,16 +13,17 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../hooks/use-translation";
 
 const ProfileScreen = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [isBusinessProfile, setIsBusinessProfile] = useState(false);
+  const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
   const { data: profileData } = useGetProfileQuery({});
   const displayUser = profileData?.data;
 
@@ -36,6 +39,7 @@ const ProfileScreen = () => {
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('userRole');
       await AsyncStorage.removeItem('userType');
+      await AsyncStorage.removeItem('availableProfiles');
 
       // Clear Redux state
       dispatch(logOut());
@@ -52,9 +56,57 @@ const ProfileScreen = () => {
     setShowSwitchModal(true);
   };
 
-  const onConfirmSwitch = () => {
-    setIsBusinessProfile(!isBusinessProfile);
+  const onConfirmSwitch = async () => {
     setShowSwitchModal(false);
+
+    try {
+      const response = await switchProfile("vendor").unwrap();
+      const payload = response?.data || response;
+
+      if (!payload?.accessToken || !payload?.user) {
+        throw new Error("Invalid switch profile response");
+      }
+
+      const normalizedUser = { ...payload.user, userType: "vendor" };
+      const nextAvailableProfiles = payload.availableProfiles || availableProfiles || null;
+
+      dispatch(apiSlice.util.resetApiState());
+      dispatch(
+        setCredentials({
+          user: normalizedUser,
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken || null,
+          availableProfiles: nextAvailableProfiles,
+        })
+      );
+
+      await persistAuthState({
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken || null,
+        user: normalizedUser,
+        availableProfiles: nextAvailableProfiles,
+      });
+
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      const message = String(error?.data?.message || error?.message || "");
+
+      if (error?.status === 400) {
+        Alert.alert(
+          t("switch_profile", "Switch profile"),
+          message || "Vendor profile is not available. Please complete vendor registration first.",
+          [
+            {
+              text: t("ok", "OK"),
+              onPress: () => router.replace("/(screens)/CompleteProfileScreen"),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert(t("error", "Error"), message || "Failed to switch profile");
+    }
   };
 
   const ConfirmationModal = ({
@@ -104,7 +156,6 @@ const ProfileScreen = () => {
       displayUser?.logo ||
       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
   };
-
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView
@@ -240,7 +291,6 @@ const ProfileScreen = () => {
             {t("setting", "Setting")}
           </Text>
 
-          {/* Switch Profile */}
           <View
             style={{
               flexDirection: "row",
@@ -269,10 +319,11 @@ const ProfileScreen = () => {
             </View>
             <Switch
               trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-              thumbColor={isBusinessProfile ? "#278687" : "#fff"}
+              thumbColor="#278687"
               ios_backgroundColor="#3e3e3e"
               onValueChange={toggleSwitch}
-              value={isBusinessProfile}
+              value={false}
+              disabled={isSwitchingProfile}
             />
           </View>
 
@@ -404,7 +455,7 @@ const ProfileScreen = () => {
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
         title={t("switch_profile_q", "Switch Profile?")}
-        subtitle={isBusinessProfile ? t("switch_profile_desc_personal", "Are you sure you want to switch to Personal profile?") : t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
+        subtitle={t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
         confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />

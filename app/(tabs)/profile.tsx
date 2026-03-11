@@ -1,5 +1,7 @@
 
-import { useGetProfileQuery } from "@/store/api/authApiSlice";
+import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
+import { apiSlice } from "@/store/api/apiSlice";
+import { persistAuthState } from "@/services/authStorage";
 import {
   useCreateAccountLinkMutation,
   useCreateVendorAccountMutation,
@@ -7,7 +9,7 @@ import {
 } from "@/store/api/paymentApiSlice";
 import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectCurrentAccessToken, selectCurrentUser } from "@/store/slices/authSlice";
+import { logOut, selectAvailableProfiles, selectCurrentAccessToken, selectCurrentUser, setCredentials } from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -37,9 +39,10 @@ const ProfileScreen = () => {
   const dispatch = useAppDispatch();
   const user = useAppSelector(selectCurrentUser);
   const accessToken = useAppSelector(selectCurrentAccessToken);
-  const [isBusinessProfile, setIsBusinessProfile] = useState(false);
+  const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
   const { data: profileData } = useGetProfileQuery({});
 
   // Stripe hooks
@@ -103,6 +106,7 @@ const ProfileScreen = () => {
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('userRole');
       await AsyncStorage.removeItem('userType');
+      await AsyncStorage.removeItem('availableProfiles');
 
       // Clear Redux state (this now triggers a global reset)
       dispatch(logOut());
@@ -120,9 +124,57 @@ const ProfileScreen = () => {
     setShowSwitchModal(true);
   };
 
-  const onConfirmSwitch = () => {
-    setIsBusinessProfile(!isBusinessProfile);
+  const onConfirmSwitch = async () => {
     setShowSwitchModal(false);
+
+    try {
+      const response = await switchProfile("buyer").unwrap();
+      const payload = response?.data || response;
+
+      if (!payload?.accessToken || !payload?.user) {
+        throw new Error("Invalid switch profile response");
+      }
+
+      const normalizedUser = { ...payload.user, userType: "buyer" };
+      const nextAvailableProfiles = payload.availableProfiles || availableProfiles || null;
+
+      dispatch(apiSlice.util.resetApiState());
+      dispatch(
+        setCredentials({
+          user: normalizedUser,
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken || null,
+          availableProfiles: nextAvailableProfiles,
+        })
+      );
+
+      await persistAuthState({
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken || null,
+        user: normalizedUser,
+        availableProfiles: nextAvailableProfiles,
+      });
+
+      router.replace("/(users)");
+    } catch (error: any) {
+      const message = String(error?.data?.message || error?.message || "");
+
+      if (error?.status === 400) {
+        Alert.alert(
+          t("switch_profile", "Switch profile"),
+          message || "Buyer profile is not available. Please complete buyer registration first.",
+          [
+            {
+              text: t("ok", "OK"),
+              onPress: () => router.replace("/(user_screen)/CompleteProfileScreen"),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert(t("error", "Error"), message || "Failed to switch profile");
+    }
   };
 
   const ConfirmationModal = ({
@@ -224,7 +276,6 @@ const ProfileScreen = () => {
   };
 
   const isStripeConnected = stripeStatus?.chargesEnabled && stripeStatus?.payoutsEnabled;
-
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView
@@ -495,7 +546,6 @@ const ProfileScreen = () => {
             {t("setting", "Setting")}
           </Text>
 
-          {/* Switch Profile */}
           <View
             style={{
               flexDirection: "row",
@@ -524,10 +574,11 @@ const ProfileScreen = () => {
             </View>
             <Switch
               trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-              thumbColor={isBusinessProfile ? "#278687" : "#fff"}
+              thumbColor="#278687"
               ios_backgroundColor="#3e3e3e"
               onValueChange={toggleSwitch}
-              value={isBusinessProfile}
+              value={true}
+              disabled={isSwitchingProfile}
             />
           </View>
 
@@ -658,7 +709,7 @@ const ProfileScreen = () => {
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
         title={t("switch_profile_q", "Switch Profile?")}
-        subtitle={isBusinessProfile ? t("switch_profile_desc_personal", "Are you sure you want to switch to Personal profile?") : t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
+        subtitle={t("switch_profile_desc_personal", "Are you sure you want to switch to Personal profile?")}
         confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />

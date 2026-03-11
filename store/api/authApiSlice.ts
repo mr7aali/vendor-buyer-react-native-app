@@ -107,6 +107,13 @@ export const authApiSlice = apiSlice.injectEndpoints({
                 body: data,
             }),
         }),
+        switchProfile: builder.mutation({
+            query: (targetRole: "buyer" | "vendor") => ({
+                url: "/auth/switch-profile",
+                method: "POST",
+                body: { targetRole },
+            }),
+        }),
     }),
     overrideExisting: true,
 });
@@ -124,5 +131,6 @@ export const {
     useGetProfileQuery,
     useGetUserVendorStatisticsQuery,
     useUpdateProfileMutation,
-    useChangePasswordMutation
+    useChangePasswordMutation,
+    useSwitchProfileMutation,
 } = authApiSlice;

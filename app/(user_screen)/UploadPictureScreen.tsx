@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
 import { useRegisterBuyerMutation } from "@/store/api/authApiSlice";
+import { persistAuthState } from "@/services/authStorage";
 import { setCredentials } from "@/store/slices/authSlice";
 import { updateBuyerRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
@@ -154,15 +155,24 @@ const UploadPictureScreen = () => {
         const updatedUser = result?.data?.user || result?.user || result?.data;
         if (updatedUser || auth.user) {
           const mergedUser = { ...(auth.user || {}), ...(updatedUser || {}), userType: "buyer" };
+          const availableProfiles = {
+            buyer: true,
+            vendor: !!(auth.availableProfiles?.vendor || (auth.user as any)?.vendor || (auth.user as any)?.userType === "vendor"),
+          };
           dispatch(
             setCredentials({
               user: mergedUser as any,
               accessToken: auth.accessToken || "",
               refreshToken: auth.refreshToken,
+              availableProfiles,
             })
           );
-          await AsyncStorage.setItem("user", JSON.stringify(mergedUser));
-          await AsyncStorage.setItem("userRole", "buyer");
+          await persistAuthState({
+            accessToken: auth.accessToken || "",
+            refreshToken: auth.refreshToken,
+            user: mergedUser,
+            availableProfiles,
+          });
         }
 
         Alert.alert(t("success", "Success"), ui.registrationSuccess, [
