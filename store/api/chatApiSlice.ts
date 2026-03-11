@@ -256,13 +256,13 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             },
             invalidatesTags: ['Chat'],
         }),
-        markAsRead: builder.mutation<void, string>({
+        markAsRead: builder.mutation<null, string>({
             async queryFn(messageId, _api, _extraOptions, baseQuery) {
                 const socket = socketService.getSocket();
 
                 if (socket?.connected) {
                     socket.emit('mark_read', messageId);
-                    return { data: undefined };
+                    return { data: null };
                 }
 
                 const result = await baseQuery({
@@ -270,7 +270,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                     method: 'PATCH',
                 });
                 if (result.error) return { error: result.error as any };
-                return { data: undefined };
+                return { data: null };
             },
         }),
     }),
