@@ -10,6 +10,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 const normalizeId = (value: any) => (value === undefined || value === null ? '' : String(value));
+const resolveChatUserId = (entity: any) =>
+  normalizeId(
+    entity?.userId ??
+      entity?.buyer?.userId ??
+      entity?.vendor?.userId ??
+      entity?.user?.userId ??
+      entity?.id ??
+      entity?._id ??
+      entity,
+  );
 const formatTime = (value: any) => {
   if (!value) return '';
   const date = new Date(value);
@@ -21,7 +31,7 @@ export default function ChatTabs() {
   const router = useRouter();
   const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
-  const currentUserId = normalizeId(user?.userId || user?.id || (user as any)?._id);
+  const currentUserId = resolveChatUserId(user);
 
   const [activeTab, setActiveTab] = useState<'chat' | 'support'>('chat');
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,7 +57,7 @@ export default function ChatTabs() {
       const text = row?.lastMessage?.messageText || '';
       return String(name).toLowerCase().includes(q) || String(text).toLowerCase().includes(q);
     });
-  }, [conversationsData, searchQuery]);
+  }, [conversationsData, searchQuery, t]);
 
   const filteredTickets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -94,7 +104,10 @@ export default function ChatTabs() {
             ) : filteredConversations.length ? (
               filteredConversations.map((conversation: any, index: number) => {
                 const partner = conversation?.partner || conversation?.participant || {};
-                const partnerId = normalizeId(conversation?.partnerId || partner?.id || partner?._id || partner?.userId);
+                const partnerId =
+                  resolveChatUserId(partner?.userId ? partner : null) ||
+                  resolveChatUserId(partner) ||
+                  normalizeId(conversation?.partnerId);
                 const displayName =
                   partner?.fullName ||
                   partner?.businessName ||
@@ -118,6 +131,7 @@ export default function ChatTabs() {
                         }
                       }
 
+                      if (!partnerId) return;
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {

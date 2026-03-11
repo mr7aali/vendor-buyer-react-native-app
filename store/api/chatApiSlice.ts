@@ -6,15 +6,20 @@ const normalizeId = (value: any): string | undefined => {
     return String(value);
 };
 
-const resolveEntityId = (entity: any): string | undefined => {
+const resolveChatUserId = (entity: any): string | undefined => {
     return normalizeId(
         entity?.userId ??
-        entity?._id ??
-        entity?.id ??
+        entity?.buyer?.userId ??
+        entity?.vendor?.userId ??
         entity?.user?.userId ??
-        entity?.user?._id ??
-        entity?.user?.id
+        entity?.id ??
+        entity?._id ??
+        entity
     );
+};
+
+const resolveEntityId = (entity: any): string | undefined => {
+    return resolveChatUserId(entity);
 };
 
 const resolveMessageSideId = (value: any): string | undefined => {
@@ -29,6 +34,13 @@ const toEntityList = (value: any): any[] => {
     return Array.isArray(value) ? value : [value];
 };
 
+const normalizeMessage = (msg: any) => ({
+    ...msg,
+    id: msg?.id || msg?._id,
+    _id: msg?._id || msg?.id,
+    messageText: msg?.messageText || msg?.text || '',
+});
+
 const normalizeConversation = (conv: any, currentUserId?: string) => {
     const participantCandidates = [
         ...toEntityList(conv?.partner),
@@ -40,7 +52,7 @@ const normalizeConversation = (conv: any, currentUserId?: string) => {
 
     const selectedPartner =
         participantCandidates.find((p: any) => {
-            const id = resolveEntityId(p);
+            const id = resolveChatUserId(p);
             return !!id && (!currentUserId || id !== currentUserId);
         }) ||
         participantCandidates[0] ||
@@ -49,23 +61,23 @@ const normalizeConversation = (conv: any, currentUserId?: string) => {
         null;
 
     let partnerId =
+        resolveChatUserId(selectedPartner) ||
         normalizeId(conv?.partnerId) ||
-        resolveEntityId(selectedPartner) ||
         normalizeId(conv?.conversationPartnerId) ||
-        resolveEntityId(conv?.vendorId) ||
-        resolveEntityId(conv?.vendor) ||
-        resolveEntityId(conv?.buyerId) ||
-        resolveEntityId(conv?.buyer) ||
-        resolveEntityId(conv?.userId) ||
-        resolveEntityId(conv?.user);
+        resolveChatUserId(conv?.vendorId) ||
+        resolveChatUserId(conv?.vendor) ||
+        resolveChatUserId(conv?.buyerId) ||
+        resolveChatUserId(conv?.buyer) ||
+        resolveChatUserId(conv?.userId) ||
+        resolveChatUserId(conv?.user);
 
     // If fallback resolved own id, try another participant.
     if (partnerId && currentUserId && partnerId === currentUserId) {
         const other = participantCandidates.find((p: any) => {
-            const id = resolveEntityId(p);
+            const id = resolveChatUserId(p);
             return !!id && id !== currentUserId;
         });
-        const otherId = resolveEntityId(other);
+        const otherId = resolveChatUserId(other);
         if (otherId) partnerId = otherId;
     }
 
@@ -121,11 +133,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             query: (partnerId) => `/messages/conversation/${partnerId}`,
             transformResponse: (response: { data: any[] }) => {
                 const raw = Array.isArray(response?.data) ? response.data : [];
-                return raw.map((msg: any) => ({
-                    ...msg,
-                    id: msg?.id || msg?._id,
-                    messageText: msg?.messageText || msg?.text || '',
-                }));
+                return raw.map(normalizeMessage);
             },
             providesTags: (result, error, partnerId) => [{ type: 'Chat', id: partnerId }],
             async onCacheEntryAdded(
@@ -138,12 +146,13 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                     if (!socket) return;
 
                     const listener = (newMessage: any) => {
-                        console.log('New message received via socket:', newMessage.id || newMessage._id);
-                        const senderId = resolveMessageSideId(newMessage.senderId ?? newMessage.sender);
-                        const receiverIdFromMsg = resolveMessageSideId(newMessage.receiverId ?? newMessage.receiver);
+                        const normalizedMessage = normalizeMessage(newMessage);
+                        console.log('New message received via socket:', normalizedMessage.id || normalizedMessage._id);
+                        const senderId = resolveMessageSideId(normalizedMessage.senderId ?? normalizedMessage.sender);
+                        const receiverIdFromMsg = resolveMessageSideId(normalizedMessage.receiverId ?? normalizedMessage.receiver);
                         const partnerKey = normalizeId(partnerId);
                         const state = getState() as any;
-                        const myId = resolveEntityId(state?.auth?.user);
+                        const myId = resolveChatUserId(state?.auth?.user);
 
                         const isRelevant = !!partnerKey && (
                             myId
@@ -156,11 +165,18 @@ export const chatApiSlice = apiSlice.injectEndpoints({
 
                         if (isRelevant) {
                             updateCachedData((draft) => {
-                                // Check if message already exists to avoid duplicates (e.g. from optimistic updates)
-                                const incomingId = normalizeId(newMessage._id || newMessage.id);
+                                const incomingId = normalizeId(normalizedMessage._id || normalizedMessage.id);
+                                const optimisticIndex = draft.findIndex((m: any) =>
+                                    m?.isOptimistic &&
+                                    normalizeId(m?.senderId || m?.sender) === senderId &&
+                                    normalizeId(m?.receiverId || m?.receiver) === receiverIdFromMsg &&
+                                    String(m?.messageText || m?.text || '') === normalizedMessage.messageText
+                                );
                                 const exists = draft.some((m: any) => normalizeId(m._id || m.id) === incomingId);
-                                if (!exists) {
-                                    draft.push(newMessage);
+                                if (optimisticIndex >= 0) {
+                                    draft[optimisticIndex] = normalizedMessage;
+                                } else if (!exists) {
+                                    draft.push(normalizedMessage);
                                 }
                             });
                         }
@@ -187,7 +203,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                 // Optimistic Update
                 const state = getState() as any;
                 const currentUser = state.auth.user;
-                const currentUserId = resolveEntityId(currentUser) || '';
+                const currentUserId = resolveChatUserId(currentUser) || '';
                 console.log('SendMessage onQueryStarted - senderId:', currentUserId);
                 const tempId = Date.now().toString();
 
@@ -210,8 +226,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
 
                 try {
                     await queryFulfilled;
-                    // Invalidate to get the real message with server ID or let socket handle it
-                    // dispatch(apiSlice.util.invalidateTags(['Chat']));
+                    dispatch(apiSlice.util.invalidateTags(['Chat']));
                 } catch {
                     patchResult.undo();
                 }

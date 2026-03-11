@@ -11,6 +11,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 
 const normalizeId = (value: any) => (value === undefined || value === null ? '' : String(value));
+const resolveChatUserId = (entity: any) =>
+  normalizeId(
+    entity?.userId ??
+      entity?.buyer?.userId ??
+      entity?.vendor?.userId ??
+      entity?.user?.userId ??
+      entity?.id ??
+      entity?._id ??
+      entity,
+  );
 const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
 const resolveEntityId = (entity: any) =>
   normalizeId(
@@ -65,7 +75,7 @@ export default function ChatScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
-  const currentUserId = normalizeId(user?.userId || user?.id || (user as any)?._id);
+  const currentUserId = resolveChatUserId(user);
   const [activeTab, setActiveTab] = useState<'chat' | 'support'>('chat');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -91,24 +101,24 @@ export default function ChatScreen() {
 
     conversationRows.forEach((row: any) => {
       const partner = row?.partner || row?.participant || {};
-      const partnerId = normalizeId(
-        row?.partnerId ||
-        resolveEntityId(partner) ||
-        resolveEntityId(row?.participant) ||
-        resolveEntityId(row?.vendorId) ||
-        resolveEntityId(row?.vendor),
-      );
+      const partnerId =
+        resolveChatUserId(partner?.userId ? partner : null) ||
+        resolveChatUserId(partner) ||
+        resolveChatUserId(row?.participant) ||
+        resolveChatUserId(row?.vendorId) ||
+        resolveChatUserId(row?.vendor) ||
+        normalizeId(row?.partnerId);
       if (partnerId) byPartnerId.set(partnerId, row);
     });
 
     rawConnections.forEach((conn: any) => {
       const vendor = conn?.vendor || conn?.vendorId || {};
-      const partnerId = normalizeId(
-        resolveEntityId(vendor) ||
-        resolveEntityId(conn?.vendorId) ||
-        conn?.vendorUserId ||
-        conn?.vendorId,
-      );
+      const partnerId =
+        resolveChatUserId(vendor?.userId ? vendor : null) ||
+        resolveChatUserId(vendor) ||
+        resolveChatUserId(conn?.vendorId) ||
+        normalizeId(conn?.vendorUserId) ||
+        normalizeId(conn?.vendorId);
       if (!partnerId || byPartnerId.has(partnerId)) return;
 
       byPartnerId.set(partnerId, {
@@ -196,17 +206,17 @@ export default function ChatScreen() {
                     : lastReceiverId && lastReceiverId !== currentUserId
                       ? lastReceiverId
                       : '';
-                const partnerId = normalizeId(
-                  conversation?.partnerId ||
-                    resolveEntityId(partner) ||
-                    resolveEntityId(conversation?.participant) ||
-                    resolveEntityId(participantOther) ||
-                    lastMessageOtherId ||
-                    resolveEntityId(conversation?.vendorId) ||
-                    resolveEntityId(conversation?.vendor) ||
-                    resolveEntityId(conversation?.buyerId) ||
-                    resolveEntityId(conversation?.buyer),
-                );
+                const partnerId =
+                  resolveChatUserId(partner?.userId ? partner : null) ||
+                  resolveChatUserId(partner) ||
+                  resolveChatUserId(conversation?.participant) ||
+                  resolveChatUserId(participantOther) ||
+                  normalizeId(lastMessageOtherId) ||
+                  resolveChatUserId(conversation?.vendorId) ||
+                  resolveChatUserId(conversation?.vendor) ||
+                  resolveChatUserId(conversation?.buyerId) ||
+                  resolveChatUserId(conversation?.buyer) ||
+                  normalizeId(conversation?.partnerId);
                 const displayName = partner?.fullName || partner?.businessName || partner?.storename || partner?.email || t('chat_user_fallback', 'User');
                 const avatar = resolveAvatarUri(partner);
                 const unreadCount = Number(conversation?.unreadCount || 0);
@@ -223,6 +233,7 @@ export default function ChatScreen() {
                         } catch {
                         }
                       }
+                      if (!partnerId) return;
                       router.push({
                         pathname: '/(screens)/chat_box',
                         params: {

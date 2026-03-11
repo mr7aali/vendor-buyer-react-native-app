@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const SOCKET_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
+    .trim()
+    .replace(/\/+$/, '');
 
 class SocketService {
     private static instance: SocketService;
@@ -18,12 +20,17 @@ class SocketService {
     public init(token?: string): Socket {
         if (!this.socket) {
             this.socket = io(SOCKET_URL, {
-                auth: { token },
-                transports: ['websocket'],
-                autoConnect: false, // Wait for auth
+                auth: token ? { token } : {},
+                transports: ['websocket', 'polling'],
+                autoConnect: false,
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000,
             });
-        } else if (token) {
-            this.socket.auth = { token };
+        } else {
+            this.socket.auth = token ? { token } : {};
         }
         return this.socket;
     }

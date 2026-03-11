@@ -79,6 +79,17 @@ const resolveEntityId = (entity: any): string => {
   );
 };
 
+const resolveChatUserId = (entity: any): string =>
+  normalizeId(
+    entity?.userId ??
+      entity?.buyer?.userId ??
+      entity?.vendor?.userId ??
+      entity?.user?.userId ??
+      entity?.id ??
+      entity?._id ??
+      entity,
+  );
+
 // Removed hardcoded coupons - now fetched from API
 
 // --- HELPER COMPONENTS ---
@@ -243,7 +254,7 @@ const ChatBox: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const user = useSelector((state: RootState) => state.auth.user);
-  const currentUserId = resolveEntityId(user);
+  const currentUserId = resolveChatUserId(user);
   const router = useRouter();
   const {
     conversationId,
@@ -256,7 +267,9 @@ const ChatBox: React.FC = () => {
   const paramPartnerId = (partnerIdParam as string) || "";
 
   // Resolve partner ID first; don't use conversation ID as receiver ID.
-  const [activePartnerId, setActivePartnerId] = useState(paramPartnerId);
+  const [activePartnerId, setActivePartnerId] = useState(
+    resolveChatUserId(paramPartnerId),
+  );
 
   const { data: conversationsData } = useGetConversationsQuery(currentUserId, {
     skip: !currentUserId,
@@ -274,7 +287,7 @@ const ChatBox: React.FC = () => {
         conv?.participants?.find(
           (p: any) => (p.userId || p._id || p.id) !== currentUserId,
         );
-      const pId = p?.userId || p?._id || p?.id;
+      const pId = resolveChatUserId(p);
       if (pId && pId !== activePartnerId) {
         console.log("ChatBox - Resolved partner ID from conversation:", pId);
         setActivePartnerId(pId);
@@ -291,23 +304,25 @@ const ChatBox: React.FC = () => {
   const partnerData = useMemo(() => {
     const fromParams = {
       name: (fullname || name) as string,
-      id: activePartnerId || paramPartnerId,
+      id: resolveChatUserId(activePartnerId) || resolveChatUserId(paramPartnerId),
       avatar: "https://via.placeholder.com/44",
     };
 
     if (conversationsData) {
       const conv = conversationsData.find((c: any) => {
         const p =
+          c.partner ||
           c.participant ||
           c.participants?.find(
-            (p: any) => (p._id || p.id || p.userId) === activePartnerId,
+            (p: any) => resolveChatUserId(p) === activePartnerId,
           );
         return p || (c._id || c.id) === paramConversationId;
       });
       const p =
+        conv?.partner ||
         conv?.participant ||
         conv?.participants?.find(
-          (p: any) => (p._id || p.id || p.userId) !== currentUserId,
+          (p: any) => resolveChatUserId(p) !== currentUserId,
         );
       if (p) {
         return {
@@ -317,7 +332,7 @@ const ChatBox: React.FC = () => {
             p.fullName ||
             p.fulllName ||
             fromParams.name,
-          id: p.userId || p._id || p.id,
+          id: resolveChatUserId(p),
           avatar: p.avatar || p.logoUrl || fromParams.avatar,
         };
       }
@@ -332,6 +347,41 @@ const ChatBox: React.FC = () => {
     paramConversationId,
     currentUserId,
   ]);
+
+  const canonicalPartnerId = useMemo(() => {
+    const matchedConversation = Array.isArray(conversationsData)
+      ? conversationsData.find((conversation: any) => {
+          const conversationKey = normalizeId(
+            conversation?._id || conversation?.id,
+          );
+          return (
+            conversationKey === paramConversationId ||
+            resolveChatUserId(conversation?.partner) === activePartnerId ||
+            resolveChatUserId(conversation?.participant) === activePartnerId
+          );
+        })
+      : null;
+
+    return (
+      resolveChatUserId(matchedConversation?.partner) ||
+      resolveChatUserId(matchedConversation?.participant) ||
+      resolveChatUserId(partnerData) ||
+      resolveChatUserId(paramPartnerId) ||
+      resolveChatUserId(activePartnerId)
+    );
+  }, [
+    conversationsData,
+    paramConversationId,
+    activePartnerId,
+    partnerData,
+    paramPartnerId,
+  ]);
+
+  React.useEffect(() => {
+    if (canonicalPartnerId && canonicalPartnerId !== activePartnerId) {
+      setActivePartnerId(canonicalPartnerId);
+    }
+  }, [canonicalPartnerId, activePartnerId]);
 
   const displayName = partnerData.name || t("chat_partner_fallback", "Partner");
   const partnerAvatar = partnerData.avatar;
@@ -413,12 +463,12 @@ const ChatBox: React.FC = () => {
 
   // API Queries
   const { data: messagesData, isLoading: messagesLoading } =
-    useGetMessagesQuery(activePartnerId, {
-      skip: !activePartnerId,
+    useGetMessagesQuery(canonicalPartnerId || activePartnerId, {
+      skip: !(canonicalPartnerId || activePartnerId),
     });
   const { data: categoriesData, isLoading: categoriesLoading } =
-    useGetCategoriesByVendorQuery(activePartnerId, {
-      skip: isVendorSide || !activePartnerId || activeTab !== "categories",
+    useGetCategoriesByVendorQuery(canonicalPartnerId || activePartnerId, {
+      skip: isVendorSide || !(canonicalPartnerId || activePartnerId) || activeTab !== "categories",
     });
   const { data: ordersData, isLoading: ordersLoading } = useGetOrdersQuery(
     undefined,
@@ -464,7 +514,7 @@ const ChatBox: React.FC = () => {
       return [];
     }
     const myId = normalizeId(currentUserId);
-    const partnerId = normalizeId(activePartnerId);
+    const partnerId = normalizeId(canonicalPartnerId || activePartnerId);
     return messagesData.map((msg: any) => ({
       id: msg._id || msg.id,
       text: msg.messageText || msg.text || "",
@@ -492,7 +542,7 @@ const ChatBox: React.FC = () => {
           : "text"),
       couponDetails: msg.couponDetails,
     }));
-  }, [messagesData, currentUserId, activePartnerId]);
+  }, [messagesData, currentUserId, canonicalPartnerId, activePartnerId]);
 
   React.useEffect(() => {
     if (!Array.isArray(messagesData) || !currentUserId) return;
@@ -502,7 +552,7 @@ const ChatBox: React.FC = () => {
       const senderId = resolveEntityId(msg?.senderId);
       return (
         normalizeId(receiverId) === normalizeId(currentUserId) &&
-        normalizeId(senderId) === normalizeId(activePartnerId) &&
+        normalizeId(senderId) === normalizeId(canonicalPartnerId || activePartnerId) &&
         !msg?.isRead
       );
     });
@@ -515,7 +565,7 @@ const ChatBox: React.FC = () => {
         markAsRead(String(messageId));
       }
     });
-  }, [messagesData, currentUserId, activePartnerId, markAsRead]);
+  }, [messagesData, currentUserId, canonicalPartnerId, activePartnerId, markAsRead]);
 
   const filteredOrders = useMemo(() => {
     return (ordersData || []).filter((order: any) => {
@@ -534,9 +584,10 @@ const ChatBox: React.FC = () => {
         order.userId?._id ||
         order.userId?.id ||
         order.userId;
-      return vendorId === activePartnerId || buyerId === activePartnerId;
+      const targetPartnerId = normalizeId(canonicalPartnerId || activePartnerId);
+      return normalizeId(vendorId) === targetPartnerId || normalizeId(buyerId) === targetPartnerId;
     });
-  }, [ordersData, activePartnerId]);
+  }, [ordersData, canonicalPartnerId, activePartnerId]);
 
   const handleSendMessage = async (
     text: string,
@@ -544,7 +595,8 @@ const ChatBox: React.FC = () => {
     coupon?: CouponData,
   ) => {
     if (!text.trim() && type === "text") return;
-    if (!activePartnerId) return;
+    const targetPartnerId = canonicalPartnerId || activePartnerId;
+    if (!targetPartnerId) return;
     if (type === "coupon" && !isVendorSide) {
       return;
     }
@@ -555,7 +607,7 @@ const ChatBox: React.FC = () => {
         const buyerProfileId = messagesData?.find(
           (m: any) => m.buyerId,
         )?.buyerId;
-        const targetBuyerId = buyerProfileId || activePartnerId;
+        const targetBuyerId = resolveChatUserId(buyerProfileId) || targetPartnerId;
 
         console.log("ChatBox.handleSendMessage - Triggered with type:", type);
         console.log("ChatBox.handleSendMessage - Coupon:", coupon?.id);
@@ -607,7 +659,7 @@ const ChatBox: React.FC = () => {
           : text;
 
       await sendMessage({
-        receiverId: activePartnerId,
+        receiverId: targetPartnerId,
         messageText: msgText,
       }).unwrap();
 
