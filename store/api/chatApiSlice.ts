@@ -39,6 +39,10 @@ const normalizeMessage = (msg: any) => ({
     id: msg?.id || msg?._id,
     _id: msg?._id || msg?.id,
     messageText: msg?.messageText || msg?.text || '',
+    type: msg?.type || 'TEXT',
+    conversationId: normalizeId(msg?.conversationId ?? msg?.conversation?.id ?? msg?.conversation?._id),
+    orderId: normalizeId(msg?.orderId) || null,
+    metadata: msg?.metadata ?? null,
 });
 
 const normalizeConversation = (conv: any, currentUserId?: string) => {
@@ -204,6 +208,14 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                 }
             },
         }),
+        getPinnedMessage: builder.query<any, string>({
+            query: (conversationId) => `/conversations/${conversationId}/pinned`,
+            transformResponse: (response: any) => {
+                const payload = response?.data ?? response ?? null;
+                return payload ? normalizeMessage(payload) : null;
+            },
+            providesTags: (result, error, conversationId) => [{ type: 'Chat', id: `pinned-${conversationId}` }],
+        }),
         sendMessage: builder.mutation<any, { receiverId: string; messageText: string }>({
             async queryFn(body, _api, _extraOptions, baseQuery) {
                 console.log('Sending message body:', body);
@@ -279,6 +291,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
 export const {
     useGetConversationsQuery,
     useGetMessagesQuery,
+    useGetPinnedMessageQuery,
     useSendMessageMutation,
     useMarkAsReadMutation,
 } = chatApiSlice;

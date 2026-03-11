@@ -1,8 +1,11 @@
 import { useTranslation } from "@/hooks/use-translation";
+import { useSocket } from "@/context/SocketContext";
+import socketService from "@/services/socket";
 import { useGetCategoriesByVendorQuery } from "@/store/api/categoryApiSlice";
 import {
   useGetConversationsQuery,
   useGetMessagesQuery,
+  useGetPinnedMessageQuery,
   useMarkAsReadMutation,
   useSendMessageMutation,
 } from "@/store/api/chatApiSlice";
@@ -53,8 +56,35 @@ interface CustomChatMessage {
   text: string;
   timestamp: string;
   isOwn: boolean;
-  type: "text" | "image" | "file" | "coupon";
+  type:
+    | "TEXT"
+    | "ORDER_PLACED"
+    | "ORDER_UPDATED"
+    | "text"
+    | "image"
+    | "file"
+    | "coupon";
   couponDetails?: CouponData;
+  conversationId?: string;
+  orderId?: string | null;
+  metadata?: any;
+}
+
+interface OrderItemSummary {
+  productName?: string;
+  quantity?: number;
+  price?: number;
+}
+
+interface OrderMessageMetadata {
+  orderId?: string;
+  orderNumber?: string;
+  productName?: string;
+  quantity?: number;
+  price?: number;
+  items?: OrderItemSummary[];
+  totalAmount?: number;
+  status?: string;
 }
 
 const normalizeId = (value: any): string => {
@@ -97,6 +127,30 @@ const resolveVendorProfileId = (entity: any): string =>
       entity?._id ??
       '',
   );
+
+const normalizeMessageType = (value: any): CustomChatMessage["type"] => {
+  const normalized = String(value || "").toUpperCase();
+  if (normalized === "TEXT") return "TEXT";
+  if (normalized === "ORDER_PLACED") return "ORDER_PLACED";
+  if (normalized === "ORDER_UPDATED") return "ORDER_UPDATED";
+  return (value as CustomChatMessage["type"]) || "text";
+};
+
+const normalizeOrderStatus = (value: any) => String(value || "").trim().toLowerCase();
+
+const isOrderMessageType = (type: CustomChatMessage["type"]) =>
+  type === "ORDER_PLACED" || type === "ORDER_UPDATED";
+
+const isPinEligibleOrderStatus = (status: any) => {
+  const normalized = normalizeOrderStatus(status);
+  return normalized !== "completed" && normalized !== "cancelled" && normalized !== "delivered";
+};
+
+const formatCurrency = (value: any) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return null;
+  return `$${amount.toFixed(2)}`;
+};
 
 // Removed hardcoded coupons - now fetched from API
 
@@ -261,6 +315,7 @@ const CouponModal = ({ visible, onClose, onSelect, coupons, labels }: any) => (
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { socket } = useSocket();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = resolveChatUserId(user);
   const router = useRouter();
@@ -413,6 +468,55 @@ const ChatBox: React.FC = () => {
     }
   }, [canonicalPartnerId, activePartnerId]);
 
+  const canonicalConversationId = useMemo(() => {
+    const matchedConversation = Array.isArray(conversationsData)
+      ? conversationsData.find((conversation: any) => {
+          const conversationKey = normalizeId(conversation?._id || conversation?.id);
+          const candidateIds = [
+            resolveChatUserId(conversation?.partner),
+            resolveChatUserId(conversation?.participant),
+            ...(Array.isArray(conversation?.participants)
+              ? conversation.participants.map((p: any) => resolveChatUserId(p))
+              : []),
+          ].filter(Boolean);
+
+          return (
+            (!!activePartnerId && candidateIds.includes(activePartnerId)) ||
+            (!!explicitPartnerId && candidateIds.includes(explicitPartnerId)) ||
+            (!!conversationKey && conversationKey === paramConversationId)
+          );
+        })
+      : null;
+
+    const matchedConversationId = normalizeId(
+      matchedConversation?.id || matchedConversation?._id,
+    );
+
+    if (paramConversationId) {
+      if (!Array.isArray(conversationsData)) {
+        return "";
+      }
+
+      if (!conversationsData.length) {
+        return paramConversationId;
+      }
+
+      const paramMatchesConversation = conversationsData.some(
+        (conversation: any) =>
+          normalizeId(conversation?.id || conversation?._id) === paramConversationId,
+      );
+
+      return paramMatchesConversation ? paramConversationId : matchedConversationId;
+    }
+
+    return matchedConversationId;
+  }, [
+    paramConversationId,
+    conversationsData,
+    activePartnerId,
+    explicitPartnerId,
+  ]);
+
   const displayName = partnerData.name || t("chat_partner_fallback", "Partner");
   const partnerAvatar = partnerData.avatar;
   const buyerVendorProfileId =
@@ -505,6 +609,10 @@ const ChatBox: React.FC = () => {
     useGetMessagesQuery(canonicalPartnerId || activePartnerId, {
       skip: !(canonicalPartnerId || activePartnerId),
     });
+  const { data: initialPinnedMessage } = useGetPinnedMessageQuery(canonicalConversationId, {
+    skip: !canonicalConversationId,
+    refetchOnMountOrArgChange: true,
+  });
   const { data: categoriesData, isLoading: categoriesLoading } =
     useGetCategoriesByVendorQuery(canonicalPartnerId || activePartnerId, {
       skip: isVendorSide || !(canonicalPartnerId || activePartnerId) || activeTab !== "categories",
@@ -517,6 +625,7 @@ const ChatBox: React.FC = () => {
   );
 
   const [sendMessage] = useSendMessageMutation();
+  const [pinnedMessage, setPinnedMessage] = useState<any | null>(null);
 
   // Fetch vendor's coupons for the coupon modal - Use the VENDOR'S ID, not the partner ID!
   const currentVendorId = user?.userId || user?.id || "";
@@ -548,13 +657,13 @@ const ChatBox: React.FC = () => {
       }));
   }, [vendorCouponsData]);
 
-  const chatMessages = useMemo(() => {
+  const chatMessages = useMemo<CustomChatMessage[]>(() => {
     if (!Array.isArray(messagesData)) {
       return [];
     }
     const myId = normalizeId(currentUserId);
     const partnerId = normalizeId(canonicalPartnerId || activePartnerId);
-    return messagesData.map((msg: any) => ({
+    return messagesData.map((msg: any): CustomChatMessage => ({
       id: msg._id || msg.id,
       text: msg.messageText || msg.text || "",
       timestamp: msg.createdAt,
@@ -573,15 +682,26 @@ const ChatBox: React.FC = () => {
         // Fallback to current user id match.
         return !!myId && senderId === myId;
       })(),
-      type:
-        msg.type ||
-        (String(msg.messageText || msg.text || "").startsWith("data:image/") ||
-        String(msg.messageText || msg.text || "").startsWith("file://")
-          ? "image"
-          : "text"),
+      type: (() => {
+        const normalizedType = normalizeMessageType(msg.type);
+        if (normalizedType === "TEXT") {
+          return String(msg.messageText || msg.text || "").startsWith("data:image/") ||
+            String(msg.messageText || msg.text || "").startsWith("file://")
+            ? "image"
+            : "TEXT";
+        }
+        return normalizedType;
+      })() as CustomChatMessage["type"],
       couponDetails: msg.couponDetails,
+      conversationId: normalizeId(msg.conversationId) || canonicalConversationId,
+      orderId: normalizeId(msg.orderId || msg.metadata?.orderId) || null,
+      metadata: msg.metadata ?? null,
     }));
-  }, [messagesData, currentUserId, canonicalPartnerId, activePartnerId]);
+  }, [messagesData, currentUserId, canonicalPartnerId, activePartnerId, canonicalConversationId]);
+
+  React.useEffect(() => {
+    setPinnedMessage(initialPinnedMessage ?? null);
+  }, [initialPinnedMessage]);
 
   React.useEffect(() => {
     if (!Array.isArray(messagesData) || !currentUserId) return;
@@ -605,6 +725,21 @@ const ChatBox: React.FC = () => {
       }
     });
   }, [messagesData, currentUserId, canonicalPartnerId, activePartnerId, markAsRead]);
+
+  React.useEffect(() => {
+    if (!socket) return;
+
+    const handlePinnedMessage = (payload: any) => {
+      if (normalizeId(payload?.conversationId) !== canonicalConversationId) return;
+      setPinnedMessage(payload?.pinnedMessage ?? null);
+    };
+
+    socket.on("message_pinned", handlePinnedMessage);
+
+    return () => {
+      socket.off("message_pinned", handlePinnedMessage);
+    };
+  }, [socket, canonicalConversationId]);
 
   const filteredOrders = useMemo(() => {
     return (ordersData || []).filter((order: any) => {
@@ -761,6 +896,146 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  const handlePinMessage = (message: CustomChatMessage) => {
+    if (!canonicalConversationId) {
+      Alert.alert("Pin unavailable", "Conversation ID is not ready yet.");
+      return;
+    }
+
+    const activeSocket = socket || socketService.getSocket();
+    if (!activeSocket?.connected) {
+      Alert.alert("Pin unavailable", "Realtime connection is not available.");
+      return;
+    }
+
+    activeSocket.emit("pin_message", {
+      conversationId: canonicalConversationId,
+      messageId: message.id,
+    });
+  };
+
+  const renderOrderCard = (msg: CustomChatMessage, compact = false) => {
+    const metadata = (msg.metadata || {}) as OrderMessageMetadata;
+    const items = Array.isArray(metadata.items) ? metadata.items : [];
+    const isPlaced = msg.type === "ORDER_PLACED";
+    const normalizedStatus = normalizeOrderStatus(metadata.status);
+    const summaryPrice = formatCurrency(metadata.price);
+    const totalAmount = formatCurrency(metadata.totalAmount);
+    const canPin =
+      isOrderMessageType(msg.type) &&
+      (!normalizedStatus || isPinEligibleOrderStatus(normalizedStatus));
+
+    return (
+      <View
+        style={[
+          styles.orderMessageCard,
+          compact && styles.orderMessageCardCompact,
+          msg.isOwn ? styles.orderMessageCardOwn : styles.orderMessageCardOther,
+        ]}
+      >
+        <View style={styles.orderMessageTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderMessageEyebrow}>
+              {isPlaced ? "Order placed" : "Order update"}
+            </Text>
+            <Text style={styles.orderMessageTitle}>
+              {metadata.orderNumber || `#${(msg.orderId || "").slice(-6).toUpperCase()}`}
+            </Text>
+          </View>
+          {!compact && canPin ? (
+            <TouchableOpacity
+              onPress={() => handlePinMessage(msg)}
+              style={styles.pinButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="pin-outline" size={16} color="#1F2937" />
+              <Text style={styles.pinButtonText}>Pin</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <Text style={styles.orderMessageBodyText}>
+          {msg.text || (isPlaced ? "A new order was placed." : "Order status was updated.")}
+        </Text>
+
+        {isPlaced ? (
+          <View style={styles.orderMessageSection}>
+            {metadata.productName ? (
+              <Text style={styles.orderMessageLine}>
+                {metadata.productName}
+                {metadata.quantity ? ` x${metadata.quantity}` : ""}
+                {summaryPrice ? ` • ${summaryPrice}` : ""}
+              </Text>
+            ) : null}
+            {items.slice(0, compact ? 1 : 3).map((item, index) => (
+              <Text key={`${item.productName || "item"}-${index}`} style={styles.orderMessageSubline}>
+                {item.productName || "Item"}
+                {item.quantity ? ` x${item.quantity}` : ""}
+                {formatCurrency(item.price) ? ` • ${formatCurrency(item.price)}` : ""}
+              </Text>
+            ))}
+            {totalAmount ? (
+              <Text style={styles.orderMessageTotal}>
+                Total {totalAmount}
+              </Text>
+            ) : null}
+          </View>
+        ) : normalizedStatus ? (
+          <View style={styles.orderMessageStatusPill}>
+            <Text style={styles.orderMessageStatusText}>{normalizedStatus}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
+  const resolvedPinnedMessage = useMemo<CustomChatMessage | null>(() => {
+    if (!pinnedMessage) return null;
+
+    const pinnedId = normalizeId(pinnedMessage?.id || pinnedMessage?._id);
+    const liveMessage =
+      pinnedId && Array.isArray(chatMessages)
+        ? chatMessages.find((message) => normalizeId(message.id) === pinnedId)
+        : null;
+
+    if (liveMessage) {
+      return liveMessage;
+    }
+
+    return {
+      id: pinnedId,
+      text: pinnedMessage?.messageText || pinnedMessage?.text || "",
+      timestamp: pinnedMessage?.createdAt || "",
+      isOwn: false,
+      type: normalizeMessageType(pinnedMessage?.type),
+      conversationId: normalizeId(pinnedMessage?.conversationId) || canonicalConversationId,
+      orderId: normalizeId(pinnedMessage?.orderId || pinnedMessage?.metadata?.orderId) || null,
+      metadata: pinnedMessage?.metadata ?? null,
+    } as CustomChatMessage;
+  }, [pinnedMessage, chatMessages, canonicalConversationId]);
+
+  const renderPinnedBanner = () => {
+    if (!resolvedPinnedMessage) return null;
+
+    return (
+      <View style={styles.pinnedBanner}>
+        <View style={styles.pinnedBannerHeader}>
+          <View style={styles.pinnedBadge}>
+            <Ionicons name="pin" size={12} color="#0F766E" />
+            <Text style={styles.pinnedBadgeText}>Pinned order</Text>
+          </View>
+        </View>
+        {isOrderMessageType(resolvedPinnedMessage.type) ? (
+          renderOrderCard({ ...resolvedPinnedMessage, isOwn: false }, true)
+        ) : (
+          <Text style={styles.pinnedBannerText} numberOfLines={2}>
+            {resolvedPinnedMessage.text}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
   const renderMessage = ({ item: msg }: { item: CustomChatMessage }) => {
     const isCoupon =
       msg.type === "coupon" ||
@@ -791,6 +1066,8 @@ const ChatBox: React.FC = () => {
                 defaultDiscount: t("chat_coupon_default_discount", "10%"),
               }}
             />
+          ) : isOrderMessageType(msg.type) ? (
+            renderOrderCard(msg)
           ) : msg.type === "image" ? (
             <View
               style={[
@@ -822,7 +1099,7 @@ const ChatBox: React.FC = () => {
               </Text>
             </View>
           )}
-          <Text style={styles.timeText}>{formatTime(msg.timestamp)}</Text>
+            <Text style={styles.timeText}>{formatTime(msg.timestamp)}</Text>
         </View>
       </View>
     );
@@ -1037,6 +1314,7 @@ const ChatBox: React.FC = () => {
         keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
       >
         <View style={{ flex: 1 }}>
+          {activeTab === "chat" ? renderPinnedBanner() : null}
           {renderContent()}
 
           {activeTab === "chat" && (
@@ -1189,6 +1467,34 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, color: "#2F3437", fontWeight: "500" },
   activeTabText: { color: "#FFF" },
 
+  pinnedBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: "#ECFEFF",
+    borderWidth: 1,
+    borderColor: "#A5F3FC",
+  },
+  pinnedBannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  pinnedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#CCFBF1",
+  },
+  pinnedBadgeText: { fontSize: 12, fontWeight: "700", color: "#115E59" },
+  pinnedBannerText: { fontSize: 13, lineHeight: 18, color: "#134E4A" },
+
   chatList: { padding: 16, flexGrow: 1, backgroundColor: "#F9FAFB" },
   messageRow: {
     marginBottom: 20,
@@ -1223,6 +1529,100 @@ const styles = StyleSheet.create({
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
   timeText: { fontSize: 10, color: "#9CA3AF", marginTop: 4 },
+  orderMessageCard: {
+    minWidth: 220,
+    maxWidth: 280,
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  orderMessageCardCompact: {
+    minWidth: 0,
+    maxWidth: "100%",
+  },
+  orderMessageCardOwn: {
+    backgroundColor: "#D7F6F5",
+    borderColor: "#84E1DD",
+  },
+  orderMessageCardOther: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "#D1D5DB",
+  },
+  orderMessageTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  orderMessageEyebrow: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    color: "#0F766E",
+  },
+  orderMessageTitle: {
+    marginTop: 2,
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  orderMessageBodyText: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#374151",
+  },
+  orderMessageSection: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  orderMessageLine: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  orderMessageSubline: {
+    marginTop: 4,
+    fontSize: 12,
+    color: "#4B5563",
+  },
+  orderMessageTotal: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#0F766E",
+  },
+  orderMessageStatusPill: {
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#E0F2FE",
+  },
+  orderMessageStatusText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#075985",
+    textTransform: "capitalize",
+  },
+  pinButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#F3F4F6",
+  },
+  pinButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
+  },
 
   inputArea: {
     flexDirection: "row",
