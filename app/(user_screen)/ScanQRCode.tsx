@@ -69,6 +69,39 @@ const buildVendorCodeCandidates = (rawCode: string) => {
   );
 };
 
+const resolveChatVendor = (response: any) => {
+  const vendor =
+    response?.data?.vendor ||
+    response?.vendor ||
+    response?.connection?.vendor ||
+    response?.data?.vendorId ||
+    response?.connection?.vendorId ||
+    {};
+
+  const partnerId =
+    vendor?.userId ||
+    vendor?.vendor?.userId ||
+    vendor?._id ||
+    vendor?.id ||
+    response?.data?.vendorUserId ||
+    response?.data?.vendorId?.userId ||
+    response?.data?.vendorId?._id ||
+    response?.data?.vendorId?.id ||
+    "";
+
+  const name =
+    vendor?.storename ||
+    vendor?.businessName ||
+    vendor?.fullName ||
+    vendor?.name ||
+    "";
+
+  return {
+    partnerId: String(partnerId || ""),
+    name,
+  };
+};
+
 export default function ScanQRScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -128,15 +161,18 @@ export default function ScanQRScreen() {
           throw lastError || new Error(t("scan_failed_connect_qr", "Failed to connect via QR code"));
         }
 
-        const vendor = res.vendor || res.connection?.vendor || {};
+        const resolvedVendor = resolveChatVendor(res);
+        if (!resolvedVendor.partnerId) {
+          throw new Error(t("scan_failed_connect_qr", "Failed to connect via QR code"));
+        }
 
         router.push({
           pathname: "/(screens)/chat_box",
           params: {
             role: "buyer",
-            partnerId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
-            conversationId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
-            name: res.data.vendorId?.storename || res.data.vendorId?.businessName || t("scan_vendor", "Vendor")
+            partnerId: resolvedVendor.partnerId,
+            conversationId: resolvedVendor.partnerId,
+            name: resolvedVendor.name || t("scan_vendor", "Vendor"),
           }
         });
       } catch (err: any) {

@@ -68,9 +68,10 @@ const PRODUCTS = [
 const ElectronicsScreen = () => {
   const { t } = useTranslation();
   const router = useRouter();
-  const { categoryId, categoryName } = useLocalSearchParams<{
+  const { categoryId, categoryName, vendorId } = useLocalSearchParams<{
     categoryId: string;
     categoryName: string;
+    vendorId?: string;
   }>();
   const [addedItems, setAddedItems] = useState<{ [key: string]: boolean }>({});
   const [showQtyModal, setShowQtyModal] = useState(false);
@@ -85,8 +86,38 @@ const ElectronicsScreen = () => {
       skip: !currentUserId,
       refetchOnMountOrArgChange: true,
     });
-  const activeVendorId =
-    connections?.data?.[0]?.vendor?._id || connections?.data?.[0]?.vendor?.id;
+  const connectionList = Array.isArray((connections as any)?.data)
+    ? (connections as any).data
+    : Array.isArray(connections)
+      ? (connections as any)
+      : [];
+  const matchedConnection = connectionList.find((conn: any) => {
+    const vendor = conn?.vendor || conn?.vendorId || {};
+    const candidates = [
+      vendor?.userId,
+      vendor?._id,
+      vendor?.id,
+      conn?.vendorUserId,
+      conn?.vendorId?._id,
+      conn?.vendorId?.id,
+      conn?.vendorId,
+    ]
+      .filter(Boolean)
+      .map((value: any) => String(value));
+
+    return vendorId ? candidates.includes(String(vendorId)) : false;
+  });
+  const fallbackVendor = connectionList[0]?.vendor || connectionList[0]?.vendorId || {};
+  const activeVendorId = String(
+    matchedConnection?.vendor?.id ||
+      matchedConnection?.vendor?._id ||
+      matchedConnection?.vendorId?.id ||
+      matchedConnection?.vendorId?._id ||
+      fallbackVendor?.id ||
+      fallbackVendor?._id ||
+      vendorId ||
+      "",
+  );
 
   const { data: products, isLoading: isProductsLoading } =
     useGetProductsByVendorQuery(

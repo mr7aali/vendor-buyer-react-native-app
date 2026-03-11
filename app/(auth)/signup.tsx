@@ -313,7 +313,11 @@ const SignUpScreen: React.FC = () => {
         const accessToken = data.accessToken;
         const refreshToken = data.refreshToken || response.refreshToken || null;
 
-        const normalizedUser = { ...user, userType: user?.userType || "user" };
+        const normalizedUser = {
+          ...user,
+          email: user?.email || email.trim(),
+          userType: user?.userType || "user",
+        };
         const availableProfiles = data.availableProfiles || null;
         dispatch(setCredentials({ user: normalizedUser, accessToken, refreshToken, availableProfiles }));
         await persistAuthState({

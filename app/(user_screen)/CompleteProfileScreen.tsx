@@ -357,8 +357,9 @@ const CompleteProfileScreen = () => {
   const { language } = useTranslation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const buyerRegistration = useSelector((state: RootState) => state.registration.buyer);
   const [fullName, setFullName] = useState("");
-  const email = user?.email || "";
+  const email = user?.email || buyerRegistration?.email || "";
   const [phone, setPhoneNumber] = useState("");
 
   // Updated Country States

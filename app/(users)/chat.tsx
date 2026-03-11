@@ -21,6 +21,16 @@ const resolveChatUserId = (entity: any) =>
       entity?._id ??
       entity,
   );
+const resolveVendorProfileId = (entity: any) =>
+  normalizeId(
+    entity?.vendor?.id ??
+      entity?.vendor?._id ??
+      entity?.id ??
+      entity?._id ??
+      entity?.vendorId?.id ??
+      entity?.vendorId?._id ??
+      '',
+  );
 const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
 const resolveEntityId = (entity: any) =>
   normalizeId(
@@ -108,7 +118,11 @@ export default function ChatScreen() {
         resolveChatUserId(row?.vendorId) ||
         resolveChatUserId(row?.vendor) ||
         normalizeId(row?.partnerId);
-      if (partnerId) byPartnerId.set(partnerId, row);
+      const vendorProfileId =
+        resolveVendorProfileId(partner) ||
+        resolveVendorProfileId(row?.vendor) ||
+        resolveVendorProfileId(row?.vendorId);
+      if (partnerId) byPartnerId.set(partnerId, { ...row, vendorProfileId });
     });
 
     rawConnections.forEach((conn: any) => {
@@ -120,10 +134,14 @@ export default function ChatScreen() {
         normalizeId(conn?.vendorUserId) ||
         normalizeId(conn?.vendorId);
       if (!partnerId || byPartnerId.has(partnerId)) return;
+      const vendorProfileId =
+        resolveVendorProfileId(vendor) ||
+        resolveVendorProfileId(conn?.vendorId);
 
       byPartnerId.set(partnerId, {
         id: normalizeId(conn?._id || conn?.id || partnerId),
         partnerId,
+        vendorProfileId,
         partner: vendor,
         participant: vendor,
         unreadCount: 0,
@@ -221,6 +239,11 @@ export default function ChatScreen() {
                 const avatar = resolveAvatarUri(partner);
                 const unreadCount = Number(conversation?.unreadCount || 0);
                 const messageId = conversation?.lastMessage?.id || conversation?.lastMessage?._id;
+                const vendorProfileId =
+                  normalizeId(conversation?.vendorProfileId) ||
+                  resolveVendorProfileId(partner) ||
+                  resolveVendorProfileId(conversation?.vendor) ||
+                  resolveVendorProfileId(conversation?.vendorId);
 
                 return (
                   <TouchableOpacity
@@ -239,6 +262,7 @@ export default function ChatScreen() {
                         params: {
                           role: 'buyer',
                           partnerId,
+                          vendorId: vendorProfileId,
                           conversationId: normalizeId(conversation?.id || conversation?._id || partnerId),
                           fullname: displayName,
                         },

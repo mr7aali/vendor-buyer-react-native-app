@@ -334,7 +334,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "@/hooks/use-translation";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -371,11 +371,12 @@ const CompleteProfileScreen: React.FC = () => {
   const router = useRouter();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const vendorRegistration = useSelector((state: RootState) => state.registration.vendor);
 
   const [formData, setFormData] = useState<ProfileFormData>({
     fullName: "",
     phone: "",
-    email: user?.email || "",
+    email: user?.email || vendorRegistration?.email || "",
     address: "",
     storename: "",
     storeDescription: "",
@@ -386,6 +387,13 @@ const CompleteProfileScreen: React.FC = () => {
 
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [isGenderModalVisible, setIsGenderModalVisible] = useState(false);
+
+  useEffect(() => {
+    const currentEmail = user?.email || vendorRegistration?.email || "";
+    setFormData((prev) => (
+      prev.email === currentEmail ? prev : { ...prev, email: currentEmail }
+    ));
+  }, [user?.email, vendorRegistration?.email]);
 
   const ui = React.useMemo(() => {
     if (language === "he") {

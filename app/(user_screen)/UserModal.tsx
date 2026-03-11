@@ -66,6 +66,39 @@ const buildVendorCodeCandidates = (rawCode: string) => {
   );
 };
 
+const resolveChatVendor = (response: any) => {
+  const vendor =
+    response?.data?.vendor ||
+    response?.vendor ||
+    response?.connection?.vendor ||
+    response?.data?.vendorId ||
+    response?.connection?.vendorId ||
+    {};
+
+  const partnerId =
+    vendor?.userId ||
+    vendor?.vendor?.userId ||
+    vendor?._id ||
+    vendor?.id ||
+    response?.data?.vendorUserId ||
+    response?.data?.vendorId?.userId ||
+    response?.data?.vendorId?._id ||
+    response?.data?.vendorId?.id ||
+    "";
+
+  const name =
+    vendor?.storename ||
+    vendor?.businessName ||
+    vendor?.fullName ||
+    vendor?.name ||
+    "";
+
+  return {
+    partnerId: String(partnerId || ""),
+    name,
+  };
+};
+
 const VendorModal: React.FC<VendorModalProps> = ({
   isVisible,
   onClose,
@@ -108,15 +141,18 @@ const VendorModal: React.FC<VendorModalProps> = ({
       // Navigate to ChatDetailsScreen with vendor details from response
       // Assuming res contains the vendor object or connection object with vendor details
       // Adjust based on actual API response. For now, assuming res.vendor
-      const vendor = res.vendor || res.connection?.vendor || {};
+      const resolvedVendor = resolveChatVendor(res);
+      if (!resolvedVendor.partnerId) {
+        throw new Error("Failed to connect to vendor");
+      }
 
       router.push({
         pathname: "/(screens)/chat_box",
         params: {
           role: "buyer",
-          partnerId: vendor.userId || vendor.id || res.id,
-          conversationId: vendor.userId || vendor.id || res.id,
-          name: vendor.businessName || vendor.name || 'Vendor'
+          partnerId: resolvedVendor.partnerId,
+          conversationId: resolvedVendor.partnerId,
+          name: resolvedVendor.name || "Vendor"
         }
       });
     } catch (err: any) {

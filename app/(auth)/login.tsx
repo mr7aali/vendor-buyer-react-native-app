@@ -276,7 +276,13 @@ export default function LoginScreen() {
           : (storedRole === 'buyer' || storedRole === 'vendor' ? storedRole : 'user');
       console.log('User type detected:', userType);
 
-      const normalizedUser = { ...data.user, userType: effectiveRole };
+      const inferredEmail =
+        String(emailOrPhone || "").includes("@") ? String(emailOrPhone || "").trim() : "";
+      const normalizedUser = {
+        ...data.user,
+        email: data.user?.email || inferredEmail,
+        userType: effectiveRole,
+      };
       const availableProfiles = data.availableProfiles || null;
       dispatch(apiSlice.util.resetApiState());
       dispatch(setCredentials({
