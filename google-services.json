@@ -12,7 +12,20 @@
           "package_name": "com.soriful420.yozietranceApp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "222814341874-8m7ouc26qugahdus79fhoejcp9l682l6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.soriful420.yozietranceApp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "222814341874-lpaf7hu3sljqbqpl3at14824kk9dmnk5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBWKH_4UkSL61aVLdn_C7wuV12tt9hOQZU"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "222814341874-lpaf7hu3sljqbqpl3at14824kk9dmnk5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
