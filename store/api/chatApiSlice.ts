@@ -182,22 +182,45 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                         }
                     };
 
+                    const readListener = ({ messageId }: { messageId: string }) => {
+                        if (!messageId) return;
+                        updateCachedData((draft) => {
+                            const msg = draft.find((item: any) =>
+                                normalizeId(item?.id || item?._id) === normalizeId(messageId)
+                            );
+                            if (msg) {
+                                msg.isRead = true;
+                            }
+                        });
+                    };
+
                     socket.on('new_message', listener);
+                    socket.on('message_read', readListener);
 
                     await cacheEntryRemoved;
                     socket.off('new_message', listener);
+                    socket.off('message_read', readListener);
                 } catch {
                 }
             },
         }),
         sendMessage: builder.mutation<any, { receiverId: string; messageText: string }>({
-            query: (body) => {
+            async queryFn(body, _api, _extraOptions, baseQuery) {
                 console.log('Sending message body:', body);
-                return {
+                const socket = socketService.getSocket();
+
+                if (socket?.connected) {
+                    socket.emit('send_message', body);
+                    return { data: { success: true, via: 'socket' } };
+                }
+
+                const result = await baseQuery({
                     url: '/messages',
                     method: 'POST',
                     body,
-                };
+                });
+                if (result.error) return { error: result.error as any };
+                return { data: result.data };
             },
             async onQueryStarted({ receiverId, messageText }, { dispatch, queryFulfilled, getState }) {
                 // Optimistic Update
@@ -234,10 +257,21 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             invalidatesTags: ['Chat'],
         }),
         markAsRead: builder.mutation<void, string>({
-            query: (messageId) => ({
-                url: `/messages/${messageId}/read`,
-                method: 'PATCH',
-            }),
+            async queryFn(messageId, _api, _extraOptions, baseQuery) {
+                const socket = socketService.getSocket();
+
+                if (socket?.connected) {
+                    socket.emit('mark_read', messageId);
+                    return { data: undefined };
+                }
+
+                const result = await baseQuery({
+                    url: `/messages/${messageId}/read`,
+                    method: 'PATCH',
+                });
+                if (result.error) return { error: result.error as any };
+                return { data: undefined };
+            },
         }),
     }),
 });
