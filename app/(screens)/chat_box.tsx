@@ -184,6 +184,26 @@ const hasTerminalOrderUpdate = (messages: CustomChatMessage[], target: any) => {
   });
 };
 
+const areMessagesEquivalent = (left: any, right: any) => {
+  if (!left || !right) return false;
+
+  const leftId = normalizeId(left?.id || left?._id);
+  const rightId = normalizeId(right?.id || right?._id);
+  const leftOrderId = resolveOrderId(left);
+  const rightOrderId = resolveOrderId(right);
+  const leftOrderNumber = resolveOrderNumber(left);
+  const rightOrderNumber = resolveOrderNumber(right);
+  const leftText = resolveMessageBody(left);
+  const rightText = resolveMessageBody(right);
+
+  return (
+    (!!leftId && !!rightId && leftId === rightId) ||
+    (!!leftOrderId && !!rightOrderId && leftOrderId === rightOrderId) ||
+    (!!leftOrderNumber && !!rightOrderNumber && leftOrderNumber === rightOrderNumber) ||
+    (!!leftText && !!rightText && leftText === rightText)
+  );
+};
+
 const resolvePinnedBannerLines = (message: CustomChatMessage) => {
   const metadata = (message.metadata || {}) as OrderMessageMetadata;
   const type = normalizeMessageType(message.type);
@@ -604,6 +624,8 @@ const ChatBox: React.FC = () => {
   const [assignCoupon] = useAssignCouponMutation();
   const [markAsRead] = useMarkAsReadMutation();
   const flatListRef = useRef<FlatList>(null);
+  const autoPinnedMessageKeyRef = useRef("");
+  const [highlightedMessageId, setHighlightedMessageId] = useState("");
 
   // Load role from AsyncStorage on mount
   React.useEffect(() => {
@@ -833,6 +855,21 @@ const ChatBox: React.FC = () => {
       setPinnedMessage(null);
     }
   }, [pinnedMessage, chatMessages]);
+
+  const autoPinnedOrderMessage = useMemo<CustomChatMessage | null>(() => {
+    if (!Array.isArray(chatMessages) || !chatMessages.length) {
+      return null;
+    }
+
+    const openPlacedMessages = chatMessages.filter((message) => {
+      if (message.type !== "ORDER_PLACED") return false;
+      return !hasTerminalOrderUpdate(chatMessages, message);
+    });
+
+    return openPlacedMessages.length
+      ? openPlacedMessages[openPlacedMessages.length - 1]
+      : null;
+  }, [chatMessages]);
 
   const filteredOrders = useMemo(() => {
     return (ordersData || []).filter((order: any) => {
@@ -1085,12 +1122,14 @@ const ChatBox: React.FC = () => {
   };
 
   const resolvedPinnedMessage = useMemo<CustomChatMessage | null>(() => {
-    if (!pinnedMessage) return null;
+    const pinnedSource = autoPinnedOrderMessage || pinnedMessage;
 
-    const pinnedId = normalizeId(pinnedMessage?.id || pinnedMessage?._id);
-    const pinnedOrderId = resolveOrderId(pinnedMessage);
-    const pinnedOrderNumber = resolveOrderNumber(pinnedMessage);
-    const pinnedText = resolveMessageBody(pinnedMessage);
+    if (!pinnedSource) return null;
+
+    const pinnedId = normalizeId(pinnedSource?.id || pinnedSource?._id);
+    const pinnedOrderId = resolveOrderId(pinnedSource);
+    const pinnedOrderNumber = resolveOrderNumber(pinnedSource);
+    const pinnedText = resolveMessageBody(pinnedSource);
     const liveMessage = Array.isArray(chatMessages)
       ? chatMessages.find((message) => {
           const messageId = normalizeId(message.id);
@@ -1111,17 +1150,12 @@ const ChatBox: React.FC = () => {
       return liveMessage;
     }
 
-    return {
-      id: pinnedId,
-      text: pinnedMessage?.messageText || pinnedMessage?.text || "",
-      timestamp: pinnedMessage?.createdAt || "",
-      isOwn: false,
-      type: normalizeMessageType(pinnedMessage?.type),
-      conversationId: normalizeId(pinnedMessage?.conversationId) || effectiveConversationId,
-      orderId: normalizeId(pinnedMessage?.orderId || pinnedMessage?.metadata?.orderId) || null,
-      metadata: pinnedMessage?.metadata ?? null,
-    } as CustomChatMessage;
-  }, [pinnedMessage, chatMessages, effectiveConversationId]);
+    if (autoPinnedOrderMessage && areMessagesEquivalent(autoPinnedOrderMessage, pinnedSource)) {
+      return autoPinnedOrderMessage;
+    }
+
+    return null;
+  }, [pinnedMessage, autoPinnedOrderMessage, chatMessages]);
 
   const shouldHidePinnedBanner = useMemo(() => {
     if (!resolvedPinnedMessage || !Array.isArray(chatMessages) || !chatMessages.length) {
@@ -1131,12 +1165,82 @@ const ChatBox: React.FC = () => {
     return hasTerminalOrderUpdate(chatMessages, resolvedPinnedMessage);
   }, [resolvedPinnedMessage, chatMessages]);
 
+  React.useEffect(() => {
+    if (!autoPinnedOrderMessage) {
+      autoPinnedMessageKeyRef.current = "";
+      return;
+    }
+
+    const autoPinnedKey =
+      normalizeId(autoPinnedOrderMessage.id) ||
+      resolveOrderId(autoPinnedOrderMessage) ||
+      resolveOrderNumber(autoPinnedOrderMessage);
+
+    if (!autoPinnedKey || autoPinnedMessageKeyRef.current === autoPinnedKey) {
+      return;
+    }
+
+    autoPinnedMessageKeyRef.current = autoPinnedKey;
+    setPinnedMessage((current: any) =>
+      areMessagesEquivalent(current, autoPinnedOrderMessage)
+        ? current
+        : autoPinnedOrderMessage,
+    );
+
+    const activeSocket = socket || socketService.getSocket();
+    if (
+      activeSocket?.connected &&
+      effectiveConversationId &&
+      !areMessagesEquivalent(pinnedMessage, autoPinnedOrderMessage)
+    ) {
+      activeSocket.emit("pin_message", {
+        conversationId: effectiveConversationId,
+        messageId: autoPinnedOrderMessage.id,
+      });
+    }
+  }, [autoPinnedOrderMessage, socket, effectiveConversationId, pinnedMessage]);
+
+  React.useEffect(() => {
+    if (!highlightedMessageId) return;
+
+    const timer = setTimeout(() => {
+      setHighlightedMessageId("");
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, [highlightedMessageId]);
+
+  const jumpToPinnedMessage = React.useCallback(() => {
+    if (!resolvedPinnedMessage || !chatMessages.length) return;
+
+    const targetIndex = chatMessages.findIndex((message) =>
+      areMessagesEquivalent(message, resolvedPinnedMessage),
+    );
+
+    if (targetIndex < 0) {
+      Alert.alert("Pinned message", "Pinned message was not found in the loaded chat.");
+      return;
+    }
+
+    setHighlightedMessageId(normalizeId(chatMessages[targetIndex]?.id));
+
+    flatListRef.current?.scrollToIndex({
+      index: targetIndex,
+      animated: true,
+      viewPosition: 0.35,
+    });
+  }, [resolvedPinnedMessage, chatMessages]);
+
   const renderPinnedBanner = () => {
     if (!resolvedPinnedMessage || shouldHidePinnedBanner) return null;
     const pinnedBanner = resolvePinnedBannerLines(resolvedPinnedMessage);
 
     return (
-      <View style={styles.pinnedBanner}>
+      <TouchableOpacity
+        style={styles.pinnedBanner}
+        activeOpacity={0.85}
+        onPress={jumpToPinnedMessage}
+      >
         <View style={styles.pinnedBannerInner}>
           <View style={styles.pinnedIconWrap}>
             <Ionicons name="pin" size={14} color="#0F766E" />
@@ -1150,7 +1254,7 @@ const ChatBox: React.FC = () => {
             </Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1169,6 +1273,9 @@ const ChatBox: React.FC = () => {
           style={[
             styles.bubbleWrapper,
             msg.isOwn ? styles.alignEnd : styles.alignStart,
+            highlightedMessageId && highlightedMessageId === normalizeId(msg.id)
+              ? styles.highlightedBubbleWrapper
+              : null,
           ]}
         >
           {isCoupon ? (
@@ -1409,6 +1516,21 @@ const ChatBox: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.chatList}
             renderItem={renderMessage}
+            onScrollToIndexFailed={(info) => {
+              const fallbackIndex = Math.max(0, info.index - 1);
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * fallbackIndex,
+                animated: true,
+              });
+
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.35,
+                });
+              }, 250);
+            }}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode={
               Platform.OS === "ios" ? "interactive" : "on-drag"
@@ -1628,6 +1750,14 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   bubbleWrapper: { maxWidth: "75%" },
+  highlightedBubbleWrapper: {
+    borderRadius: 20,
+    shadowColor: "#14B8A6",
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 3,
+  },
   alignEnd: { alignItems: "flex-end" },
   alignStart: { alignItems: "flex-start" },
   bubble: {
