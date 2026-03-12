@@ -79,16 +79,25 @@ const ProfileScreen = () => {
       // 2. Create account link
       const linkResponse = await createAccountLink({}).unwrap();
       console.log("Link Response:", linkResponse);
-      if (linkResponse?.url) {
+      const onboardingUrl =
+        linkResponse?.url ||
+        linkResponse?.accountLink ||
+        linkResponse?.onboardingUrl ||
+        linkResponse?.data?.url;
+
+      if (onboardingUrl) {
         router.push({
           pathname: "/(screens)/stripe_webview",
           params: {
-            url: encodeURIComponent(linkResponse.url),
+            url: encodeURIComponent(onboardingUrl),
             flow: "connect",
             title: "Stripe Connect",
           },
         });
+        return;
       }
+
+      Alert.alert("Error", "Stripe onboarding link was not returned.");
     } catch (error: any) {
       console.error("Stripe Connect error:", error);
       Alert.alert("Error", error?.data?.message || "Failed to initiate Stripe connection.");
@@ -275,7 +284,8 @@ const ProfileScreen = () => {
       "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
   };
 
-  const isStripeConnected = stripeStatus?.chargesEnabled && stripeStatus?.payoutsEnabled;
+  const isStripeConnected = Boolean(stripeStatus?.chargesEnabled && stripeStatus?.payoutsEnabled);
+  const stripeStatusLabel = String(stripeStatus?.status || "").toLowerCase();
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView
@@ -488,7 +498,9 @@ const ProfileScreen = () => {
             ) : isStripeConnected ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
                 <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
-                <Text style={{ color: '#4CAF50', fontWeight: 'bold', marginLeft: 5, fontSize: 12 }}>{t("connected", "Connected")}</Text>
+                <Text style={{ color: '#4CAF50', fontWeight: 'bold', marginLeft: 5, fontSize: 12 }}>
+                  {stripeStatusLabel === "verified" ? "Verified" : t("connected", "Connected")}
+                </Text>
               </View>
             ) : (
               <TouchableOpacity
@@ -519,6 +531,11 @@ const ProfileScreen = () => {
               {t("stripe_connect_hint", "Connect your Stripe account to receive payouts.")}
             </Text>
           )}
+          {stripeStatus?.stripeAccountId ? (
+            <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
+              Stripe ID: {stripeStatus.stripeAccountId}
+            </Text>
+          ) : null}
         </View>
 
         {/* Setting Card */}
