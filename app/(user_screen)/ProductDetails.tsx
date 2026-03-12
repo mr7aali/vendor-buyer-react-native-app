@@ -26,6 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
 const { width } = Dimensions.get("window");
+const MIN_ORDER_QTY = 10;
 
 const resolveEntityId = (value: any): string => {
   if (typeof value === "string" || typeof value === "number") return String(value);
@@ -63,7 +64,7 @@ const ProductDetails = () => {
   const [createReview, { isLoading: isSubmittingReview }] = useCreateReviewMutation();
   const user = useSelector((state: RootState) => state.auth.user);
 
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(MIN_ORDER_QTY);
   const [selectedColor, setSelectedColor] = useState("Teal");
   const [coupon, setCoupon] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -118,6 +119,13 @@ const ProductDetails = () => {
       Alert.alert(t("error", "Error"), t("product_details_login_order", "Please login to place an order"));
       return;
     }
+    if (!Number.isInteger(quantity) || quantity < MIN_ORDER_QTY) {
+      Alert.alert(
+        t("error", "Error"),
+        t("product_details_min_order_qty_error", "Minimum order quantity is 10"),
+      );
+      return;
+    }
 
     try {
       const orderData = {
@@ -135,7 +143,7 @@ const ProductDetails = () => {
 
       const result = await createOrder(orderData).unwrap();
       Alert.alert(t("success", "Success"), t("product_details_order_success", "Order placed successfully!"), [
-        { text: t("ok", "OK"), onPress: () => router.push("/(users)/order") }
+        { text: t("ok", "OK"), onPress: () => router.push("/(users)/cart") }
       ]);
     } catch (err: any) {
       Alert.alert(t("error", "Error"), err?.data?.message || t("product_details_order_failed", "Failed to place order"));
@@ -182,18 +190,6 @@ const ProductDetails = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FBF9" }}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FBF9" />
-      {/* Floating Review Button */}
-      <TouchableOpacity
-        onPress={() => {
-          if (!user) {
-            Alert.alert(t("product_details_login_required", "Login Required"), t("product_details_login_give_review", "Please login to give a review"));
-            return;
-          }
-          setIsReviewModalVisible(true);
-        }}
-        style={{ position: 'absolute', bottom: 30, zIndex: 9999, right: 15, backgroundColor: "#FFF", width: 44, height: 44, borderRadius: 14, justifyContent: "center", alignItems: "center", elevation: 4, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 4, borderWidth: 1, borderColor: "#2D8C8C" }}>
-        <Ionicons name="star-outline" size={24} color="#2D8C8C" />
-      </TouchableOpacity>
       {/* Header */}
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 10 }}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -342,6 +338,13 @@ const ProductDetails = () => {
             if (!product) return;
             if (!user) {
               Alert.alert(t("error", "Error"), t("product_details_login_add_cart", "Please login to add items to cart"));
+              return;
+            }
+            if (!Number.isInteger(quantity) || quantity < MIN_ORDER_QTY) {
+              Alert.alert(
+                t("error", "Error"),
+                t("product_details_min_order_qty_error", "Minimum order quantity is 10"),
+              );
               return;
             }
             try {

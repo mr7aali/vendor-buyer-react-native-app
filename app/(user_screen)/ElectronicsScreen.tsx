@@ -170,14 +170,10 @@ const ElectronicsScreen = () => {
         quantity: Number(quantity),
       }).unwrap();
 
-      Alert.alert(
-        t("success", "Success"),
-        t("electronics_added_to_cart", "Product added to cart!"),
-      );
       setShowQtyModal(false);
       setSelectedProduct(null);
       setQuantityInput("");
-      // loadAddedItems will be updated via cartData change
+      router.push("/(users)/cart" as any);
     } catch (error: any) {
       console.error("Error adding to cart:", error);
       Alert.alert(
@@ -488,32 +484,32 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: "#FF5A5F",
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "500",
     flex: 1,
     paddingRight: 12,
   },
   qtyInput: {
-    height: 80,
+    height: 52,
     borderWidth: 2,
     borderColor: "#C4C8CB",
-    borderRadius: 22,
-    paddingHorizontal: 22,
-    fontSize: 24,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    fontSize: 16,
     color: "#1F2937",
-    marginBottom: 22,
+    marginBottom: 18,
     backgroundColor: "#EEF1EF",
   },
   addToCartBtn: {
-    height: 72,
-    borderRadius: 36,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#2A8B8A",
     alignItems: "center",
     justifyContent: "center",
   },
   addToCartBtnText: {
     color: "#fff",
-    fontSize: 22,
+    fontSize: 14,
     fontWeight: "500",
   },
 });
