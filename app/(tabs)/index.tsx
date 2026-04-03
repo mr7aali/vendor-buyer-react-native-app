@@ -260,7 +260,7 @@ export default function HomeScreen() {
                 fontWeight: "600",
               }}
             >
-              {t("welcome_back", "Welcome back")}
+              {t("welcome", "Welcome")}
             </Text>
             <Text
               style={{
