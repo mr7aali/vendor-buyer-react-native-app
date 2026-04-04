@@ -196,6 +196,9 @@ const SignUpScreen: React.FC = () => {
       const { GoogleSignin } = googleModule;
       GoogleSignin.configure({ webClientId: googleWebClientId });
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      if (GoogleSignin.getCurrentUser()) {
+        await GoogleSignin.signOut();
+      }
       const signInResult = await GoogleSignin.signIn();
       let idToken = (signInResult as any)?.data?.idToken || (signInResult as any)?.idToken;
 
