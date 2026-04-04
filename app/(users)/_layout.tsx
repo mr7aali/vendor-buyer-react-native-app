@@ -109,12 +109,6 @@ export default function UsersLayout() {
           title: t("tab_categories", "Categories"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
-          tabBarStyle: {
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            display: "flex",
-          },
         }}
       />
       <Tabs.Screen
@@ -123,12 +117,6 @@ export default function UsersLayout() {
           title: t("tab_information", "Information"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
-          tabBarStyle: {
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            display: "flex",
-          },
         }}
       />
     </Tabs>
