@@ -8,11 +8,12 @@ type AvailableProfiles = {
 type PersistAuthPayload = {
   accessToken: string;
   refreshToken?: string | null;
-  user: any;
+  user?: any;
   availableProfiles?: AvailableProfiles;
 };
 
 const AVAILABLE_PROFILES_KEY = "availableProfiles";
+const AUTH_KEYS = ["accessToken", "refreshToken", "user", "userRole", AVAILABLE_PROFILES_KEY] as const;
 
 export const persistAuthState = async ({
   accessToken,
@@ -23,7 +24,6 @@ export const persistAuthState = async ({
   const userRole = String(user?.userType || user?.role || "").toLowerCase();
   const writes: [string, string][] = [
     ["accessToken", accessToken],
-    ["user", JSON.stringify(user ?? null)],
   ];
 
   if (refreshToken) {
@@ -47,6 +47,34 @@ export const persistAuthState = async ({
   if (!availableProfiles) {
     await AsyncStorage.removeItem(AVAILABLE_PROFILES_KEY);
   }
+
+  // We intentionally do not persist the full user object anymore.
+  await AsyncStorage.removeItem("user");
+};
+
+export const loadPersistedAuthState = async () => {
+  const [[, accessToken], [, refreshToken], [, userRole]] = await AsyncStorage.multiGet([
+    "accessToken",
+    "refreshToken",
+    "userRole",
+  ]);
+  const availableProfiles = await loadAvailableProfiles();
+
+  if (!accessToken) {
+    await clearPersistedAuthState();
+    return null;
+  }
+
+  return {
+    accessToken,
+    refreshToken: refreshToken || null,
+    userRole: userRole || "",
+    availableProfiles,
+  };
+};
+
+export const clearPersistedAuthState = async () => {
+  await AsyncStorage.multiRemove([...AUTH_KEYS]);
 };
 
 export const loadAvailableProfiles = async () => {

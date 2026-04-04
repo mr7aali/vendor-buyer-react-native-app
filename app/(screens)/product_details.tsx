@@ -3,8 +3,8 @@ import { useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo } from 'react';
-import { ActivityIndicator, Alert, I18nManager, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, I18nManager, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const FALLBACK = 'https://via.placeholder.com/200';
@@ -26,6 +26,7 @@ const resolveEntityId = (value: any): string => {
 
 export default function ProductDetails() {
   const { language, t } = useTranslation();
+  const { width } = useWindowDimensions();
   const { id: idParam } = useLocalSearchParams();
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
   const requestId = String(id || '');
@@ -40,6 +41,7 @@ export default function ProductDetails() {
     { skip: !reviewProductId },
   );
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const ui = useMemo(() => {
     if (language === 'he') {
@@ -176,6 +178,16 @@ export default function ProductDetails() {
       : { label: ui.active, bg: '#E8F8EE', text: '#248D5A' };
 
   const images = Array.isArray(product.images) && product.images.length ? product.images : [FALLBACK];
+  const imageCountLabel = `${Math.min(activeImageIndex + 1, images.length)}/${images.length}`;
+  const heroImageWidth = Math.max(width - 52, 0);
+
+  const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, layoutMeasurement } = event.nativeEvent;
+    const nextIndex = Math.round(contentOffset.x / Math.max(layoutMeasurement.width, 1));
+    if (nextIndex !== activeImageIndex) {
+      setActiveImageIndex(Math.max(0, Math.min(nextIndex, images.length - 1)));
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -191,9 +203,29 @@ export default function ProductDetails() {
         <View style={styles.card}>
           <View style={styles.mediaHeader}>
             <Text style={styles.sectionTitle}>{ui.media}</Text>
-            <Text style={styles.mediaCount}>{images.length}/5</Text>
+            <Text style={styles.mediaCount}>{imageCountLabel}</Text>
           </View>
-          <Image source={{ uri: images[0] }} style={styles.heroImage} />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleImageScroll}
+            style={styles.heroCarousel}
+          >
+            {images.map((uri, index) => (
+              <Image key={`${uri}-${index}`} source={{ uri }} style={[styles.heroImage, { width: heroImageWidth }]} />
+            ))}
+          </ScrollView>
+          {images.length > 1 ? (
+            <View style={styles.paginationRow}>
+              {images.map((_, index) => (
+                <View
+                  key={`dot-${index}`}
+                  style={[styles.paginationDot, index === activeImageIndex ? styles.paginationDotActive : null]}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -297,7 +329,11 @@ const styles = StyleSheet.create({
   mediaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1F2A30' },
   mediaCount: { color: '#8A969D', fontSize: 12 },
-  heroImage: { width: '100%', height: 190, borderRadius: 10, backgroundColor: '#E8EEF1' },
+  heroCarousel: { marginHorizontal: -12 },
+  heroImage: { width: 336, height: 190, borderRadius: 10, backgroundColor: '#E8EEF1', marginHorizontal: 12 },
+  paginationRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10, gap: 6 },
+  paginationDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D5DFE4' },
+  paginationDotActive: { width: 16, backgroundColor: '#278687' },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   productName: { fontSize: 18, fontWeight: '700', color: '#1F2A30', flex: 1, paddingRight: 8 },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },

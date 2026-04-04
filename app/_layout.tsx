@@ -9,7 +9,7 @@ import "react-native-reanimated";
 import { Provider, useSelector } from "react-redux";
 import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
 import { SocketProvider } from "../context/SocketContext";
-import { loadAvailableProfiles } from "../services/authStorage";
+import { loadPersistedAuthState, persistAuthState } from "../services/authStorage";
 import {
   registerForPushNotificationsAsync,
   syncPushTokenToBackend,
@@ -54,7 +54,12 @@ const AuthSync = () => {
       if (currentUserJson === updatedUserJson) return;
 
       console.log("Syncing profile data into auth state");
-      AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      persistAuthState({
+        accessToken: token,
+        refreshToken: refreshToken || null,
+        user: updatedUser,
+        availableProfiles,
+      });
 
       dispatch(
         setCredentials({
@@ -142,43 +147,26 @@ export default function RootLayout() {
           store.dispatch(setLanguage(savedLanguage));
         }
 
-        const accessToken = await AsyncStorage.getItem("accessToken");
-        const refreshToken = await AsyncStorage.getItem("refreshToken");
-        const rawUser = await AsyncStorage.getItem("user");
-        const availableProfiles = await loadAvailableProfiles();
-        const storedRole = (await AsyncStorage.getItem("userRole")) || "";
+        const persistedAuth = await loadPersistedAuthState();
 
-        let parsedUser: any = null;
-        if (rawUser) {
-          try {
-            parsedUser = JSON.parse(rawUser);
-          } catch {
-            parsedUser = null;
-          }
-        }
-
-        if (accessToken && parsedUser) {
+        if (persistedAuth) {
           store.dispatch(
             setCredentials({
-              user: parsedUser,
-              accessToken,
-              refreshToken: refreshToken || "",
-              availableProfiles,
+              user: null,
+              accessToken: persistedAuth.accessToken,
+              refreshToken: persistedAuth.refreshToken || "",
+              availableProfiles: persistedAuth.availableProfiles,
             }),
           );
 
-          const detectedRole = String(
-            parsedUser?.userType ||
-              parsedUser?.role ||
-              storedRole ||
-              (parsedUser?.vendor
-                ? "vendor"
-                : parsedUser?.buyer
-                  ? "buyer"
-                  : ""),
-          ).toLowerCase();
+          const detectedRole = String(persistedAuth.userRole || "").toLowerCase();
 
-          targetPath = detectedRole === "vendor" ? "/(tabs)" : "/(users)";
+          targetPath =
+            detectedRole === "vendor"
+              ? "/(tabs)"
+              : detectedRole === "buyer"
+                ? "/(users)"
+                : "/(onboarding)";
         } else {
           // Not logged in -> onboarding/auth flow
           targetPath = "/(onboarding)";

@@ -153,8 +153,7 @@ const ProfileScreen = () => {
       displayUser?.buyer?.avatar ||
       displayUser?.avatar ||
       displayUser?.image ||
-      displayUser?.logo ||
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
+      displayUser?.logo,
   };
   return (
     <SafeAreaView style={{ flex: 1 }}>

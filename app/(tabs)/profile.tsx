@@ -280,8 +280,7 @@ const ProfileScreen = () => {
       displayUser?.vendor?.logo ||
       displayUser?.logo ||
       displayUser?.image ||
-      displayUser?.avatar ||
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
+      displayUser?.avatar,
   };
 
   const isStripeConnected = Boolean(stripeStatus?.chargesEnabled && stripeStatus?.payoutsEnabled);

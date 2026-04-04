@@ -67,8 +67,7 @@ const PersonalInfoScreen = () => {
       displayUser?.vendor?.logo ||
       displayUser?.buyer?.profilePhotoUrl ||
       displayUser?.avatar ||
-      displayUser?.image ||
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
+      displayUser?.image,
     dob: displayUser?.dob || "N/A",
     email: displayUser?.email || "N/A",
     phone: displayUser?.vendor?.phone || displayUser?.buyer?.phone || displayUser?.phone || displayUser?.phoneNumber || "N/A",
@@ -86,8 +85,7 @@ const PersonalInfoScreen = () => {
           displayUser?.vendor?.logo ||
           displayUser?.buyer?.profilePhotoUrl ||
           displayUser?.avatar ||
-          displayUser?.image ||
-          "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
+          displayUser?.image ,
         dob: displayUser?.dob || "N/A",
         email: displayUser?.email || "N/A",
         phone: displayUser?.vendor?.phone || displayUser?.buyer?.phone || displayUser?.phone || displayUser?.phoneNumber || "N/A",
