@@ -201,7 +201,11 @@ export default function OrdersScreen() {
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#999" />
-        <TextInput placeholder={t("orders_search", "Search......")} style={styles.searchInput} />
+        <TextInput
+          placeholder={t("orders_search", "Search......")}
+          placeholderTextColor="#9CA3AF"
+          style={styles.searchInput}
+        />
       </View>
 
       <View style={{ height: 50, marginBottom: 10 }}>
@@ -304,7 +308,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
   },
-  headerTitle: { fontSize: 18, fontWeight: "700" },
+  headerTitle: { fontSize: 22, fontWeight: "700" },
   searchContainer: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -315,7 +319,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEE",
   },
-  searchInput: { marginLeft: 10, flex: 1 },
+  searchInput: { marginLeft: 10, flex: 1, color: "#1F2937" },
   filterBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,
