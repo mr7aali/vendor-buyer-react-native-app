@@ -21,12 +21,12 @@ import {
 
 import { useAppleAuthMutation, useGoogleAuthMutation, useRegisterMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
+import { GoogleLogo } from "@/components/ui/google-logo";
 import { persistAuthState } from "@/services/authStorage";
 import { useAppDispatch } from "@/store/hooks";
 import { logOut, setCredentials } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Apple, Chrome } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const SignUpScreen: React.FC = () => {
@@ -453,10 +453,10 @@ const SignUpScreen: React.FC = () => {
           {/* Social Icons */}
           <View style={styles.socialContainer}>
             <TouchableOpacity style={styles.socialIcon} onPress={handleGoogleSignup} disabled={isSocialLoading || isLoading}>
-              <Chrome color="#EA4335" size={24} />
+              <GoogleLogo size={20} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.socialIcon} onPress={handleAppleSignup} disabled={isSocialLoading || isLoading}>
-              <Apple color="#000" size={24} />
+              <Ionicons name="logo-apple" size={26} color="#000" />
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -24,6 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppleAuthMutation, useGoogleAuthMutation, useLoginMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
+import { GoogleLogo } from "@/components/ui/google-logo";
 import { persistAuthState } from "@/services/authStorage";
 import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
@@ -384,7 +385,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.socialIconsRow}>
-            <TouchableOpacity style={styles.socialIconCircle} onPress={handleGoogleLogin} disabled={isSocialLoading || isLoading}><FontAwesome name="google" size={24} color="#DB4437" /></TouchableOpacity>
+            <TouchableOpacity style={styles.socialIconCircle} onPress={handleGoogleLogin} disabled={isSocialLoading || isLoading}><GoogleLogo size={20} /></TouchableOpacity>
             <TouchableOpacity style={styles.socialIconCircle} onPress={handleAppleLogin} disabled={isSocialLoading || isLoading}><FontAwesome name="apple" size={24} color="black" /></TouchableOpacity>
             
           </View>
