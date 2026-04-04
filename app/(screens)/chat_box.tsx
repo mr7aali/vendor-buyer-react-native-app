@@ -1549,9 +1549,9 @@ const ChatBox: React.FC = () => {
       {renderTabs()}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? Math.max(insets.top, 12) : 0}
       >
         <View style={{ flex: 1 }}>
           {activeTab === "chat" ? renderPinnedBanner() : null}
@@ -1581,7 +1581,7 @@ const ChatBox: React.FC = () => {
               <View
                 style={[
                   styles.inputArea,
-                  { paddingBottom: Math.max(insets.bottom, 8) },
+                  { paddingBottom: Math.max(insets.bottom, 10), paddingHorizontal: 14 },
                 ]}
               >
                 <TouchableOpacity
@@ -1875,7 +1875,7 @@ const styles = StyleSheet.create({
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
     backgroundColor: "#fff",
