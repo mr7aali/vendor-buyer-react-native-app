@@ -146,7 +146,6 @@ const AppNavigator = () => {
 };
 
 export default function RootLayout() {
-  const [isReady, setIsReady] = React.useState(false);
   const stripePublishableKey = (
     process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
   ).trim();
@@ -197,7 +196,6 @@ export default function RootLayout() {
       } catch (e) {
         console.error("Auto-login failed:", e);
       } finally {
-        setIsReady(true);
         if (shouldRedirect && targetPath !== "/(onboarding)") {
           router.replace(targetPath as any);
         }
@@ -208,12 +206,14 @@ export default function RootLayout() {
   }, []);
 
   React.useEffect(() => {
-    if (!isReady) return;
-
-    SplashScreen.hideAsync().catch(() => {
-      // Ignore splash hide race conditions during fast refresh.
+    const frame = requestAnimationFrame(() => {
+      SplashScreen.hideAsync().catch(() => {
+        // Ignore splash hide race conditions during fast refresh.
+      });
     });
-  }, [isReady]);
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <Provider store={store}>

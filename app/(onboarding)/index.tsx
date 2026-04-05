@@ -7,7 +7,7 @@ export default function SplashScreen() {
   useEffect(() => {
     const timer = setTimeout(() => {
       router.replace("/(onboarding)/PrivacyPolicy");
-    }, 2000);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, []);
@@ -20,7 +20,7 @@ export default function SplashScreen() {
     >
       <View>
         <Image
-          source={require("../../assets/users/logoImg.png")}
+          source={require("../../assets/images/imagelogo.png")}
           style={styles.logo}
           resizeMode="contain"
         />
