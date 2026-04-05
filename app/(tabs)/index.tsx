@@ -6,6 +6,7 @@ import { selectCurrentUser } from "@/store/slices/authSlice";
 import { Feather } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
   ActivityIndicator,
@@ -240,6 +241,11 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <StatusBar
+        style="dark"
+        backgroundColor="#FFFFFF"
+        translucent={false}
+      />
       <View>
         {/* THIS IS FOR HOME HEADER */}
         <View

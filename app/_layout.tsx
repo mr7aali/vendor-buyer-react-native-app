@@ -2,10 +2,15 @@ import { useAppSelector } from "@/store/hooks";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { Stack, router } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { View } from "react-native";
 import "react-native-reanimated";
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from "react-native-safe-area-context";
 import { Provider, useSelector } from "react-redux";
 import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
 import { SocketProvider } from "../context/SocketContext";
@@ -19,6 +24,12 @@ import { setCredentials } from "../store/slices/authSlice";
 import { selectLanguage, setLanguage } from "../store/slices/languageSlice";
 import { RootState, store } from "../store/store";
 import "./global.css";
+
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Ignore if the splash screen is already controlled elsewhere.
+});
+
+const APP_BACKGROUND_COLOR = "#F8FAF9";
 
 const AuthSync = () => {
   const dispatch = store.dispatch;
@@ -110,8 +121,18 @@ const AppNavigator = () => {
   const isRTL = getLayoutDirection(language) === "rtl";
 
   return (
-    <View style={{ flex: 1, direction: isRTL ? "rtl" : "ltr" }}>
-      <StatusBar style="dark" />
+    <View
+      style={{
+        flex: 1,
+        direction: isRTL ? "rtl" : "ltr",
+        backgroundColor: APP_BACKGROUND_COLOR,
+      }}
+    >
+      <StatusBar
+        style="dark"
+        backgroundColor={APP_BACKGROUND_COLOR}
+        translucent={false}
+      />
       <Stack key={isRTL ? "rtl" : "ltr"} initialRouteName="(onboarding)">
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen name="(users)" options={{ headerShown: false }} />
@@ -177,11 +198,8 @@ export default function RootLayout() {
         console.error("Auto-login failed:", e);
       } finally {
         setIsReady(true);
-        // Delay redirect slightly so navigator is mounted before route change.
         if (shouldRedirect && targetPath !== "/(onboarding)") {
-          setTimeout(() => {
-            router.replace(targetPath as any);
-          }, 500);
+          router.replace(targetPath as any);
         }
       }
     };
@@ -189,22 +207,28 @@ export default function RootLayout() {
     checkLogin();
   }, []);
 
-  if (!isReady) {
-    return null; // Or return a custom loading component/splash screen
-  }
+  React.useEffect(() => {
+    if (!isReady) return;
+
+    SplashScreen.hideAsync().catch(() => {
+      // Ignore splash hide race conditions during fast refresh.
+    });
+  }, [isReady]);
 
   return (
     <Provider store={store}>
-      <StripeProvider
-        publishableKey={stripePublishableKey}
-        merchantIdentifier="merchant.com.yozietranceapp"
-        urlScheme="yozietranceapp"
-      >
-        <AuthSync />
-        <SocketProvider>
-          <AppNavigator />
-        </SocketProvider>
-      </StripeProvider>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <StripeProvider
+          publishableKey={stripePublishableKey}
+          merchantIdentifier="merchant.com.yozietranceapp"
+          urlScheme="yozietranceapp"
+        >
+          <AuthSync />
+          <SocketProvider>
+            <AppNavigator />
+          </SocketProvider>
+        </StripeProvider>
+      </SafeAreaProvider>
     </Provider>
   );
 }

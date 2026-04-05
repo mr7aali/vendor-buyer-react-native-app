@@ -329,6 +329,7 @@ import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Bell, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
 import {
@@ -465,6 +466,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        style="dark"
+        backgroundColor={styles.container.backgroundColor}
+        translucent={false}
+      />
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <TouchableOpacity
