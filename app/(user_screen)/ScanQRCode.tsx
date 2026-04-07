@@ -15,7 +15,6 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import VendorModal from "./UserModal";
 
 import { useConnectToVendorMutation } from "@/store/api/connectionApiSlice";
 
@@ -108,7 +107,6 @@ export default function ScanQRScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [zoom, setZoom] = useState(0);
-  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const [connectToVendor, { isLoading }] = useConnectToVendorMutation();
 
@@ -182,11 +180,6 @@ export default function ScanQRScreen() {
         setTimeout(() => setScanned(false), 2000);
       }
     }
-  };
-
-  const handleManualConnect = (code: string) => {
-    setIsModalVisible(false);
-    // Connection handled in UserModal, which redirects.
   };
 
   return (
@@ -263,17 +256,11 @@ export default function ScanQRScreen() {
       <TouchableOpacity
         style={styles.manualButton}
         activeOpacity={0.8}
-        onPress={() => setIsModalVisible(true)}
+        onPress={() => router.push("/(user_screen)/ManualVendorSearch")}
       >
         <Keyboard color="#4A4A4A" size={20} />
         <Text style={styles.manualButtonText}>{t("scan_enter_code_manually", "Enter Code Manually")}</Text>
       </TouchableOpacity>
-
-      <VendorModal
-        isVisible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        onConnect={handleManualConnect}
-      />
     </SafeAreaView>
   );
 }
