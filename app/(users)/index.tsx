@@ -330,7 +330,7 @@ import { selectCurrentUser } from "@/store/slices/authSlice";
 import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Bell, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
+import { Bell, Compass, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
 import {
   Dimensions,
@@ -344,7 +344,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-
 const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -551,6 +550,15 @@ const Dashboard: React.FC = () => {
           </View>
         </View>
 
+        <TouchableOpacity
+          style={styles.exploreButton}
+          onPress={() => router.push("/(users)/explore")}
+          activeOpacity={0.85}
+        >
+          <Compass size={22} color="#E9F7F5" />
+          <Text style={styles.exploreButtonText}>{t("explore", "Explore")}</Text>
+        </TouchableOpacity>
+
         {/* Recent Order Section (Updated) */}
         <Text style={styles.sectionTitleMain}>{t("recent_order", "Recent order")}</Text>
 
@@ -710,7 +718,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2D8C8C",
     borderRadius: 16,
     padding: 20,
-    marginBottom: 25,
+    marginBottom: 14,
   },
   sectionTitleWhite: {
     fontSize: 16,
@@ -720,6 +728,26 @@ const styles = StyleSheet.create({
   },
   stepsList: { gap: 10 },
   stepItem: { color: "#E0F2F2", fontSize: 14, lineHeight: 20 },
+  exploreButton: {
+    backgroundColor: "#2D8C8C",
+    borderRadius: 16,
+    minHeight: 58,
+    marginBottom: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#1D6C6D",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  exploreButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F5FFFE",
+  },
   sectionTitleMain: {
     fontSize: 18,
     fontWeight: "700",

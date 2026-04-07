@@ -112,6 +112,14 @@ export default function UsersLayout() {
         }}
       />
       <Tabs.Screen
+        name="explore"
+        options={{
+          title: t("explore", "Explore"),
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: "none" },
+        }}
+      />
+      <Tabs.Screen
         name="Information"
         options={{
           title: t("tab_information", "Information"),
