@@ -44,6 +44,7 @@ const DUMMY_VENDOR_CARDS = [
   },
 ];
 
+
 export default function ExploreScreen() {
   const { t } = useTranslation();
 
