@@ -23,6 +23,9 @@ const DUMMY_VENDOR_CARDS = [
     name: "Elite Electronics",
     image:
       "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+
+
+      
   },
   {
     id: "nova-gadgets",
