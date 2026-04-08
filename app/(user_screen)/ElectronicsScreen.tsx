@@ -1,16 +1,22 @@
-import { useAddToCartMutation, useGetCartQuery } from "@/store/api/cartApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
+import {
+  useAddToCartMutation,
+  useGetCartQuery,
+} from "@/store/api/cartApiSlice";
 import { useGetMyConnectionsQuery } from "@/store/api/connectionApiSlice";
 import { useGetProductsByVendorQuery } from "@/store/api/product_api_slice";
 import { RootState } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
   Image,
+  Modal,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +28,7 @@ import { useSelector } from "react-redux";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 2;
+const MIN_ORDER_QTY = 10;
 
 const PRODUCTS = [
   {
@@ -59,29 +66,75 @@ const PRODUCTS = [
 ];
 
 const ElectronicsScreen = () => {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { categoryId, categoryName } = useLocalSearchParams<{ categoryId: string; categoryName: string }>();
+  const { categoryId, categoryName, vendorId } = useLocalSearchParams<{
+    categoryId: string;
+    categoryName: string;
+    vendorId?: string;
+  }>();
   const [addedItems, setAddedItems] = useState<{ [key: string]: boolean }>({});
+  const [showQtyModal, setShowQtyModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [quantityInput, setQuantityInput] = useState("");
+  const suppressNextCardPressRef = useRef(false);
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = user?.userId || user?.id || (user as any)?._id;
 
-  const { data: connections, isLoading: isConnectionsLoading } = useGetMyConnectionsQuery(currentUserId, {
-    skip: !currentUserId,
-    refetchOnMountOrArgChange: true,
-  });
-  const activeVendorId = connections?.data?.[0]?.vendor?._id || connections?.data?.[0]?.vendor?.id;
+  const { data: connections, isLoading: isConnectionsLoading } =
+    useGetMyConnectionsQuery(currentUserId, {
+      skip: !currentUserId,
+      refetchOnMountOrArgChange: true,
+    });
+  const connectionList = Array.isArray((connections as any)?.data)
+    ? (connections as any).data
+    : Array.isArray(connections)
+      ? (connections as any)
+      : [];
+  const matchedConnection = connectionList.find((conn: any) => {
+    const vendor = conn?.vendor || conn?.vendorId || {};
+    const candidates = [
+      vendor?.userId,
+      vendor?._id,
+      vendor?.id,
+      conn?.vendorUserId,
+      conn?.vendorId?._id,
+      conn?.vendorId?.id,
+      conn?.vendorId,
+    ]
+      .filter(Boolean)
+      .map((value: any) => String(value));
 
-  const { data: products, isLoading: isProductsLoading } = useGetProductsByVendorQuery(
-    { vendorId: activeVendorId, categoryId },
-    { skip: !activeVendorId }
+    return vendorId ? candidates.includes(String(vendorId)) : false;
+  });
+  const fallbackVendor = connectionList[0]?.vendor || connectionList[0]?.vendorId || {};
+  const activeVendorId = String(
+    matchedConnection?.vendor?.id ||
+      matchedConnection?.vendor?._id ||
+      matchedConnection?.vendorId?.id ||
+      matchedConnection?.vendorId?._id ||
+      fallbackVendor?.id ||
+      fallbackVendor?._id ||
+      vendorId ||
+      "",
   );
 
-  const [addToCartMutation, { isLoading: isAddingToCart }] = useAddToCartMutation();
+  const { data: products, isLoading: isProductsLoading } =
+    useGetProductsByVendorQuery(
+      { vendorId: activeVendorId, categoryId },
+      { skip: !activeVendorId },
+    );
+
+  const [addToCartMutation, { isLoading: isAddingToCart }] =
+    useAddToCartMutation();
   const { data: cartData, refetch: refetchCart } = useGetCartQuery();
 
   const loadAddedItems = useCallback(() => {
     if (cartData) {
-      const rawItems = cartData?.data?.items || cartData?.items || (Array.isArray(cartData) ? cartData : []);
+      const rawItems =
+        cartData?.data?.items ||
+        cartData?.items ||
+        (Array.isArray(cartData) ? cartData : []);
       const addedMap: { [key: string]: boolean } = {};
       rawItems.forEach((item: any) => {
         const id = item.productId?._id || item.productId?.id || item.productId;
@@ -98,19 +151,56 @@ const ElectronicsScreen = () => {
     }, [refetchCart, loadAddedItems]),
   );
 
-  const addToCart = async (product: any) => {
+  const addToCart = async (product: any, quantity?: number) => {
+    // Safety guard: never allow direct add below minimum quantity.
+    // This also protects against any stale/old call sites that might pass no quantity.
+    if (!Number.isInteger(quantity) || Number(quantity) < MIN_ORDER_QTY) {
+      setSelectedProduct(product);
+      setShowQtyModal(true);
+      Alert.alert(
+        t("error", "Error"),
+        t("electronics_min_order_error", "Minimum order quantity is 10"),
+      );
+      return;
+    }
+
     try {
       await addToCartMutation({
         productId: product._id || product.id,
-        quantity: 1
+        quantity: Number(quantity),
       }).unwrap();
 
-      Alert.alert("Success", "Product added to cart!");
-      // loadAddedItems will be updated via cartData change
+      setShowQtyModal(false);
+      setSelectedProduct(null);
+      setQuantityInput("");
+      router.push("/(users)/cart" as any);
     } catch (error: any) {
       console.error("Error adding to cart:", error);
-      Alert.alert("Error", error?.data?.message || "Failed to add to cart");
+      Alert.alert(
+        t("error", "Error"),
+        error?.data?.message ||
+          t("electronics_failed_add_to_cart", "Failed to add to cart"),
+      );
     }
+  };
+
+  const openQtyModal = (product: any) => {
+    setSelectedProduct(product);
+    setQuantityInput("");
+    setShowQtyModal(true);
+  };
+
+  const handleConfirmAddToCart = async () => {
+    if (!selectedProduct) return;
+    const qty = Number(quantityInput);
+    if (!Number.isInteger(qty) || qty < MIN_ORDER_QTY) {
+      Alert.alert(
+        t("error", "Error"),
+        t("electronics_min_order_error", "Minimum order quantity is 10"),
+      );
+      return;
+    }
+    await addToCart(selectedProduct, qty);
   };
 
   return (
@@ -120,7 +210,9 @@ const ElectronicsScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{categoryName || "Electronics"}</Text>
+        <Text style={styles.headerTitle}>
+          {categoryName || t("electronics_title", "Electronics")}
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -128,7 +220,7 @@ const ElectronicsScreen = () => {
       <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={20} color="#888" />
         <TextInput
-          placeholder="Search Product.."
+          placeholder={t("electronics_search_placeholder", "Search Product..")}
           style={styles.searchInput}
           placeholderTextColor="#888"
         />
@@ -136,7 +228,9 @@ const ElectronicsScreen = () => {
 
       {/* Product Grid List */}
       {isConnectionsLoading || isProductsLoading ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <ActivityIndicator size="large" color="#2A8383" />
         </View>
       ) : (
@@ -147,66 +241,136 @@ const ElectronicsScreen = () => {
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.listPadding}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.8}
-              onPress={() =>
-                router.push({
-                  pathname: "/(user_screen)/ProductDetails",
-                  params: { productId: item.id || item._id },
-                })
-              }
-            >
-              {/* Light Blue Image Container */}
-              <View style={styles.imageBox}>
-                <Image
-                  source={item.images?.[0] ? { uri: item.images[0] } : item.image}
-                  style={styles.img}
-                  resizeMode="contain"
-                />
-              </View>
+            <View style={styles.card}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  // If "+" was tapped and the press bubbled, skip this navigation once.
+                  if (suppressNextCardPressRef.current) {
+                    suppressNextCardPressRef.current = false;
+                    return;
+                  }
+                  router.push({
+                    pathname: "/(user_screen)/ProductDetails",
+                    params: { productId: item.id || item._id },
+                  });
+                }}
+              >
+                {/* Light Blue Image Container */}
+                <View style={styles.imageBox}>
+                  <Image
+                    source={
+                      item.images?.[0] ? { uri: item.images[0] } : item.image
+                    }
+                    style={styles.img}
+                    resizeMode="contain"
+                  />
+                </View>
 
-              {/* Product Title */}
-              <Text style={styles.title} numberOfLines={1}>
-                {item.title || item.name}
-              </Text>
+                {/* Product Title */}
+                <Text style={styles.title} numberOfLines={1}>
+                  {item.title || item.name}
+                </Text>
 
-              {/* Rating Section */}
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={16} color="#FFB800" />
-                <Text style={styles.ratingText}>{item.rating || "0.0"}</Text>
-                <Text style={styles.reviews}>({item.reviews || 0} reviews)</Text>
-              </View>
+                {/* Rating Section */}
+                <View style={styles.ratingRow}>
+                  <Ionicons name="star" size={16} color="#FFB800" />
+                  <Text style={styles.ratingText}>{item.rating || "0.0"}</Text>
+                  <Text style={styles.reviews}>
+                    ({item.reviews || 0} {t("electronics_reviews", "reviews")})
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
               {/* Price and Circular Add Button */}
               <View style={styles.cardBottom}>
                 <View>
                   <Text style={styles.priceText}>
                     ${item.price}
-                    <Text style={styles.unitText}> /unit</Text>
+                    <Text style={styles.unitText}>
+                      {" "}
+                      /{t("electronics_unit", "unit")}
+                    </Text>
                   </Text>
                 </View>
 
-                <TouchableOpacity
+                <Pressable
                   style={[
                     styles.addButton,
                     addedItems[item.id || item._id] && {
                       backgroundColor: "#E0F2F1",
                     },
                   ]}
-                  onPress={() => addToCart(item)}
+                  hitSlop={8}
+                  onPress={() => {
+                    suppressNextCardPressRef.current = true;
+                    openQtyModal(item);
+                  }}
                 >
                   {addedItems[item.id || item._id] ? (
                     <Ionicons name="checkmark" size={24} color="#2A8383" />
                   ) : (
                     <Ionicons name="add" size={24} color="#333" />
                   )}
-                </TouchableOpacity>
+                </Pressable>
               </View>
-            </TouchableOpacity>
+            </View>
           )}
+          ListEmptyComponent={
+            <Text
+              style={{ textAlign: "center", color: "#6B7280", marginTop: 32 }}
+            >
+              {t("electronics_no_products", "No products found")}
+            </Text>
+          }
         />
       )}
+
+      <Modal
+        visible={showQtyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQtyModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {t("electronics_min_order", "Minimum order quantity: 10")}
+              </Text>
+              <TouchableOpacity onPress={() => setShowQtyModal(false)}>
+                <Ionicons name="close" size={34} color="#FF5A5F" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.qtyInput}
+              placeholder={t(
+                "electronics_enter_quantity",
+                "Enter your quantity",
+              )}
+              placeholderTextColor="#7A7E80"
+              keyboardType="number-pad"
+              value={quantityInput}
+              onChangeText={setQuantityInput}
+            />
+
+            <TouchableOpacity
+              style={styles.addToCartBtn}
+              onPress={handleConfirmAddToCart}
+              disabled={isAddingToCart}
+            >
+              {isAddingToCart ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.addToCartBtnText}>
+                  {t("electronics_add_to_cart", "Add to Cart")}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -214,6 +378,7 @@ const ElectronicsScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F7FAF8" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -299,6 +464,53 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     justifyContent: "center",
     alignItems: "center",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: "#E9ECEA",
+    borderRadius: 28,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  modalTitle: {
+    color: "#FF5A5F",
+    fontSize: 18,
+    fontWeight: "500",
+    flex: 1,
+    paddingRight: 12,
+  },
+  qtyInput: {
+    height: 52,
+    borderWidth: 2,
+    borderColor: "#C4C8CB",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: "#1F2937",
+    marginBottom: 18,
+    backgroundColor: "#EEF1EF",
+  },
+  addToCartBtn: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#2A8B8A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addToCartBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
   },
 });
 

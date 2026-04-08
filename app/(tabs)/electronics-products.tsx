@@ -1,5 +1,6 @@
 import { useGetProfileQuery } from '@/store/api/authApiSlice';
 import { useGetProductsByVendorQuery } from '@/store/api/product_api_slice';
+import { useTranslation } from '@/hooks/use-translation';
 import { useAppSelector } from '@/store/hooks';
 import { selectCurrentUser } from '@/store/slices/authSlice';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -10,16 +11,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const FALLBACK = 'https://via.placeholder.com/150';
 
-const statusMeta = (product: any) => {
-  const low = Number(product?.stockQuantity || 0) < 10;
-  if (!product?.isAvailable) return { label: 'Unpublish', bg: '#FFF4D9', text: '#A56700', dot: '#A56700' };
-  if (low) return { label: `${product.stockQuantity} in stock`, bg: '#FDEEEE', text: '#D54444', dot: '#D54444' };
-  return { label: `${product.stockQuantity} in stock`, bg: '#E8F8EE', text: '#248D5A', dot: '#248D5A' };
-};
-
 const money = (value: any) => `$${Number(value || 0).toFixed(2)}`;
 
 export default function ElectronicsProducts() {
+  const { language, t } = useTranslation();
   const { categoryId: routeCategoryId, categoryName } = useLocalSearchParams();
   const user = useAppSelector(selectCurrentUser);
   const { data: profileData } = useGetProfileQuery({});
@@ -35,6 +30,56 @@ export default function ElectronicsProducts() {
   const categoryId = routeCategoryId ? String(routeCategoryId) : undefined;
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'drafts' | 'low_stock'>('all');
+
+  const ui = useMemo(() => {
+    if (language === 'he') {
+      return {
+        totalValue: 'ערך כולל',
+        lowStockItems: 'פריטים במלאי נמוך',
+        drafts: 'טיוטות',
+        lowStock: 'מלאי נמוך',
+        inventoryItems: 'פריטי מלאי',
+        failedLoadProducts: 'טעינת המוצרים נכשלה.',
+        active: 'פעיל',
+        unpublish: 'לא פורסם',
+        inStock: (count: number) => `${count} במלאי`,
+      };
+    }
+    if (language === 'hi') {
+      return {
+        totalValue: 'कुल मूल्य',
+        lowStockItems: 'कम स्टॉक आइटम्स',
+        drafts: 'ड्राफ्ट्स',
+        lowStock: 'कम स्टॉक',
+        inventoryItems: 'इन्वेंटरी आइटम्स',
+        failedLoadProducts: 'प्रोडक्ट लोड करना विफल रहा।',
+        active: 'सक्रिय',
+        unpublish: 'अप्रकाशित',
+        inStock: (count: number) => `${count} स्टॉक में`,
+      };
+    }
+    return {
+      totalValue: 'Total value',
+      lowStockItems: 'Low stock items',
+      drafts: 'Drafts',
+      lowStock: 'Low Stock',
+      inventoryItems: 'Inventory Items',
+      failedLoadProducts: 'Failed to load products.',
+      active: 'Active',
+      unpublish: 'Unpublish',
+      inStock: (count: number) => `${count} in stock`,
+    };
+  }, [language]);
+
+  const statusMeta = useMemo(
+    () => (product: any) => {
+      const low = Number(product?.stockQuantity || 0) < 10;
+      if (!product?.isAvailable) return { label: ui.unpublish, bg: '#FFF4D9', text: '#A56700', dot: '#A56700' };
+      if (low) return { label: ui.inStock(Number(product.stockQuantity || 0)), bg: '#FDEEEE', text: '#D54444', dot: '#D54444' };
+      return { label: ui.inStock(Number(product.stockQuantity || 0)), bg: '#E8F8EE', text: '#248D5A', dot: '#248D5A' };
+    },
+    [ui]
+  );
 
   const {
     data: products = [],
@@ -71,7 +116,7 @@ export default function ElectronicsProducts() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={22} color="#1F2A30" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{(categoryName as string) || 'Electronics'}</Text>
+        <Text style={styles.headerTitle}>{(categoryName as string) || t('electronics_title', 'Electronics')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
@@ -84,7 +129,7 @@ export default function ElectronicsProducts() {
           <Ionicons name="search-outline" size={20} color="#6E7B84" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name"
+            placeholder={t('electronics_search_placeholder', 'Search Product..')}
             placeholderTextColor="#8A969D"
             value={search}
             onChangeText={setSearch}
@@ -93,12 +138,12 @@ export default function ElectronicsProducts() {
 
         <View style={styles.statRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Total value</Text>
+            <Text style={styles.statLabel}>{ui.totalValue}</Text>
             <Text style={styles.statValue}>{totalValue}</Text>
           </View>
           <View style={styles.statCard}>
             <View style={styles.lowHeader}>
-              <Text style={styles.statLabel}>Low stock items</Text>
+              <Text style={styles.statLabel}>{ui.lowStockItems}</Text>
               <Ionicons name="alert-circle-outline" size={18} color="#F15B63" />
             </View>
             <Text style={styles.statValue}>{lowCount}</Text>
@@ -107,10 +152,10 @@ export default function ElectronicsProducts() {
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
           {[
-            { key: 'all', label: 'All' },
-            { key: 'active', label: 'Active' },
-            { key: 'drafts', label: 'Drafts' },
-            { key: 'low_stock', label: 'Low Stock' },
+            { key: 'all', label: t('orders_filter_all', 'All') },
+            { key: 'active', label: ui.active },
+            { key: 'drafts', label: ui.drafts },
+            { key: 'low_stock', label: ui.lowStock },
           ].map((f) => {
             const active = activeFilter === (f.key as any);
             return (
@@ -125,14 +170,14 @@ export default function ElectronicsProducts() {
           })}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>Inventory Items</Text>
+        <Text style={styles.sectionTitle}>{ui.inventoryItems}</Text>
 
         {isLoading ? (
           <ActivityIndicator size="large" color="#278687" style={{ marginTop: 24 }} />
         ) : isError ? (
-          <Text style={styles.emptyText}>Failed to load products.</Text>
+          <Text style={styles.emptyText}>{ui.failedLoadProducts}</Text>
         ) : filtered.length === 0 ? (
-          <Text style={styles.emptyText}>No products found.</Text>
+          <Text style={styles.emptyText}>{t('electronics_no_products', 'No products found')}</Text>
         ) : (
           filtered.map((product: any) => {
             const status = statusMeta(product);
@@ -145,7 +190,7 @@ export default function ElectronicsProducts() {
                 <Image source={{ uri: product.images?.[0] || FALLBACK }} style={styles.productImage} />
                 <View style={{ flex: 1 }}>
                   <Text numberOfLines={1} style={styles.productName}>{product.name}</Text>
-                  <Text style={styles.productSku}>SKU: {product.sku || 'N/A'}</Text>
+                  <Text style={styles.productSku}>{`${t('product_details_sku', 'Sku')}: ${product.sku || t('orders_na', 'N/A')}`}</Text>
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={13} color="#F0B429" />
                     <Text style={styles.ratingText}>{Number(product.averageRating || 0).toFixed(1)} ({product.totalReviews || 0})</Text>
@@ -176,7 +221,7 @@ export default function ElectronicsProducts() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
   headerTitle: { fontSize: 24, fontWeight: '700', color: '#1F2A30' },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
   searchBox: { height: 48, borderRadius: 12, borderWidth: 1, borderColor: '#DCE4E8', backgroundColor: '#FFF', paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row', marginBottom: 12 },

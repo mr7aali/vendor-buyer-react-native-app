@@ -1,5 +1,22 @@
 import { apiSlice } from './apiSlice';
 
+const normalizePayload = (response: any) => response?.data || response;
+
+const normalizeTransactionHistory = (response: any) => {
+    const payload = normalizePayload(response);
+    const items =
+        (Array.isArray(payload?.items) && payload.items) ||
+        (Array.isArray(payload?.payments) && payload.payments) ||
+        (Array.isArray(payload?.history) && payload.history) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+
+    return {
+        ...payload,
+        items,
+    };
+};
+
 export const paymentApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         createPaymentIntent: builder.mutation({
@@ -8,14 +25,15 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
                 method: 'POST',
                 body: data,
             }),
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizePayload,
         }),
         getPaymentStatus: builder.query({
             query: (sessionId) => `/payments/status/${sessionId}`,
+            transformResponse: normalizePayload,
         }),
         getPaymentByOrderId: builder.query({
             query: (orderId) => `/payments/order/${orderId}`,
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizePayload,
         }),
         getAllPayments: builder.query({
             // Keep cache user-scoped and send userId so backend can filter if supported.
@@ -23,6 +41,7 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
                 url: '/payments',
                 ...(userId ? { params: { userId } } : {}),
             }),
+            transformResponse: normalizeTransactionHistory,
             providesTags: ['Payment']
         }),
         getBuyerTransactionHistory: builder.query({
@@ -40,7 +59,7 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
                     sortOrder: params?.sortOrder ?? 'desc',
                 },
             }),
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizeTransactionHistory,
             providesTags: ['Payment'],
         }),
         getVendorTransactionHistory: builder.query({
@@ -62,7 +81,7 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
                     sortOrder: params?.sortOrder ?? 'desc',
                 },
             }),
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizeTransactionHistory,
             providesTags: ['Payment'],
         }),
         // Vendor Endpoints
@@ -71,18 +90,18 @@ export const paymentApiSlice = apiSlice.injectEndpoints({
                 url: '/payments/vendor/stripe/account',
                 method: 'POST',
             }),
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizePayload,
         }),
         createAccountLink: builder.mutation({
             query: () => ({
                 url: '/payments/vendor/stripe/account-link',
                 method: 'POST',
             }),
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizePayload,
         }),
         getVendorAccountStatus: builder.query({
             query: () => '/payments/vendor/stripe/status',
-            transformResponse: (response: any) => response?.data || response,
+            transformResponse: normalizePayload,
         }),
     }),
     overrideExisting: true,

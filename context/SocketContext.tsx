@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Socket } from 'socket.io-client';
 import socketService from '../services/socket';
@@ -16,25 +16,54 @@ const SocketContext = createContext<SocketContextData>({
 
 export const useSocket = () => useContext(SocketContext);
 
+const resolveChatUserId = (entity: any): string | null => {
+    const value =
+        entity?.userId ??
+        entity?.buyer?.userId ??
+        entity?.vendor?.userId ??
+        entity?.user?.userId ??
+        entity?.id ??
+        entity?._id ??
+        null;
+    return value === undefined || value === null ? null : String(value);
+};
+
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isConnected, setIsConnected] = useState(false);
     const token = useSelector((state: RootState) => state.auth.accessToken);
     const user = useSelector((state: RootState) => state.auth.user);
-    const roomIds = Array.from(
+    const roomIds = useMemo(() => Array.from(
         new Set(
-            [user?.userId, user?.id, (user as any)?._id]
+            [
+                resolveChatUserId(user),
+                resolveChatUserId((user as any)?.buyer),
+                resolveChatUserId((user as any)?.vendor),
+                user?.id,
+                (user as any)?._id,
+            ]
                 .filter((v) => v !== undefined && v !== null)
                 .map((v) => String(v))
         )
-    );
+    ), [user]);
+    const roomKey = roomIds.join('|');
 
     useEffect(() => {
-        const socket = socketService.init(token || undefined);
+        if (!token) {
+            socketService.disconnect();
+            setIsConnected(false);
+            return;
+        }
+
+        const socket = socketService.init(token);
+
+        const joinRooms = () => {
+            roomIds.forEach((id) => socket.emit('join_room', `user:${id}`));
+        };
 
         const onConnect = () => {
             console.log("Socket connected:", socket.id);
             setIsConnected(true);
-            roomIds.forEach((id) => socket.emit('join_room', `user:${id}`));
+            joinRooms();
         };
 
         const onDisconnect = () => setIsConnected(false);
@@ -43,27 +72,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         socket.on('connect', onConnect);
         socket.on('disconnect', onDisconnect);
         socket.on('connect_error', onError);
+        socket.on('error', onError);
 
-        if (token) {
+        if (!socket.connected) {
             socket.connect();
-        }
-
-        // If already connected, join room now (since onConnect might not fire again)
-        if (socket.connected) {
-            roomIds.forEach((id) => {
-                console.log("Socket already connected, joining room for:", id);
-                socket.emit('join_room', `user:${id}`);
-            });
+        } else {
+            setIsConnected(true);
+            joinRooms();
         }
 
         return () => {
             socket.off('connect', onConnect);
             socket.off('disconnect', onDisconnect);
             socket.off('connect_error', onError);
-            // Optional: socket.disconnect() if you want to close on unmount
-            // but often we keep it open for background tasks if needed
+            socket.off('error', onError);
         };
-    }, [token, roomIds.join('|')]);
+    }, [token, roomIds, roomKey]);
 
     return (
         <SocketContext.Provider value={{ socket: socketService.getSocket(), isConnected }}>

@@ -1,4 +1,5 @@
 import { useGetProfileQuery } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -34,6 +35,7 @@ const InfoItem = ({ icon, label, value, isLast }: InfoItemProps) => (
 );
 
 const ProfileInfoScreen = () => {
+  const { language, t } = useTranslation();
   const { data: profileData } = useGetProfileQuery({});
   const userData = profileData?.data;
   const imageMediaTypes = (ImagePicker as any).MediaType?.Images
@@ -46,6 +48,45 @@ const ProfileInfoScreen = () => {
   const getPhone = () => userData?.buyer?.phone || userData?.phoneNumber || "N/A";
   const getIdType = () => userData?.buyer?.idType || "National ID";
   const getIdNumber = () => userData?.buyer?.nidNumber || userData?.idNumber || "N/A";
+  const ui = useMemo(() => {
+    if (language === "he") {
+      return {
+        profileInfo: "פרטי פרופיל",
+        personalInformation: "מידע אישי",
+        contactInformation: "פרטי קשר",
+        identification: "זיהוי",
+        fullName: "שם מלא",
+        dateOfBirth: "תאריך לידה",
+        phone: "טלפון",
+        idType: "סוג מזהה",
+        idNumber: "מספר מזהה",
+      };
+    }
+    if (language === "hi") {
+      return {
+        profileInfo: "प्रोफाइल जानकारी",
+        personalInformation: "व्यक्तिगत जानकारी",
+        contactInformation: "संपर्क जानकारी",
+        identification: "पहचान",
+        fullName: "पूरा नाम",
+        dateOfBirth: "जन्म तिथि",
+        phone: "फोन",
+        idType: "आईडी प्रकार",
+        idNumber: "आईडी नंबर",
+      };
+    }
+    return {
+      profileInfo: "Profile Info",
+      personalInformation: "Personal Information",
+      contactInformation: "Contact Information",
+      identification: "Identification",
+      fullName: "Full Name",
+      dateOfBirth: "Date of Birth",
+      phone: "Phone",
+      idType: "ID Type",
+      idNumber: "ID Number",
+    };
+  }, [language]);
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const serverAvatarUri = useMemo(
@@ -64,8 +105,8 @@ const ProfileInfoScreen = () => {
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Denied",
-        "Sorry, we need camera roll permissions to make this work!"
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
       );
       return;
     }
@@ -92,7 +133,7 @@ const ProfileInfoScreen = () => {
         >
           <MaterialCommunityIcons name="chevron-left" size={30} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile Info</Text>
+        <Text style={styles.headerTitle}>{ui.profileInfo}</Text>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => router.push("/(user_screen)/EditProfileScreen")}
@@ -125,45 +166,45 @@ const ProfileInfoScreen = () => {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <Text style={styles.sectionTitle}>{ui.personalInformation}</Text>
           <InfoItem
             icon="account-outline"
-            label="Full Name"
+            label={ui.fullName}
             value={getName()}
           />
           <InfoItem
             icon="calendar-month-outline"
-            label="Date of Birth"
+            label={ui.dateOfBirth}
             value={getDob()}
             isLast
           />
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <Text style={styles.sectionTitle}>{ui.contactInformation}</Text>
           <InfoItem
             icon="email-outline"
-            label="Email"
+            label={t("info_email", "Email")}
             value={userData?.email || "N/A"}
           />
           <InfoItem
             icon="phone-outline"
-            label="Phone"
+            label={ui.phone}
             value={getPhone()}
             isLast
           />
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Identification</Text>
+          <Text style={styles.sectionTitle}>{ui.identification}</Text>
           <InfoItem
             icon="card-account-details-outline"
-            label="ID Type"
+            label={ui.idType}
             value={getIdType()}
           />
           <InfoItem
             icon="card-text-outline"
-            label="ID Number"
+            label={ui.idNumber}
             value={getIdNumber()}
             isLast
           />
@@ -179,6 +220,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7FBF9",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

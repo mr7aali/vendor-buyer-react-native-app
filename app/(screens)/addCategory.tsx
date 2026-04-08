@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -22,6 +23,7 @@ import {
 } from "../../store/api/categoryApiSlice";
 
 const AddCategoryScreen: React.FC = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { id, name: initialName, description: initialDescription, catImage: initialImage, displayOrder: initialOrder } = params;
@@ -35,14 +37,68 @@ const AddCategoryScreen: React.FC = () => {
   const [description, setDescription] = useState(initialDescription as string || "");
   const [displayOrder, setDisplayOrder] = useState(initialOrder as string || "0");
   const [selectedImage, setSelectedImage] = useState<string | null>(initialImage as string || null);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        editCategory: "עריכת קטגוריה",
+        addNewCategory: "הוספת קטגוריה חדשה",
+        categoryImage: "תמונת קטגוריה",
+        uploadImage: "העלה תמונה",
+        categoryName: "שם קטגוריה",
+        displayOrder: "סדר תצוגה",
+        descriptionOptional: "תיאור (אופציונלי)",
+        briefDescription: "תיאור קצר של הקטגוריה",
+        updateCategory: "עדכן קטגוריה",
+        createCategory: "צור קטגוריה",
+        enterCategoryName: "נא להזין שם קטגוריה",
+        categoryUpdated: "הקטגוריה עודכנה בהצלחה",
+        categoryAdded: "הקטגוריה נוספה בהצלחה",
+        failedSave: "משהו השתבש. נסה שוב.",
+      };
+    }
+    if (language === "hi") {
+      return {
+        editCategory: "कैटेगरी एडिट करें",
+        addNewCategory: "नई कैटेगरी जोड़ें",
+        categoryImage: "कैटेगरी इमेज",
+        uploadImage: "इमेज अपलोड करें",
+        categoryName: "कैटेगरी नाम",
+        displayOrder: "डिस्प्ले क्रम",
+        descriptionOptional: "विवरण (वैकल्पिक)",
+        briefDescription: "इस कैटेगरी का संक्षिप्त विवरण",
+        updateCategory: "कैटेगरी अपडेट करें",
+        createCategory: "कैटेगरी बनाएं",
+        enterCategoryName: "कृपया कैटेगरी नाम दर्ज करें",
+        categoryUpdated: "कैटेगरी सफलतापूर्वक अपडेट हुई",
+        categoryAdded: "कैटेगरी सफलतापूर्वक जोड़ दी गई",
+        failedSave: "कुछ गलत हुआ। कृपया फिर से प्रयास करें।",
+      };
+    }
+    return {
+      editCategory: "Edit Category",
+      addNewCategory: "Add New Category",
+      categoryImage: "Category Image",
+      uploadImage: "Upload Image",
+      categoryName: "Category Name",
+      displayOrder: "Display Order",
+      descriptionOptional: "Description (Optional)",
+      briefDescription: "Brief description of this category",
+      updateCategory: "Update Category",
+      createCategory: "Create Category",
+      enterCategoryName: "Please enter a category name",
+      categoryUpdated: "Category updated successfully",
+      categoryAdded: "Category added successfully",
+      failedSave: "Something went wrong. Please try again.",
+    };
+  }, [language]);
 
   const handleImagePicker = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
       Alert.alert(
-        "Permission Denied",
-        "Sorry, we need camera roll permissions to make this work!"
+        t("permission_required", "Permission Required"),
+        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
       );
       return;
     }
@@ -60,13 +116,13 @@ const AddCategoryScreen: React.FC = () => {
       }
     } catch (error) {
       console.error("ImagePicker Error: ", error);
-      Alert.alert("Error", "Something went wrong while picking the image.");
+      Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image. Please try again."));
     }
   };
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a category name");
+      Alert.alert(t("error", "Error"), ui.enterCategoryName);
       return;
     }
 
@@ -89,15 +145,15 @@ const AddCategoryScreen: React.FC = () => {
 
       if (id) {
         await updateCategory({ id: id as string, formData }).unwrap();
-        Alert.alert("Success", "Category updated successfully");
+        Alert.alert(t("success", "Success"), ui.categoryUpdated);
       } else {
         await addCategory(formData).unwrap();
-        Alert.alert("Success", "Category added successfully");
+        Alert.alert(t("success", "Success"), ui.categoryAdded);
       }
       router.back();
     } catch (error: any) {
       console.error("Failed to save category:", error);
-      Alert.alert("Error", error?.data?.message || "Something went wrong. Please try again.");
+      Alert.alert(t("error", "Error"), error?.data?.message || ui.failedSave);
     }
   };
 
@@ -112,21 +168,21 @@ const AddCategoryScreen: React.FC = () => {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{id ? "Edit Category" : "Add New Category"}</Text>
+          <Text style={styles.headerTitle}>{id ? ui.editCategory : ui.addNewCategory}</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Image Upload */}
           <View style={styles.imageSection}>
-            <Text style={styles.label}>Category Image</Text>
+            <Text style={styles.label}>{ui.categoryImage}</Text>
             <TouchableOpacity style={styles.uploadBox} onPress={handleImagePicker}>
               {selectedImage ? (
                 <Image source={{ uri: selectedImage }} style={styles.previewImage} />
               ) : (
                 <View style={styles.placeholder}>
                   <Ionicons name="camera" size={40} color="#999" />
-                  <Text style={styles.uploadText}>Upload Image</Text>
+                  <Text style={styles.uploadText}>{ui.uploadImage}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -135,7 +191,7 @@ const AddCategoryScreen: React.FC = () => {
           {/* Form Fields */}
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Category Name</Text>
+              <Text style={styles.label}>{ui.categoryName}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Electronics"
@@ -145,7 +201,7 @@ const AddCategoryScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Display Order</Text>
+              <Text style={styles.label}>{ui.displayOrder}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="0"
@@ -156,10 +212,10 @@ const AddCategoryScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Description (Optional)</Text>
+              <Text style={styles.label}>{ui.descriptionOptional}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="Brief description of this category"
+                placeholder={ui.briefDescription}
                 multiline
                 numberOfLines={4}
                 value={description}
@@ -178,7 +234,7 @@ const AddCategoryScreen: React.FC = () => {
             {isAdding || isUpdating ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.saveBtnText}>{id ? "Update Category" : "Create Category"}</Text>
+              <Text style={styles.saveBtnText}>{id ? ui.updateCategory : ui.createCategory}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -190,6 +246,7 @@ const AddCategoryScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFF" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

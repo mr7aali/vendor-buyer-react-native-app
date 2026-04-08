@@ -1,4 +1,5 @@
 import { useOTPVerificationMutation } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ShieldCheck } from "lucide-react-native";
@@ -16,12 +17,61 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const OTPVerification: React.FC = () => {
+  const { language } = useTranslation();
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
   const [otp, setOtp] = useState<string[]>(["", "", "", "", "", ""]);
   const inputs = useRef<TextInput[]>([]);
 
   const [verifyOtp, { isLoading }] = useOTPVerificationMutation();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        otpVerification: "אימות OTP",
+        enterCode: "הזן קוד אימות",
+        sentCodeTo: "שלחנו קוד בן 6 ספרות אל",
+        yourEmail: "האימייל שלך",
+        pasteCode: "הדבק קוד",
+        verify: "אמת",
+        verifying: "מאמת...",
+        didNotReceive: "לא קיבלת את הקוד?",
+        resend: "שלח שוב",
+        backToLogin: "חזרה להתחברות",
+        invalidOtp: "נא להזין קוד בן 6 ספרות",
+        verificationFailed: "האימות נכשל",
+      };
+    }
+    if (language === "hi") {
+      return {
+        otpVerification: "OTP सत्यापन",
+        enterCode: "सत्यापन कोड दर्ज करें",
+        sentCodeTo: "हमने 6-अंकों का कोड भेजा है",
+        yourEmail: "आपके ईमेल पर",
+        pasteCode: "कोड पेस्ट करें",
+        verify: "सत्यापित करें",
+        verifying: "सत्यापन हो रहा है...",
+        didNotReceive: "कोड नहीं मिला?",
+        resend: "फिर से भेजें",
+        backToLogin: "लॉगिन पर वापस जाएं",
+        invalidOtp: "कृपया मान्य 6-अंकों का OTP दर्ज करें",
+        verificationFailed: "सत्यापन विफल",
+      };
+    }
+    return {
+      otpVerification: "OTP Verification",
+      enterCode: "Enter Verification Code",
+      sentCodeTo: "We ve sent a 6-digit code to",
+      yourEmail: "your email",
+      pasteCode: "Paste Code",
+      verify: "Verify",
+      verifying: "Verifying...",
+      didNotReceive: "Did n t receive the code?",
+      resend: "Resend",
+      backToLogin: "Back to Login",
+      invalidOtp: "Please enter a valid 6-digit OTP",
+      verificationFailed: "Verification failed",
+    };
+  }, [language]);
 
   const handleOtpChange = (value: string, index: number) => {
     const newOtp = [...otp];
@@ -42,7 +92,7 @@ const OTPVerification: React.FC = () => {
   const handleVerify = async () => {
     const otpString = otp.join("");
     if (otpString.length !== 6) {
-      alert("Please enter a valid 6-digit OTP");
+      alert(ui.invalidOtp);
       return;
     }
 
@@ -53,7 +103,7 @@ const OTPVerification: React.FC = () => {
       router.push({ pathname: "/(auth)/SetNewPassword", params: { email, otp: otpString } });
     } catch (err) {
       console.error("OTP Verification failed", err);
-      alert("Verification failed: " + ((err as any)?.data?.message || "Invalid OTP"));
+      alert(`${ui.verificationFailed}: ` + ((err as any)?.data?.message || "Invalid OTP"));
     }
   };
 
@@ -66,7 +116,7 @@ const OTPVerification: React.FC = () => {
         >
           <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>OTP Verification</Text>
+        <Text style={styles.headerTitle}>{ui.otpVerification}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -82,9 +132,9 @@ const OTPVerification: React.FC = () => {
             <View style={styles.iconCircle}>
               <ShieldCheck color="#FFFFFF" size={40} fill="#2D8C8C" />
             </View>
-            <Text style={styles.title}>Enter Verification Code</Text>
+            <Text style={styles.title}>{ui.enterCode}</Text>
             <Text style={styles.subtitle}>
-              We ve sent a 6-digit code to {email || "your email"}
+              {`${ui.sentCodeTo} ${email || ui.yourEmail}`}
             </Text>
           </View>
 
@@ -109,7 +159,7 @@ const OTPVerification: React.FC = () => {
           </View>
 
           <TouchableOpacity style={styles.pasteButton}>
-            <Text style={styles.pasteCodeText}>Paste Code</Text>
+            <Text style={styles.pasteCodeText}>{ui.pasteCode}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -118,21 +168,21 @@ const OTPVerification: React.FC = () => {
             onPress={handleVerify}
             disabled={isLoading}
           >
-            <Text style={styles.verifyButtonText}>{isLoading ? "Verifying..." : "Verify"}</Text>
+            <Text style={styles.verifyButtonText}>{isLoading ? ui.verifying : ui.verify}</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.resendText}>
-              Did n t receive the code?{" "}
+              {`${ui.didNotReceive} `}
               <TouchableOpacity>
-                <Text style={styles.resendLink}>Resend</Text>
+                <Text style={styles.resendLink}>{ui.resend}</Text>
               </TouchableOpacity>
             </Text>
             <TouchableOpacity
               style={styles.bottomLoginBtn}
               onPress={() => router.push("/(auth)/login")}
             >
-              <Text style={styles.bottomLoginText}>Back to Login</Text>
+              <Text style={styles.bottomLoginText}>{ui.backToLogin}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -147,6 +197,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8FAF9",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

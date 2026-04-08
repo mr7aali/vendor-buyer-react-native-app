@@ -1,8 +1,10 @@
-import { useGetOrderByIdQuery, useUpdateOrderStatusMutation } from '@/store/api/orderApiSlice';
+import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
+import { useCreateReviewMutation, useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/100';
@@ -11,16 +13,36 @@ const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
+const isUuid = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const getApiErrorMessage = (err: any, fallback: string) => {
+  if (Array.isArray(err?.data?.messages) && err.data.messages.length) return err.data.messages.join('\n');
+  return err?.data?.message || err?.message || fallback;
+};
 
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || 'pending').toLowerCase();
 const getItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
+const resolveEntityId = (value: any): string => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value);
+  if (value && typeof value === 'object') {
+    if (typeof value.id === 'string' || typeof value.id === 'number') return String(value.id);
+    if (typeof value._id === 'string' || typeof value._id === 'number') return String(value._id);
+  }
+  return '';
+};
+const getProductId = (item: any) => resolveEntityId(item?.product) || resolveEntityId(item?.productId) || '';
+const getProductName = (item: any) =>
+  item?.product?.name || item?.product?.title || item?.name || item?.title || '';
 
 const OrderDetails = () => {
+  const { t } = useTranslation();
   const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const { data: order, isLoading, error, refetch } = useGetOrderByIdQuery(id as string, { skip: !id });
-  const [updateOrderStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
+  const { id: routeIdParam, productId: fallbackProductIdParam, productName: fallbackProductNameParam } = useLocalSearchParams();
+  const routeId = Array.isArray(routeIdParam) ? routeIdParam[0] : routeIdParam;
+  const routeOrderId = String(routeId || '');
+  const { data: order, isLoading, error } = useGetOrderByIdQuery(routeOrderId, { skip: !routeOrderId });
+  const [createReview, { isLoading: isSubmittingReview }] = useCreateReviewMutation();
 
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [rating, setRating] = useState(5);
@@ -28,23 +50,53 @@ const OrderDetails = () => {
 
   const status = normalizeStatus(order?.status);
   const items = useMemo(() => getItems(order), [order]);
+  const fallbackProductId = Array.isArray(fallbackProductIdParam) ? fallbackProductIdParam[0] : fallbackProductIdParam;
+  const fallbackProductName = Array.isArray(fallbackProductNameParam) ? fallbackProductNameParam[0] : fallbackProductNameParam;
+  const resolvedOrderId = useMemo(() => {
+    const candidates = [resolveEntityId(order), resolveEntityId(order?._id), routeOrderId];
+    return candidates.find((candidate) => isUuid(candidate)) || '';
+  }, [order, routeOrderId]);
+  const primaryProductId = useMemo(() => {
+    const fromItems = items
+      .map((item: any) => getProductId(item))
+      .find((value: any) => !!value);
+    if (fromItems) return String(fromItems);
+    if (fallbackProductId) return resolveEntityId(fallbackProductId);
+    return '';
+  }, [items, fallbackProductId]);
+  const primaryProductName = useMemo(() => {
+    const fromItem = items.find((item: any) => getProductName(item)) || null;
+    return getProductName(fromItem) || String(fallbackProductName || '');
+  }, [items, fallbackProductName]);
+  const { data: productReviewsData } = useGetProductReviewsQuery(
+    { productId: primaryProductId },
+    { skip: !primaryProductId },
+  );
 
   const subtotal = toNumber(order?.subtotal);
   const tax = toNumber(order?.taxAmount, 0);
   const shipping = toNumber(order?.shippingCost, 0);
   const discount = toNumber(order?.discountAmount);
   const total = toNumber(order?.totalAmount);
+  const productReviews = productReviewsData?.data?.reviews || [];
+  const apiAverageRating = toNumber((productReviewsData as any)?.data?.averageRating, NaN);
+  const totalProductReviews = toNumber(productReviewsData?.data?.meta?.total, productReviews.length);
+  const avgProductRating = totalProductReviews > 0
+    ? (Number.isFinite(apiAverageRating)
+      ? apiAverageRating
+      : productReviews.reduce((acc: number, curr: any) => acc + toNumber(curr?.rating), 0) / Math.max(productReviews.length, 1))
+    : 0;
 
   const timeline = useMemo(() => {
     const created = order?.createdAt ? new Date(order.createdAt) : null;
     const updated = order?.updatedAt ? new Date(order.updatedAt) : created;
     return [
-      { key: 'created', title: 'Order Created', time: created },
-      { key: 'processing', title: 'Processing', time: status === 'processing' || status === 'shipped' || status === 'delivered' || status === 'completed' ? updated : null },
-      { key: 'shipped', title: 'Shipped', time: status === 'shipped' || status === 'delivered' || status === 'completed' ? updated : null },
-      { key: 'ready', title: 'Ready For Pickup', time: status === 'delivered' || status === 'completed' ? updated : null },
+      { key: 'created', title: t('order_details_timeline_created', 'Order Created'), time: created },
+      { key: 'processing', title: t('orders_filter_processing', 'Processing'), time: status === 'processing' || status === 'shipped' || status === 'delivered' || status === 'completed' ? updated : null },
+      { key: 'shipped', title: t('orders_filter_shipped', 'Shipped'), time: status === 'shipped' || status === 'delivered' || status === 'completed' ? updated : null },
+      { key: 'ready', title: t('order_details_timeline_ready_pickup', 'Ready For Pickup'), time: status === 'delivered' || status === 'completed' ? updated : null },
     ];
-  }, [order, status]);
+  }, [order, status, t]);
 
   if (isLoading) {
     return (
@@ -57,22 +109,61 @@ const OrderDetails = () => {
   if (!order || error) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={{ color: '#2A3035' }}>Order not found</Text>
+        <Text style={{ color: '#2A3035' }}>{t('order_details_not_found', 'Order not found')}</Text>
       </SafeAreaView>
     );
   }
 
   const handleConfirmPickup = async () => {
+    setShowFeedbackModal(true);
+  };
+
+  const handleSubmitFeedback = async () => {
+    const comment = feedback.trim();
+    const productIds: string[] = Array.from(
+      new Set(
+        items
+          .map((item: any) => getProductId(item))
+          .filter((value: string) => !!value && value !== '[object Object]'),
+      ),
+    );
+    if (!productIds.length && primaryProductId) {
+      productIds.push(primaryProductId);
+    }
+
+    if (!productIds.length) {
+      Alert.alert(t('error', 'Error'), t('product_details_not_found', 'Product not found'));
+      return;
+    }
+    if (!resolvedOrderId) {
+      Alert.alert(t('error', 'Error'), t('order_details_failed_confirm_pickup', 'Invalid order id for review'));
+      return;
+    }
+
     try {
-      await updateOrderStatus({ id: order?.id, status: 'completed' }).unwrap();
-      await refetch();
-      setShowFeedbackModal(true);
+      await Promise.all(
+        productIds.map((productId) =>
+          createReview({
+            productId,
+            orderId: resolvedOrderId,
+            rating,
+            comment,
+          }).unwrap(),
+        ),
+      );
+      setShowFeedbackModal(false);
+      setFeedback('');
+      setRating(5);
+      Alert.alert(t('success', 'Success'), t('product_details_review_success', 'Review submitted successfully!'));
     } catch (err: any) {
-      Alert.alert('Error', err?.data?.message || 'Failed to confirm pickup');
+      Alert.alert(
+        t('error', 'Error'),
+        getApiErrorMessage(err, t('product_details_review_failed', 'Failed to submit review')),
+      );
     }
   };
 
-  const canConfirmPickup = status === 'delivered' || status === 'shipped' || status === 'processing';
+  const canConfirmPickup = status === 'delivered';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,7 +171,7 @@ const OrderDetails = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#1C252B" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Orders #{order?.orderNumber || order?.id}</Text>
+        <Text style={styles.headerTitle}>{t('orders_title', 'Orders')} #{order?.orderNumber || order?.id}</Text>
         <TouchableOpacity
           style={styles.downloadBtn}
           onPress={() => router.push({ pathname: '/(user_screen)/ExportInvoiceScreen', params: { id: order?.id } })}
@@ -94,8 +185,8 @@ const OrderDetails = () => {
           <View style={styles.userRow}>
             <Image source={{ uri: order?.vendor?.logoUrl || IMAGE_FALLBACK }} style={styles.avatar} />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.userName}>{order?.vendor?.fullName || order?.vendor?.storename || 'Vendor'}</Text>
-              <Text style={styles.userId}>ID: {order?.vendor?.id || 'N/A'}</Text>
+              <Text style={styles.userName}>{order?.vendor?.fullName || order?.vendor?.storename || t('order_details_vendor_fallback', 'Vendor')}</Text>
+              <Text style={styles.userId}>ID: {order?.vendor?.id || t('orders_na', 'N/A')}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -104,19 +195,20 @@ const OrderDetails = () => {
               router.push({
                 pathname: '/(screens)/chat_box',
                 params: {
+                  role: 'buyer',
                   partnerId: order?.vendor?.userId || order?.vendor?.id,
-                  fullname: order?.vendor?.fullName || order?.vendor?.storename || 'Vendor',
+                  fullname: order?.vendor?.fullName || order?.vendor?.storename || t('order_details_vendor_fallback', 'Vendor'),
                 },
               })
             }
           >
             <Ionicons name="chatbubble-outline" size={16} color="#2F3A41" />
-            <Text style={styles.messageText}>Message</Text>
+            <Text style={styles.messageText}>{t('order_details_message', 'Message')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Order items</Text>
+          <Text style={styles.sectionTitle}>{t('order_details_order_items', 'Order items')}</Text>
           {items.map((item: any, index: number) => (
             <View key={item?.id || `${index}`} style={[styles.itemRow, index < items.length - 1 ? styles.itemBorder : null]}>
               <Image source={{ uri: item?.product?.images?.[0] || IMAGE_FALLBACK }} style={styles.itemImage} />
@@ -125,7 +217,7 @@ const OrderDetails = () => {
                   <Text style={styles.itemName}>#{order?.orderNumber}</Text>
                   <Text style={styles.itemPrice}>{formatMoney(item?.unitPrice || item?.totalPrice)}</Text>
                 </View>
-                <Text numberOfLines={2} style={styles.itemDesc}>{item?.product?.description || 'No description'}</Text>
+                <Text numberOfLines={2} style={styles.itemDesc}>{item?.product?.description || t('product_details_no_description', 'No description')}</Text>
                 <Text style={styles.itemQty}>x{item?.quantity || 1}</Text>
               </View>
             </View>
@@ -133,21 +225,21 @@ const OrderDetails = () => {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Payment details</Text>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Subtotal</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Tax(7.5%)</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Shipping</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
+          <Text style={styles.sectionTitle}>{t('order_details_payment_details', 'Payment details')}</Text>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_subtotal', 'Subtotal')}</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_tax', 'Tax(7.5%)')}</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_shipping', 'Shipping')}</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
           <View style={styles.dashed} />
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Discount</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{formatMoney(total)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_discount', 'Discount')}</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.totalLabel}>{t('chat_total_label', 'Total')}</Text><Text style={styles.totalValue}>{formatMoney(total)}</Text></View>
           <View style={styles.paidBadge}>
-            <Text style={styles.paidTag}>{status === 'pending' ? 'Unpaid' : 'Paid'}</Text>
-            <Text style={styles.paidText}>Via {order?.payment?.paymentMethod || 'Card ending 4242'}</Text>
+            <Text style={styles.paidTag}>{status === 'pending' ? t('order_details_unpaid', 'Unpaid') : t('order_details_paid', 'Paid')}</Text>
+            <Text style={styles.paidText}>{t('order_details_via', 'Via')} {order?.payment?.paymentMethod || t('order_details_card_ending', 'Card ending 4242')}</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Order history</Text>
+          <Text style={styles.sectionTitle}>{t('order_details_order_history', 'Order history')}</Text>
           {timeline.map((step, idx) => {
             const active = !!step.time;
             const isLast = idx === timeline.length - 1;
@@ -162,7 +254,7 @@ const OrderDetails = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.historyTitle, active ? styles.historyTitleActive : null]}>{step.title}</Text>
                   <Text style={styles.historySub}>
-                    {step.time ? step.time.toLocaleString() : 'Waiting...'}
+                    {step.time ? step.time.toLocaleString() : t('order_details_waiting', 'Waiting...')}
                   </Text>
                 </View>
               </View>
@@ -173,9 +265,9 @@ const OrderDetails = () => {
         <TouchableOpacity
           style={[styles.confirmBtn, !canConfirmPickup ? styles.confirmBtnDisabled : null]}
           onPress={handleConfirmPickup}
-          disabled={!canConfirmPickup || isUpdating}
+          disabled={!canConfirmPickup}
         >
-          {isUpdating ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmBtnText}>Confirm Pickup</Text>}
+          <Text style={styles.confirmBtnText}>{t('order_details_confirm_pickup', 'Confirm Pickup')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -190,10 +282,16 @@ const OrderDetails = () => {
               <Ionicons name="checkmark" size={24} color="#2A8C8B" />
             </View>
 
-            <Text style={styles.modalTitle}>Task Completed</Text>
-            <Text style={styles.modalSub}>Average Rating and Feedback</Text>
+            <Text style={styles.modalTitle}>{t('order_details_task_completed', 'Task Completed')}</Text>
+            <Text style={styles.modalSub}>{t('order_details_avg_rating_feedback', 'Average Rating and Feedback')}</Text>
+            {!!primaryProductName && (
+              <Text numberOfLines={1} style={styles.productNameText}>{primaryProductName}</Text>
+            )}
 
-            <Text style={styles.ratingLabel}>Avg. Rating</Text>
+            <Text style={styles.ratingLabel}>{t('order_details_avg_rating', 'Avg. Rating')}</Text>
+            <Text style={styles.avgText}>
+              {avgProductRating.toFixed(1)} ({totalProductReviews} {t('product_details_reviews', 'reviews')})
+            </Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <TouchableOpacity key={s} onPress={() => setRating(s)} style={styles.starCell}>
@@ -202,23 +300,23 @@ const OrderDetails = () => {
               ))}
             </View>
             <View style={styles.starTextRow}>
-              {['Bad', 'Average', 'Good', 'Great', 'Amazing'].map((label) => (
+              {[t('order_details_bad', 'Bad'), t('order_details_average', 'Average'), t('order_details_good', 'Good'), t('order_details_great', 'Great'), t('order_details_amazing', 'Amazing')].map((label) => (
                 <Text key={label} style={styles.starLabel}>{label}</Text>
               ))}
             </View>
 
-            <Text style={[styles.ratingLabel, { marginTop: 10 }]}>Feedback Note</Text>
+            <Text style={[styles.ratingLabel, { marginTop: 10 }]}>{t('order_details_feedback_note', 'Feedback Note')}</Text>
             <TextInput
               value={feedback}
               onChangeText={setFeedback}
-              placeholder="Type here..."
+              placeholder={t('order_details_type_here', 'Type here...')}
               placeholderTextColor="#95A2AA"
               style={styles.feedbackInput}
               multiline
             />
 
-            <TouchableOpacity style={styles.doneBtn} onPress={() => setShowFeedbackModal(false)}>
-              <Text style={styles.doneText}>Done</Text>
+            <TouchableOpacity style={[styles.doneBtn, isSubmittingReview ? { opacity: 0.7 } : null]} onPress={handleSubmitFeedback} disabled={isSubmittingReview}>
+              {isSubmittingReview ? <ActivityIndicator color="#FFF" /> : <Text style={styles.doneText}>{t('order_details_done', 'Done')}</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -230,7 +328,7 @@ const OrderDetails = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F7F6' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F3F7F6' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#1C252B', flex: 1, textAlign: 'center', marginHorizontal: 8 },
   downloadBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#2A8C8B', justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: 14, paddingBottom: 18 },
@@ -249,7 +347,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 13, fontWeight: '600', color: '#1F2A30' },
   itemPrice: { fontSize: 13, fontWeight: '700', color: '#1F2A30' },
   itemDesc: { fontSize: 11, color: '#7C8991', marginTop: 2, marginRight: 30 },
-  itemQty: { textAlign: 'right', fontSize: 11, color: '#6D7A83', marginTop: 2 },
+  itemQty: { textAlign: I18nManager.isRTL ? 'left' : 'right', fontSize: 11, color: '#6D7A83', marginTop: 2 },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   paymentLabel: { fontSize: 13, color: '#6D7A83' },
   paymentValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600' },
@@ -277,7 +375,9 @@ const styles = StyleSheet.create({
   checkWrap: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: '#2A8C8B', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: -6 },
   modalTitle: { textAlign: 'center', fontSize: 20, fontWeight: '700', color: '#1F2A30', marginTop: 10 },
   modalSub: { textAlign: 'center', color: '#718089', fontSize: 12, marginTop: 4 },
+  productNameText: { textAlign: 'center', color: '#5E6D76', fontSize: 13, marginTop: 4, fontWeight: '600' },
   ratingLabel: { fontSize: 12, color: '#4A5962', fontWeight: '700', marginTop: 8 },
+  avgText: { fontSize: 12, color: '#6F7E87', marginTop: 2 },
   starsRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   starCell: { width: 42, alignItems: 'center' },
   starTextRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },

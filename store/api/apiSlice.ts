@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { Mutex } from 'async-mutex';
+import { clearPersistedAuthState } from '../../services/authStorage';
 import { logOut, setCredentials } from '../slices/authSlice';
 
 const mutex = new Mutex();
@@ -13,11 +14,24 @@ if (!apiUrl) {
 
 const baseQuery = fetchBaseQuery({
     baseUrl: apiUrl,
-    prepareHeaders: async (headers, { getState }) => {
+    prepareHeaders: async (headers, { getState, endpoint }) => {
+        const publicAuthEndpoints = new Set([
+            'register',
+            'login',
+            'googleAuth',
+            'appleAuth',
+            'ForgotPasswordScreen',
+            'OTPVerification',
+            'SetNewPasswordScreen',
+        ]);
+
+        if (publicAuthEndpoints.has(String(endpoint || ''))) {
+            headers.delete('Authorization');
+            return headers;
+        }
+
         const state = getState() as any;
-        const reduxToken = state.auth?.accessToken;
-        const persistedToken = await AsyncStorage.getItem('accessToken');
-        const token = reduxToken || persistedToken;
+        const token = state.auth?.accessToken;
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
         }
@@ -43,6 +57,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
             try {
                 const refreshToken = (api.getState() as any).auth.refreshToken;
                 if (!refreshToken) {
+                    await clearPersistedAuthState();
                     api.dispatch(logOut());
                     return result;
                 }
@@ -72,11 +87,13 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
                     api.dispatch(setCredentials({
                         user,
                         accessToken: data.accessToken,
-                        refreshToken: data.refreshToken
+                        refreshToken: data.refreshToken,
+                        availableProfiles: (api.getState() as any).auth.availableProfiles ?? null,
                     }));
 
                     result = await baseQuery(args, api, extraOptions);
                 } else {
+                    await clearPersistedAuthState();
                     api.dispatch(logOut());
                 }
             } finally {
@@ -94,7 +111,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
 export const apiSlice = createApi({
     reducerPath: 'api',
     baseQuery: baseQueryWithReauth,
-    tagTypes: ['Category', 'Product', 'Order', 'Cart', 'User', 'Review', 'Chat', 'Coupon', 'Payment', 'Connection'], // Define tag types for invalidation here if needed
+    tagTypes: ['Category', 'Product', 'Order', 'Cart', 'User', 'Review', 'Chat', 'Coupon', 'Payment', 'Connection', 'Notification'], // Define tag types for invalidation here if needed
     endpoints: (builder) => ({}),
 });
 

@@ -40,7 +40,13 @@ export default function TransactionHistory() {
   );
 
   const transactions = useMemo(() => {
-    const raw = Array.isArray(paymentsData?.items) ? paymentsData.items : [];
+    const raw = Array.isArray((paymentsData as any)?.items)
+      ? (paymentsData as any).items
+      : Array.isArray((paymentsData as any)?.payments)
+      ? (paymentsData as any).payments
+      : Array.isArray((paymentsData as any)?.data?.items)
+      ? (paymentsData as any).data.items
+      : [];
 
     return [...raw].sort((a: any, b: any) => {
       const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -58,7 +64,11 @@ export default function TransactionHistory() {
       }
 
       const linkData = await createAccountLink(undefined).unwrap();
-      const onboardingUrl = linkData?.url;
+      const onboardingUrl =
+        linkData?.url ||
+        linkData?.accountLink ||
+        linkData?.onboardingUrl ||
+        linkData?.data?.url;
       if (!onboardingUrl) {
         Alert.alert("Error", "Stripe onboarding link was not returned.");
         return;
@@ -93,7 +103,7 @@ export default function TransactionHistory() {
         <Text style={styles.statusText}>{item.status}</Text>
       </View>
       <Text style={[styles.amountText, { color: item.status === 'succeeded' ? '#1E7B73' : '#F59E0B' }]}>
-        ${Number(item.amount).toFixed(2)}
+        ${Number(item.vendorPayoutAmount ?? item.amount ?? 0).toFixed(2)}
       </Text>
     </View>
   );
@@ -167,6 +177,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FBF9', // Light greenish background
   },
   header: {
+    direction: 'ltr',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

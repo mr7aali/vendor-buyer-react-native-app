@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -11,14 +12,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function TermsCondition() {
+  const { t } = useTranslation();
   const [accepted, setAccepted] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.modalContainer}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Terms & Condition</Text>
-
+          <Text style={styles.headerTitle}>{t("terms_heading", "Terms & Condition")}</Text>
         </View>
 
         <ScrollView
@@ -26,148 +27,20 @@ export default function TermsCondition() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
-            <Text style={styles.welcomeText}>Welcome to LlinkTo!</Text>
-            <Text style={styles.textBody}>
-              By accessing or using the Platform, you acknowledge that you have
-              read, understood, and agree to be bound by these Terms. If you do
-              not agree, you must not use the Platform.
-            </Text>
+            <Text style={styles.welcomeText}>{t("terms_heading", "Terms of Service")}</Text>
+            <Text style={styles.textBody}>{t("terms_intro", "Terms introduction")}</Text>
 
-            <Text style={styles.sectionTitle}>1. Definitions</Text>
-            <Text style={styles.textBody}>
-              • User means any individual or legal entity using the Platform.
-            </Text>
-            <Text style={styles.textBody}>
-              • Buyer means a User purchasing products through the Platform.
-            </Text>
-            <Text style={styles.textBody}>
-              • Supplier means a legally registered business entity offering
-              products for sale.
-            </Text>
-            <Text style={styles.textBody}>
-              • Order means a purchase commitment approved by the Supplier and
-              paid.
-            </Text>
-            <Text style={styles.textBody}>
-              • Completed Transaction means delivery is confirmed, no dispute is
-              opened within 15 days, and payment is released.
-            </Text>
+            <Text style={styles.sectionTitle}>{t("terms_section_1_title", "1. Use of the Service")}</Text>
+            <Text style={styles.textBody}>{t("terms_section_1_body", "Terms section 1")}</Text>
 
-            <Text style={styles.sectionTitle}>
-              2. Eligibility and Registration
-            </Text>
-            <Text style={styles.textBody}>
-              2.1 Supplier use is for legally registered business entities only.
-            </Text>
-            <Text style={styles.textBody}>
-              2.2 Buyers must act on behalf of a business and for business
-              purposes only.
-            </Text>
-            <Text style={styles.textBody}>
-              2.3 LlinkTo may require identity verification (KYC/KYB) at any
-              time.
-            </Text>
+            <Text style={styles.sectionTitle}>{t("terms_section_2_title", "2. User Responsibilities")}</Text>
+            <Text style={styles.textBody}>{t("terms_section_2_body", "Terms section 2")}</Text>
 
-            <Text style={styles.sectionTitle}>3. Role of the Platform</Text>
-            <Text style={styles.textBody}>
-              3.1 LlinkTo operates a technology platform facilitating
-              transactions.
-            </Text>
-            <Text style={styles.textBody}>
-              3.2 LlinkTo is not a party to any sales contract or logistics
-              provider.
-            </Text>
+            <Text style={styles.sectionTitle}>{t("terms_section_3_title", "3. Account & Access")}</Text>
+            <Text style={styles.textBody}>{t("terms_section_3_body", "Terms section 3")}</Text>
 
-            <Text style={styles.sectionTitle}>4. Listings and Reviews</Text>
-            <Text style={styles.textBody}>
-              4.1 Suppliers are responsible for descriptions, pricing, and
-              compliance.
-            </Text>
-            <Text style={styles.textBody}>
-              4.3 Illegal, abusive, or misleading content is strictly
-              prohibited.
-            </Text>
-            <Text style={styles.textBody}>
-              4.4 All reviews are subject to approval by LlinkTo prior to
-              publication.
-            </Text>
-
-            <Text style={styles.sectionTitle}>5. Orders and Disputes</Text>
-            <Text style={styles.textBody}>
-              5.1 An Order is created after Supplier approval and payment
-              authorization.
-            </Text>
-            <Text style={styles.textBody}>
-              5.3 Buyers may open a Dispute within 15 days for damaged or
-              incorrect goods.
-            </Text>
-            <Text style={styles.textBody}>
-              5.5 LlinkTo may require replacements, impose penalties, or
-              withhold payouts.
-            </Text>
-
-            <Text style={styles.sectionTitle}>6. Payments and Fees</Text>
-            <Text style={styles.textBody}>
-              6.1 All payments are processed by licensed third-party providers
-              (PSPs).
-            </Text>
-            <Text style={styles.textBody}>
-              6.3 LlinkTo s service fee is deducted at the time of Supplier
-              payout.
-            </Text>
-
-            <Text style={styles.sectionTitle}>7. Shipping and Taxes</Text>
-            <Text style={styles.textBody}>
-              7.1 Users are solely responsible for shipping, customs, and taxes.
-            </Text>
-            <Text style={styles.textBody}>
-              7.2 Any logistics cooperation is provided for convenience only and
-              without liability.
-            </Text>
-
-            <Text style={styles.sectionTitle}>8. Prohibited Products</Text>
-            <Text style={styles.textBody}>
-              The sale of illegal drugs, weapons, human organs, or counterfeit
-              goods is strictly prohibited.
-            </Text>
-
-            <Text style={styles.sectionTitle}>9. Intellectual Property</Text>
-            <Text style={styles.textBody}>
-              All Platform IP, software, design, and content are owned by
-              LlinkTo or its licensors.
-            </Text>
-
-            <Text style={styles.sectionTitle}>10. Limitation of Liability</Text>
-            <Text style={styles.textBody}>
-              LlinkTo is not liable for indirect damages. Total liability is
-              limited to fees paid in the preceding 12 months.
-            </Text>
-
-            <Text style={styles.sectionTitle}>11. Indemnification</Text>
-            <Text style={styles.textBody}>
-              Users agree to hold LlinkTo harmless from claims arising from
-              platform use or violations.
-            </Text>
-
-            <Text style={styles.sectionTitle}>
-              12. Suspension and Termination
-            </Text>
-            <Text style={styles.textBody}>
-              LlinkTo may terminate access for term breaches, legal risks, or
-              authority requests.
-            </Text>
-
-            <Text style={styles.sectionTitle}>13. Changes to Terms</Text>
-            <Text style={styles.textBody}>
-              Continued use of the Platform constitutes acceptance of updated
-              Terms.
-            </Text>
-
-            <Text style={styles.sectionTitle}>14. Governing Law</Text>
-            <Text style={styles.textBody}>
-              These Terms are governed by the laws of the State of Israel.
-              Disputes must first be attempted via internal resolution.
-            </Text>
+            <Text style={styles.sectionTitle}>{t("terms_section_4_title", "4. Limitation of Liability")}</Text>
+            <Text style={styles.textBody}>{t("terms_section_4_body", "Terms section 4")}</Text>
           </View>
         </ScrollView>
 
@@ -179,7 +52,7 @@ export default function TermsCondition() {
             <View style={[styles.checkbox, accepted && styles.checked]}>
               {accepted && <Ionicons name="checkmark" size={14} color="#FFF" />}
             </View>
-            <Text style={styles.checkboxText}>Accept terms & conditions</Text>
+            <Text style={styles.checkboxText}>{`${t("confirm", "Confirm")} ${t("terms_heading", "Terms of Service")}`}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -189,7 +62,7 @@ export default function TermsCondition() {
             }
             disabled={!accepted}
           >
-            <Text style={styles.nextText}>Next</Text>
+            <Text style={styles.nextText}>{t("info_continue", "Continue")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -211,6 +84,7 @@ const styles = StyleSheet.create({
     maxHeight: "85%",
   },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 15,

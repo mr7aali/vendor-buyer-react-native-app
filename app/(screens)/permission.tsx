@@ -1,36 +1,123 @@
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Notifications from "expo-notifications";
 import React, { useState } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { useTranslation } from '@/hooks/use-translation'
+import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 const PermissionScreen = () => {
+    const { language, t } = useTranslation();
     const [permissions, setPermissions] = useState({
         camera: true,
         photos: true,
         location: false,
-        notifications: true,
+        notifications: false,
         microphone: false,
         contacts: false,
         storage: true,
         calendar: false
     });
+    const [isCheckingNotification, setIsCheckingNotification] = useState(false);
+
+    React.useEffect(() => {
+        const loadNotificationPermission = async () => {
+            const settings = await Notifications.getPermissionsAsync();
+            setPermissions((prev) => ({
+                ...prev,
+                notifications: settings.status === "granted",
+            }));
+        };
+
+        loadNotificationPermission();
+    }, []);
+
+    const labels = React.useMemo(() => {
+        if (language === "he") {
+            return {
+                locationAccess: "גישה למיקום",
+                allowLocation: "אפשר גישה למיקום שלך",
+                allowNotifications: "אפשר התראות",
+                allowPush: "אפשר התראות דחיפה",
+                cameraAccess: "גישה למצלמה",
+                allowCamera: "אפשר גישה למצלמה לצילום",
+            };
+        }
+        if (language === "hi") {
+            return {
+                locationAccess: "लोकेशन एक्सेस",
+                allowLocation: "आपकी लोकेशन तक पहुंच की अनुमति दें",
+                allowNotifications: "नोटिफिकेशन की अनुमति दें",
+                allowPush: "पुश नोटिफिकेशन की अनुमति दें",
+                cameraAccess: "कैमरा एक्सेस",
+                allowCamera: "फोटो लेने के लिए कैमरा एक्सेस दें",
+            };
+        }
+        return {
+            locationAccess: "Location Access",
+            allowLocation: "Allow access to your location",
+            allowNotifications: "Allow Notifications",
+            allowPush: "Allow push notifications",
+            cameraAccess: "Camera Access",
+            allowCamera: "Allow access to camera for taking photos",
+        };
+    }, [language]);
 
     const handleBack = () => {
         router.back();
     };
 
-    const togglePermission = (key: keyof typeof permissions) => {
-        setPermissions(prev => ({
-            ...prev,
-            [key]: !prev[key]
-        }));
+    const togglePermission = async (key: keyof typeof permissions) => {
+        if (key !== "notifications") {
+            setPermissions(prev => ({
+                ...prev,
+                [key]: !prev[key]
+            }));
+            return;
+        }
+
+        if (isCheckingNotification) return;
+        setIsCheckingNotification(true);
+
+        try {
+            const current = await Notifications.getPermissionsAsync();
+
+            if (current.status === "granted") {
+                Alert.alert(
+                    t("notif_permission_enabled", "Notifications already enabled"),
+                    t("notif_permission_settings", "To disable notifications, open device settings."),
+                    [
+                        { text: t("cancel", "Cancel"), style: "cancel" },
+                        { text: t("open_settings", "Open Settings"), onPress: () => Linking.openSettings() }
+                    ]
+                );
+                setPermissions(prev => ({ ...prev, notifications: true }));
+                return;
+            }
+
+            const requested = await Notifications.requestPermissionsAsync();
+            const granted = requested.status === "granted";
+            setPermissions(prev => ({ ...prev, notifications: granted }));
+
+            if (!granted) {
+                Alert.alert(
+                    t("notif_permission_denied", "Permission denied"),
+                    t("notif_permission_denied_msg", "Please enable notification access from device settings."),
+                    [
+                        { text: t("cancel", "Cancel"), style: "cancel" },
+                        { text: t("open_settings", "Open Settings"), onPress: () => Linking.openSettings() }
+                    ]
+                );
+            }
+        } finally {
+            setIsCheckingNotification(false);
+        }
     };
 
-    const permissionItems: Array<{ key: keyof typeof permissions; label: string; description: string }> = [
-        { key: 'location', label: 'Location Access', description: 'Allow access to your location' },
-        { key: 'notifications', label: 'Allow Notifications', description: 'Allow push notifications' },
-        { key: 'camera', label: 'Camera Access', description: 'Allow access to camera for taking photos' },
+    const permissionItems: { key: keyof typeof permissions; label: string; description: string }[] = [
+        { key: 'location', label: labels.locationAccess, description: labels.allowLocation },
+        { key: 'notifications', label: labels.allowNotifications, description: labels.allowPush },
+        { key: 'camera', label: labels.cameraAccess, description: labels.allowCamera },
     ];
 
     const ToggleSwitch = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => (
@@ -76,7 +163,7 @@ const PermissionScreen = () => {
                 <TouchableOpacity onPress={() => handleBack()}>
                     <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
                 </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>Permission</Text>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>{t("permission", "Permission")}</Text>
                 <View style={{ width: 24 }} />
             </View>
 

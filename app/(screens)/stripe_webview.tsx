@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 type FlowMode = 'connect' | 'payment';
+const APP_SCHEME = 'yozietranceapp://';
 
 export default function StripeWebViewScreen() {
   const router = useRouter();
@@ -24,6 +25,8 @@ export default function StripeWebViewScreen() {
   const title = Array.isArray(params.title) ? params.title[0] : params.title;
 
   const handleResolvedUrl = (url: string) => {
+    const normalizedUrl = String(url || '').toLowerCase();
+
     if (url.includes('payment/success')) {
       router.replace('/(user_screen)/OrderAcceptedScreen');
       return true;
@@ -33,6 +36,40 @@ export default function StripeWebViewScreen() {
       Alert.alert('Payment Canceled', 'You canceled the payment.');
       router.back();
       return true;
+    }
+
+    if (flow === 'connect') {
+      const isAppRedirect = normalizedUrl.startsWith(APP_SCHEME);
+      const isNonHttpUrl =
+        normalizedUrl.length > 0 &&
+        !normalizedUrl.startsWith('http://') &&
+        !normalizedUrl.startsWith('https://') &&
+        !normalizedUrl.startsWith('about:blank');
+      const isConnectReturnUrl =
+        normalizedUrl.includes('connect/return') ||
+        normalizedUrl.includes('connect-return') ||
+        normalizedUrl.includes('stripe/return') ||
+        normalizedUrl.includes('stripe-return') ||
+        normalizedUrl.includes('onboarding/return') ||
+        normalizedUrl.includes('onboarding-return');
+      const isConnectCancelUrl =
+        normalizedUrl.includes('connect/cancel') ||
+        normalizedUrl.includes('connect-cancel') ||
+        normalizedUrl.includes('stripe/cancel') ||
+        normalizedUrl.includes('stripe-cancel') ||
+        normalizedUrl.includes('onboarding/cancel') ||
+        normalizedUrl.includes('onboarding-cancel');
+
+      if (isAppRedirect || isNonHttpUrl || isConnectReturnUrl) {
+        router.back();
+        return true;
+      }
+
+      if (isConnectCancelUrl) {
+        Alert.alert('Stripe Connect', 'Stripe onboarding was canceled.');
+        router.back();
+        return true;
+      }
     }
 
     return false;
@@ -71,16 +108,28 @@ export default function StripeWebViewScreen() {
           onLoadStart={() => setIsLoading(true)}
           onLoadEnd={() => setIsLoading(false)}
           onNavigationStateChange={(navState) => {
-            if (flow === 'payment') {
+            if (flow === 'payment' || flow === 'connect') {
               handleResolvedUrl(navState.url);
             }
           }}
           onShouldStartLoadWithRequest={(request) => {
-            if (flow === 'payment') {
+            if (flow === 'payment' || flow === 'connect') {
               return !handleResolvedUrl(request.url);
             }
 
             return true;
+          }}
+          onError={(syntheticEvent) => {
+            const failedUrl = syntheticEvent?.nativeEvent?.url || '';
+
+            if (flow === 'connect' && handleResolvedUrl(failedUrl)) {
+              return;
+            }
+
+            if (flow === 'connect') {
+              Alert.alert('Stripe Connect', 'Unable to load the Stripe page.');
+              router.back();
+            }
           }}
         />
         {isLoading && (
@@ -104,6 +153,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
+    direction: 'ltr',
     height: 52,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',

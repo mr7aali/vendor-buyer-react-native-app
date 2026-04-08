@@ -1,6 +1,7 @@
 
 
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -20,11 +21,39 @@ import { useDispatch } from "react-redux";
 import { updateVendorRegistration } from "../../store/slices/registrationSlice";
 
 const EndorIDUploadScreen = () => {
+  const { language } = useTranslation();
   const dispatch = useDispatch();
   // State variables with types
   const [nationalIdNumber, setIdNumber] = useState<string>("");
   const [nidFront, setFrontImage] = useState<string | null>(null);
   const [nidBack, setBackImage] = useState<string | null>(null);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        nationalIdNo: "מספר תעודת זהות",
+        uploadFront: "העלה תמונת תעודה (קדמי)",
+        uploadBack: "העלה תמונת תעודה (אחורי)",
+        upload: "העלה",
+        next: "הבא",
+      };
+    }
+    if (language === "hi") {
+      return {
+        nationalIdNo: "राष्ट्रीय आईडी नंबर",
+        uploadFront: "राष्ट्रीय आईडी तस्वीर अपलोड करें (फ्रंट)",
+        uploadBack: "राष्ट्रीय आईडी तस्वीर अपलोड करें (बैक)",
+        upload: "अपलोड",
+        next: "आगे",
+      };
+    }
+    return {
+      nationalIdNo: "National ID No",
+      uploadFront: "Upload your National ID picture (Front)",
+      uploadBack: "Upload your National ID picture (Back)",
+      upload: "Upload",
+      next: "Next",
+    };
+  }, [language]);
 
   // Type-safe pickImage function
   const pickImage = async (type: "front" | "back") => {
@@ -56,7 +85,7 @@ const EndorIDUploadScreen = () => {
         >
           {/* National ID Number Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>National ID No</Text>
+            <Text style={styles.label}>{ui.nationalIdNo}</Text>
             <TextInput
               style={styles.input}
               placeholder="3264 35465 341654"
@@ -69,9 +98,7 @@ const EndorIDUploadScreen = () => {
 
           {/* Upload Front Side */}
           <View style={styles.uploadGroup}>
-            <Text style={styles.label}>
-              Upload your National ID picture (Front)
-            </Text>
+            <Text style={styles.label}>{ui.uploadFront}</Text>
             <TouchableOpacity
               style={styles.uploadBox}
               onPress={() => pickImage("front")}
@@ -85,7 +112,7 @@ const EndorIDUploadScreen = () => {
               ) : (
                 <View style={styles.uploadPlaceholder}>
                   <Ionicons name="camera" size={40} color="#181725" />
-                  <Text style={styles.uploadText}>Upload</Text>
+                  <Text style={styles.uploadText}>{ui.upload}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -93,9 +120,7 @@ const EndorIDUploadScreen = () => {
 
           {/* Upload Back Side */}
           <View style={styles.uploadGroup}>
-            <Text style={styles.label}>
-              Upload your National ID picture (Back)
-            </Text>
+            <Text style={styles.label}>{ui.uploadBack}</Text>
             <TouchableOpacity
               style={styles.uploadBox}
               onPress={() => pickImage("back")}
@@ -109,7 +134,7 @@ const EndorIDUploadScreen = () => {
               ) : (
                 <View style={styles.uploadPlaceholder}>
                   <Ionicons name="camera" size={40} color="#181725" />
-                  <Text style={styles.uploadText}>Upload</Text>
+                  <Text style={styles.uploadText}>{ui.upload}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -130,7 +155,7 @@ const EndorIDUploadScreen = () => {
               router.push("/(screens)/BusinessIdUploadScreen");
             }}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            <Text style={styles.nextButtonText}>{ui.next}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

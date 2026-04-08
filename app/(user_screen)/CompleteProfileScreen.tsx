@@ -203,6 +203,7 @@
 //     flexGrow: 1,
 //   },
 //   header: {
+//     direction: 'ltr',
 //     alignItems: "center",
 //     marginBottom: 40,
 //   },
@@ -329,6 +330,7 @@
 
 
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -352,10 +354,12 @@ import { updateBuyerRegistration } from "../../store/slices/registrationSlice";
 import { RootState } from "../../store/store";
 
 const CompleteProfileScreen = () => {
+  const { language } = useTranslation();
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
+  const buyerRegistration = useSelector((state: RootState) => state.registration.buyer);
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState(user?.email || "");
+  const email = user?.email || buyerRegistration?.email || "";
   const [phone, setPhoneNumber] = useState("");
 
   // Updated Country States
@@ -365,11 +369,62 @@ const CompleteProfileScreen = () => {
 
   const [gender, setGender] = useState("");
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        completeProfile: "השלם את הפרופיל שלך",
+        subtitle: "מלא את הפרטים למטה כדי להשלים את הפרופיל שלך.",
+        enterFullName: "הזן את שמך המלא",
+        enterEmail: "הזן כתובת אימייל",
+        enterPhone: "הזן מספר טלפון",
+        countryRegion: "מדינה/אזור",
+        enterGender: "הזן מגדר",
+        selectGender: "בחר מגדר",
+        selectGenderTitle: "בחירת מגדר",
+        next: "הבא",
+        male: "זכר",
+        female: "נקבה",
+        other: "אחר",
+      };
+    }
+    if (language === "hi") {
+      return {
+        completeProfile: "अपना प्रोफाइल पूरा करें",
+        subtitle: "अपना प्रोफाइल पूरा करने के लिए नीचे विवरण भरें।",
+        enterFullName: "अपना पूरा नाम दर्ज करें",
+        enterEmail: "ईमेल पता दर्ज करें",
+        enterPhone: "अपना फोन नंबर दर्ज करें",
+        countryRegion: "देश/क्षेत्र",
+        enterGender: "अपना जेंडर चुनें",
+        selectGender: "जेंडर चुनें",
+        selectGenderTitle: "जेंडर चुनें",
+        next: "आगे",
+        male: "पुरुष",
+        female: "महिला",
+        other: "अन्य",
+      };
+    }
+    return {
+      completeProfile: "Complete your profile",
+      subtitle: "Fill in the details below to complete your profile.",
+      enterFullName: "Enter Your Full Name",
+      enterEmail: "Enter Email Address",
+      enterPhone: "Enter Your Phone Number",
+      countryRegion: "Country/Region",
+      enterGender: "Enter Your Gender",
+      selectGender: "Select Gender",
+      selectGenderTitle: "Select Gender",
+      next: "Next",
+      male: "Male",
+      female: "Female",
+      other: "Other",
+    };
+  }, [language]);
 
   const genderOptions = [
-    { label: "Male", value: "Male" },
-    { label: "Female", value: "Female" },
-    { label: "Other", value: "Other" },
+    { label: ui.male, value: "Male" },
+    { label: ui.female, value: "Female" },
+    { label: ui.other, value: "Other" },
   ];
 
   const selectGender = (value: string) => {
@@ -408,9 +463,9 @@ const CompleteProfileScreen = () => {
         >
           {/* Header Section */}
           <View style={styles.header}>
-            <Text style={styles.title}>Complete your profile</Text>
+            <Text style={styles.title}>{ui.completeProfile}</Text>
             <Text style={styles.subtitle}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed.
+              {ui.subtitle}
             </Text>
           </View>
 
@@ -418,10 +473,10 @@ const CompleteProfileScreen = () => {
           <View style={styles.form}>
             {/* Full Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Enter Your Full Name</Text>
+              <Text style={styles.label}>{ui.enterFullName}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your full name"
+                placeholder={ui.enterFullName}
                 placeholderTextColor="#C7C7CD"
                 value={fullName}
                 onChangeText={setFullName}
@@ -430,10 +485,10 @@ const CompleteProfileScreen = () => {
 
             {/* Email Address */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Enter Email Address</Text>
+              <Text style={styles.label}>{ui.enterEmail}</Text>
               <TextInput
                 style={[styles.input, { opacity: 0.6 }]}
-                placeholder="Enter email address"
+                placeholder={ui.enterEmail}
                 placeholderTextColor="#C7C7CD"
                 keyboardType="email-address"
                 value={email}
@@ -443,10 +498,10 @@ const CompleteProfileScreen = () => {
 
             {/* Phone Number */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Enter Your Phone Number</Text>
+              <Text style={styles.label}>{ui.enterPhone}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter phone number"
+                placeholder={ui.enterPhone}
                 placeholderTextColor="#C7C7CD"
                 keyboardType="phone-pad"
                 value={phone}
@@ -456,7 +511,7 @@ const CompleteProfileScreen = () => {
 
             {/* Country/Region Picker */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Country/Region</Text>
+              <Text style={styles.label}>{ui.countryRegion}</Text>
               <TouchableOpacity
                 style={styles.dropdown}
                 onPress={() => setIsCountryPickerVisible(true)}
@@ -482,7 +537,7 @@ const CompleteProfileScreen = () => {
 
             {/* Gender Dropdown */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Enter Your Gender</Text>
+              <Text style={styles.label}>{ui.enterGender}</Text>
               <TouchableOpacity
                 style={styles.dropdown}
                 onPress={() => setIsModalVisible(true)}
@@ -500,7 +555,7 @@ const CompleteProfileScreen = () => {
                       gender && { color: "#181725" },
                     ]}
                   >
-                    {gender || "Select Gender"}
+                    {gender || ui.selectGender}
                   </Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color="#181725" />
@@ -513,7 +568,7 @@ const CompleteProfileScreen = () => {
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            <Text style={styles.nextButtonText}>{ui.next}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -532,7 +587,7 @@ const CompleteProfileScreen = () => {
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Gender</Text>
+              <Text style={styles.modalTitle}>{ui.selectGenderTitle}</Text>
               <TouchableOpacity onPress={() => setIsModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#181725" />
               </TouchableOpacity>
@@ -577,6 +632,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
+    direction: 'ltr',
     alignItems: "center",
     marginBottom: 40,
   },

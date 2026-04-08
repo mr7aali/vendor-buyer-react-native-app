@@ -1,22 +1,24 @@
 import { images } from '@/constants/import_images'
+import { useTranslation } from '@/hooks/use-translation'
 import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import React, { useState } from 'react'
-import { Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 const SupportRequests = () => {
-    const [selectedIssue, setSelectedIssue] = useState('Vehicle not clean');
+    const { t } = useTranslation();
+    const [selectedIssue, setSelectedIssue] = useState('support_issue_vehicle_not_clean');
     const [complaint, setComplaint] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
     const issueOptions = [
-        'Vehicle not clean',
-        'Driver behavior',
-        'Late delivery',
-        'Wrong order',
-        'Payment issue',
-        'Other'
+        'support_issue_vehicle_not_clean',
+        'support_issue_driver_behavior',
+        'support_issue_late_delivery',
+        'support_issue_wrong_order',
+        'support_issue_payment_issue',
+        'support_issue_other'
     ];
 
     const handleBack = () => {
@@ -27,10 +29,10 @@ const SupportRequests = () => {
         // Handle form submission
         console.log('Support Request:', { issue: selectedIssue, complaint });
         // You can add API call here
-        alert('Support request submitted successfully!');
+        Alert.alert(t("success", "Success"), t("support_submitted_success", "Support request submitted successfully!"));
         // Reset form
         setComplaint('');
-        setSelectedIssue('Vehicle not clean');
+        setSelectedIssue('support_issue_vehicle_not_clean');
     };
 
     return (
@@ -47,7 +49,7 @@ const SupportRequests = () => {
                     <TouchableOpacity onPress={() => handleBack()}>
                         <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
                     </TouchableOpacity>
-                    <Text style={{ fontSize: 18, fontWeight: '600' }}>Support Requests</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '600' }}>{t("support_requests", "Support Requests")}</Text>
                     <View style={{ width: 24 }} />
                 </View>
                 {/* Body */}
@@ -69,7 +71,7 @@ const SupportRequests = () => {
                         paddingHorizontal: 20,
                         lineHeight: 24,
                     }}>
-                        If you face any kind of problem with our service feel free to contact us.
+                        {t("support_desc", "If you face any kind of problem with our service feel free to contact us.")}
                     </Text>
 
                     {/* Issue Type Dropdown */}
@@ -88,8 +90,8 @@ const SupportRequests = () => {
                                 borderColor: '#b8b9b9',
                             }}
                         >
-                            <Text style={{ fontSize: 16, color: selectedIssue === 'Vehicle not clean' ? '#9CA3AF' : '#1F2937' }}>
-                                {selectedIssue}
+                            <Text style={{ fontSize: 16, color: selectedIssue === 'support_issue_vehicle_not_clean' ? '#9CA3AF' : '#1F2937' }}>
+                                {t(selectedIssue, "Vehicle not clean")}
                             </Text>
                             <MaterialIcons
                                 name="keyboard-arrow-down"
@@ -121,7 +123,7 @@ const SupportRequests = () => {
                                         }}
                                     >
                                         <Text style={{ fontSize: 16, color: '#1F2937' }}>
-                                            {option}
+                                            {t(option, option)}
                                         </Text>
                                     </TouchableOpacity>
                                 ))}
@@ -132,7 +134,7 @@ const SupportRequests = () => {
                     {/* Complaint Text Input */}
                     <View style={{ marginBottom: 18 }}>
                         <TextInput
-                            placeholder="Write your complain here"
+                            placeholder={t("support_write_complaint", "Write your complain here")}
                             placeholderTextColor="#9CA3AF"
                             multiline
                             numberOfLines={6}
@@ -171,7 +173,7 @@ const SupportRequests = () => {
                         }}
                     >
                         <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
-                            Send to admin
+                            {t("support_send_admin", "Send to admin")}
                         </Text>
                     </TouchableOpacity>
                 </ScrollView>

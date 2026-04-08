@@ -1,5 +1,6 @@
 import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
 import { useCreatePaymentIntentMutation } from '@/store/api/paymentApiSlice';
+import { useTranslation } from '@/hooks/use-translation';
 import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,11 +30,12 @@ const getOrderItemName = (items: any[]) => {
     first?.product?.name ||
     first?.title ||
     first?.name ||
-    'Order item'
+    ''
   );
 };
 
 export default function StripePaymentScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const params = useLocalSearchParams<{ orderId?: string | string[] }>();
@@ -71,14 +73,14 @@ export default function StripePaymentScreen() {
       params: {
         url: encodeURIComponent(checkoutUrl),
         flow: 'payment',
-        title: 'Stripe Payment',
+        title: t('stripe_title', 'Stripe Payment'),
       },
     });
   };
 
   const handleContinue = async () => {
     if (!orderId) {
-      Alert.alert('Error', 'Order ID is missing.');
+      Alert.alert(t('error', 'Error'), t('stripe_order_id_missing', 'Order ID is missing.'));
       return;
     }
 
@@ -108,14 +110,14 @@ export default function StripePaymentScreen() {
         });
 
         if (initResult.error) {
-          Alert.alert('Error', initResult.error.message);
+          Alert.alert(t('error', 'Error'), initResult.error.message);
           return;
         }
 
         const presentResult = await presentPaymentSheet();
         if (presentResult.error) {
           if (presentResult.error.code !== 'Canceled') {
-            Alert.alert('Error', presentResult.error.message);
+            Alert.alert(t('error', 'Error'), presentResult.error.message);
           }
           return;
         }
@@ -142,9 +144,9 @@ export default function StripePaymentScreen() {
         return;
       }
 
-      Alert.alert('Error', payload?.message || 'Unable to start Stripe checkout.');
+      Alert.alert(t('error', 'Error'), payload?.message || t('stripe_unable_start_checkout', 'Unable to start Stripe checkout.'));
     } catch (error: any) {
-      Alert.alert('Error', error?.data?.message || 'Failed to initiate payment.');
+      Alert.alert(t('error', 'Error'), error?.data?.message || t('stripe_failed_initiate_payment', 'Failed to initiate payment.'));
     } finally {
       setIsProcessing(false);
     }
@@ -161,9 +163,9 @@ export default function StripePaymentScreen() {
   if (orderError || !order) {
     return (
       <SafeAreaView style={[styles.container, styles.center]}>
-        <Text style={styles.errorText}>Failed to load payment details.</Text>
+        <Text style={styles.errorText}>{t('stripe_failed_load_payment_details', 'Failed to load payment details.')}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
-          <Text style={styles.retryText}>Go Back</Text>
+          <Text style={styles.retryText}>{t('product_details_go_back', 'Go Back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -175,36 +177,36 @@ export default function StripePaymentScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backTap}>
           <MaterialIcons name="arrow-back-ios-new" size={22} color="#1F2933" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment</Text>
+        <Text style={styles.headerTitle}>{t('stripe_payment', 'Payment')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Booking Summary:</Text>
+        <Text style={styles.sectionTitle}>{t('stripe_booking_summary', 'Booking Summary:')}</Text>
         <View style={styles.summaryCard}>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>{itemName}</Text>
+            <Text style={styles.rowLabel}>{itemName || t('stripe_order_item', 'Order item')}</Text>
             <Text style={styles.rowValue}>{formatMoney(subtotal)}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Quantity</Text>
+            <Text style={styles.rowLabel}>{t('product_details_quantity', 'Quantity')}</Text>
             <Text style={styles.rowValue}>{quantity}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Discount</Text>
+            <Text style={styles.rowLabel}>{t('order_details_discount', 'Discount')}</Text>
             <Text style={styles.rowValue}>-{formatMoney(discount)}</Text>
           </View>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>Coupon</Text>
+            <Text style={styles.rowLabel}>{t('stripe_coupon', 'Coupon')}</Text>
             <Text style={styles.rowValue}>-{formatMoney(couponAmount)}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total Payable</Text>
+            <Text style={styles.totalLabel}>{t('chat_total_label', 'Total')}</Text>
             <Text style={styles.totalValue}>{formatMoney(totalPayable)}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Payment Method</Text>
+        <Text style={styles.sectionTitle}>{t('stripe_payment_method', 'Payment Method')}</Text>
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.paymentMethodCard}
@@ -212,7 +214,7 @@ export default function StripePaymentScreen() {
         >
           <View style={styles.paymentMethodLeft}>
             <Feather name="credit-card" size={20} color="#0093A3" />
-            <Text style={styles.paymentMethodText}>Payment Stripe</Text>
+            <Text style={styles.paymentMethodText}>{t('stripe_payment_stripe', 'Payment Stripe')}</Text>
           </View>
           <View style={styles.radioOuter}>
             {selectedMethod === 'stripe' ? <View style={styles.radioInner} /> : null}
@@ -227,7 +229,7 @@ export default function StripePaymentScreen() {
           {isProcessing || isCreatingPayment ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.continueText}>Continue</Text>
+            <Text style={styles.continueText}>{t('info_continue', 'Continue')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -245,6 +247,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   header: {
+    direction: 'ltr',
     height: 58,
     flexDirection: 'row',
     alignItems: 'center',

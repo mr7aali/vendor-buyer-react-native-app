@@ -1,4 +1,5 @@
 import { useForgotPasswordScreenMutation } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Mail } from "lucide-react-native";
@@ -16,14 +17,63 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ForgotPasswordScreen: React.FC = () => {
+  const { language } = useTranslation();
   const router = useRouter();
   const [email, setEmail] = useState<string>("");
   const [forgotPassword, { isLoading }] = useForgotPasswordScreenMutation();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        forgotPassword: "שכחת סיסמה",
+        forgotTitle: "שכחת סיסמה?",
+        subtitle: "אל דאגה! הזן אימייל או מספר טלפון רשום.",
+        content: "תוכן",
+        enterEmailOrPhone: "הזן אימייל או טלפון",
+        sendResetCode: "שלח קוד איפוס",
+        sending: "שולח...",
+        remembered: "נזכרת בסיסמה שלך?",
+        login: "התחברות",
+        needHelp: "צריך עזרה?",
+        pleaseEnterEmail: "נא להזין אימייל",
+        failedToSendCode: "שליחת הקוד נכשלה",
+      };
+    }
+    if (language === "hi") {
+      return {
+        forgotPassword: "पासवर्ड भूल गए",
+        forgotTitle: "पासवर्ड भूल गए?",
+        subtitle: "चिंता न करें! अपना रजिस्टर्ड ईमेल या फोन नंबर दर्ज करें।",
+        content: "कंटेंट",
+        enterEmailOrPhone: "अपना ईमेल या फोन नंबर दर्ज करें",
+        sendResetCode: "रीसेट कोड भेजें",
+        sending: "भेजा जा रहा है...",
+        remembered: "पासवर्ड याद आ गया?",
+        login: "लॉगिन",
+        needHelp: "मदद चाहिए?",
+        pleaseEnterEmail: "कृपया अपना ईमेल दर्ज करें",
+        failedToSendCode: "कोड भेजना विफल रहा",
+      };
+    }
+    return {
+      forgotPassword: "Forgot Password",
+      forgotTitle: "Forgot Password?",
+      subtitle: "Don t worry! Enter your registered email or phone number.",
+      content: "Content",
+      enterEmailOrPhone: "Enter your email or phone number",
+      sendResetCode: "Send Reset Code",
+      sending: "Sending...",
+      remembered: "Remembered your password?",
+      login: "Login",
+      needHelp: "Need Help?",
+      pleaseEnterEmail: "Please enter your email",
+      failedToSendCode: "Failed to send code",
+    };
+  }, [language]);
 
   const handleSendCode = async () => {
     try {
       if (!email) {
-        alert("Please enter your email");
+        alert(ui.pleaseEnterEmail);
         return;
       }
       await forgotPassword({ email }).unwrap();
@@ -31,7 +81,7 @@ const ForgotPasswordScreen: React.FC = () => {
       router.push({ pathname: "/(auth)/OTPVerification", params: { email } });
     } catch (err) {
       console.error("Forgot password failed", err);
-      alert("Failed to send code: " + ((err as any)?.data?.message || "Unknown error"));
+      alert(`${ui.failedToSendCode}: ` + ((err as any)?.data?.message || "Unknown error"));
     }
   };
 
@@ -44,7 +94,7 @@ const ForgotPasswordScreen: React.FC = () => {
         >
           <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Forgot Password</Text>
+        <Text style={styles.headerTitle}>{ui.forgotPassword}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -57,23 +107,23 @@ const ForgotPasswordScreen: React.FC = () => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.textContainer}>
-            <Text style={styles.title}>Forgot Password?</Text>
+            <Text style={styles.title}>{ui.forgotTitle}</Text>
             <Text style={styles.subtitle}>
-              Don t worry! Enter your registered email or phone number.
+              {ui.subtitle}
             </Text>
           </View>
 
           <View style={styles.formSection}>
-            <Text style={styles.label}>Content</Text>
+            <Text style={styles.label}>{ui.content}</Text>
             <Text style={styles.inputGuide}>
-              Enter your email or phone number
+              {ui.enterEmailOrPhone}
             </Text>
 
             <View style={styles.inputWrapper}>
               <Mail color="#999" size={20} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your email or phone"
+                placeholder={ui.enterEmailOrPhone}
                 placeholderTextColor="#999"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -87,22 +137,22 @@ const ForgotPasswordScreen: React.FC = () => {
               onPress={handleSendCode}
               disabled={isLoading}
             >
-              <Text style={styles.sendButtonText}>{isLoading ? "Sending..." : "Send Reset Code"}</Text>
+              <Text style={styles.sendButtonText}>{isLoading ? ui.sending : ui.sendResetCode}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>
-              Remembered your password?{" "}
+              {`${ui.remembered} `}
               <Text
                 style={styles.loginLink}
                 onPress={() => router.push("/(auth)/login")}
               >
-                Login
+                {ui.login}
               </Text>
             </Text>
             <TouchableOpacity>
-              <Text style={styles.helpText}>Need Help?</Text>
+              <Text style={styles.helpText}>{ui.needHelp}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -118,6 +168,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

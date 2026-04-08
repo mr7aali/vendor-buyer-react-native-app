@@ -1,12 +1,14 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { apiSlice } from './api/apiSlice';
 import authReducer from './slices/authSlice';
+import languageReducer from './slices/languageSlice';
 import registrationReducer from './slices/registrationSlice';
 
 const combinedReducer = combineReducers({
     [apiSlice.reducerPath]: apiSlice.reducer,
     registration: registrationReducer,
     auth: authReducer,
+    language: languageReducer,
 });
 
 const resolveUserId = (user: any) =>
@@ -14,7 +16,9 @@ const resolveUserId = (user: any) =>
 
 const rootReducer = (state: any, action: any) => {
     if (action.type === 'auth/logOut') {
-        state = undefined;
+        // Keep non-auth app preferences (e.g. language) while clearing auth/session state.
+        const preservedLanguage = state?.language;
+        state = preservedLanguage ? { language: preservedLanguage } : undefined;
     }
 
     // If credentials switch to another account, clear RTK Query cache to avoid data bleed.

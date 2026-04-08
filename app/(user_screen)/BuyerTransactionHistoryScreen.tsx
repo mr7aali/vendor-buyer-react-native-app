@@ -139,6 +139,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EDF1EF",
   },
   header: {
+    direction: 'ltr',
     height: 56,
     flexDirection: "row",
     alignItems: "center",

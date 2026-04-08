@@ -1,4 +1,5 @@
 import { images } from "@/constants/import_images";
+import { useTranslation } from "@/hooks/use-translation";
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -11,11 +12,39 @@ import {
   View,
 } from "react-native";
 
-const { width, height } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
 
 export default function GetStarted() {
+  const { language } = useTranslation();
   const router = useRouter();
   const { role } = useLocalSearchParams();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        welcome: "ברוכים הבאים ל-Inkooto",
+        subtitle: "מחברים אותך לשירותים הטובים ביותר בכל זמן ובכל מקום.",
+        getStarted: "התחל",
+        alreadyHave: "כבר יש לך חשבון?",
+        login: "התחברות",
+      };
+    }
+    if (language === "hi") {
+      return {
+        welcome: "Inkooto में आपका स्वागत है",
+        subtitle: "आपको बेहतरीन सेवाओं से जोड़ते हैं, कभी भी और कहीं भी।",
+        getStarted: "शुरू करें",
+        alreadyHave: "क्या आपका अकाउंट पहले से है?",
+        login: "लॉगिन",
+      };
+    }
+    return {
+      welcome: "Welcome to Inkooto",
+      subtitle: "Connecting you with the best services, anytime, anywhere. Experience seamless support tailored just for you.",
+      getStarted: "Get Started",
+      alreadyHave: "Already have an account?",
+      login: "Login",
+    };
+  }, [language]);
 
   const handleGetStarted = () => {
     router.push({
@@ -58,7 +87,7 @@ export default function GetStarted() {
               textAlign: "center",
             }}
           >
-            Welcome to Inkooto
+            {ui.welcome}
           </Text>
           <Text
             style={{
@@ -69,8 +98,7 @@ export default function GetStarted() {
               marginBottom: 45,
             }}
           >
-            Connecting you with the best services, anytime, anywhere. Experience
-            seamless support tailored just for you.
+            {ui.subtitle}
           </Text>
 
           {/* Get Started Button */}
@@ -99,7 +127,7 @@ export default function GetStarted() {
               style={{ marginRight: 8 }}
             />
             <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "700" }}>
-              Get Started
+              {ui.getStarted}
             </Text>
           </TouchableOpacity>
 
@@ -112,7 +140,7 @@ export default function GetStarted() {
             }}
           >
             <Text style={{ color: "#707070", fontSize: 15 }}>
-              Already have an account?{" "}
+              {`${ui.alreadyHave} `}
             </Text>
             <TouchableOpacity
               onPress={() => router.push("/(auth)/login")}
@@ -131,7 +159,7 @@ export default function GetStarted() {
                   fontWeight: "bold",
                 }}
               >
-                Login
+                {ui.login}
               </Text>
             </TouchableOpacity>
           </View>

@@ -1,8 +1,9 @@
+﻿import { useTranslation } from '@/hooks/use-translation';
 import { useGetOrderByIdQuery, useUpdateOrderStatusMutation } from '@/store/api/orderApiSlice';
 import { AntDesign, Feather, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, I18nManager, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/72';
@@ -38,6 +39,7 @@ const statusTheme = (status: string) => {
 };
 
 export default function OrderDetails() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams();
   const { data: order, isLoading, error, refetch } = useGetOrderByIdQuery(id as string, { skip: !id });
   const [updateStatus, { isLoading: isUpdating }] = useUpdateOrderStatusMutation();
@@ -59,10 +61,10 @@ export default function OrderDetails() {
   const timeline = useMemo(() => {
     const created = order?.createdAt ? new Date(order.createdAt) : null;
     return [
-      { title: 'Order Created', time: created },
-      { title: status.charAt(0).toUpperCase() + status.slice(1), time: order?.updatedAt ? new Date(order.updatedAt) : created },
+      { title: t('order_details_timeline_created', 'Order Created'), time: created },
+      { title: t(`orders_filter_${status}`, status.charAt(0).toUpperCase() + status.slice(1)), time: order?.updatedAt ? new Date(order.updatedAt) : created },
     ];
-  }, [order, status]);
+  }, [order, status, t]);
 
   if (isLoading) {
     return (
@@ -75,9 +77,9 @@ export default function OrderDetails() {
   if (!order || error) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={{ color: '#2B3439' }}>Order not found</Text>
+        <Text style={{ color: '#2B3439' }}>{t('order_details_not_found', 'Order not found')}</Text>
         <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 10 }}>
-          <Text style={{ color: '#278687' }}>Go Back</Text>
+          <Text style={{ color: '#278687' }}>{t('product_details_go_back', 'Go Back')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -89,9 +91,9 @@ export default function OrderDetails() {
       await refetch();
       setShowUpdateStatusModal(false);
       setShowCancelModal(false);
-      Alert.alert('Success', 'Order status updated');
+      Alert.alert(t('success', 'Success'), t('order_details_status_updated', 'Order status updated'));
     } catch (err: any) {
-      Alert.alert('Error', err?.data?.message || 'Failed to update status');
+      Alert.alert(t('error', 'Error'), err?.data?.message || t('order_details_failed_update_status', 'Failed to update status'));
     }
   };
 
@@ -101,7 +103,7 @@ export default function OrderDetails() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#202427" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Orders #{order?.orderNumber || order?.id}</Text>
+        <Text style={styles.headerTitle}>{t('orders_title', 'Orders')} #{order?.orderNumber || order?.id}</Text>
         <TouchableOpacity
           style={styles.downloadFab}
           onPress={() => router.push({ pathname: '/(screens)/export_invoice', params: { id: order?.id || order?._id } })}
@@ -115,8 +117,8 @@ export default function OrderDetails() {
           <View style={styles.customerRow}>
             <Image source={{ uri: order?.buyer?.profilePhotoUrl || IMAGE_FALLBACK }} style={styles.customerAvatar} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.customerName}>{order?.buyer?.fullName || 'Customer'}</Text>
-              <Text style={styles.customerId}>ID: {order?.buyer?.id || 'N/A'}</Text>
+              <Text style={styles.customerName}>{order?.buyer?.fullName || t('orders_customer_fallback', 'Customer')}</Text>
+              <Text style={styles.customerId}>ID: {order?.buyer?.id || t('orders_na', 'N/A')}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -125,19 +127,20 @@ export default function OrderDetails() {
               router.push({
                 pathname: '/(screens)/chat_box',
                 params: {
+                  role: 'vendor',
                   partnerId: order?.buyer?.userId || order?.buyer?.id,
-                  fullname: order?.buyer?.fullName || 'Customer',
+                  fullname: order?.buyer?.fullName || t('orders_customer_fallback', 'Customer'),
                 },
               })
             }
           >
             <AntDesign name="message" size={14} color="#2C3338" />
-            <Text style={styles.messageText}>Message</Text>
+            <Text style={styles.messageText}>{t('order_details_message', 'Message')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Order items</Text>
+          <Text style={styles.sectionTitle}>{t('order_details_order_items', 'Order items')}</Text>
           {items.map((item: any, idx: number) => (
             <View key={item?.id || `${idx}`} style={[styles.itemRow, idx < items.length - 1 ? { marginBottom: 10 } : null]}>
               <Image source={{ uri: item?.product?.images?.[0] || IMAGE_FALLBACK }} style={styles.itemImage} />
@@ -146,7 +149,7 @@ export default function OrderDetails() {
                   <Text style={styles.itemName} numberOfLines={1}>#{order?.orderNumber}</Text>
                   <Text style={styles.itemPrice}>{formatMoney(item?.unitPrice || item?.price)}</Text>
                 </View>
-                <Text style={styles.itemDesc} numberOfLines={2}>{item?.product?.description || 'Product details unavailable'}</Text>
+                <Text style={styles.itemDesc} numberOfLines={2}>{item?.product?.description || t('order_details_product_details_unavailable', 'Product details unavailable')}</Text>
                 <Text style={styles.itemQty}>x{item?.quantity || 1}</Text>
               </View>
             </View>
@@ -154,23 +157,23 @@ export default function OrderDetails() {
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Payment details</Text>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Subtotal</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Tax</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Shipping</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
+          <Text style={styles.sectionTitle}>{t('order_details_payment_details', 'Payment details')}</Text>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_subtotal', 'Subtotal')}</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_tax_plain', 'Tax')}</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_shipping', 'Shipping')}</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
           <View style={styles.dashed} />
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>Discount</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
-          <View style={styles.totalRow}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalValue}>{formatMoney(total)}</Text></View>
+          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_discount', 'Discount')}</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
+          <View style={styles.totalRow}><Text style={styles.totalLabel}>{t('chat_total_label', 'Total')}</Text><Text style={styles.totalValue}>{formatMoney(total)}</Text></View>
           <View style={styles.paidRow}>
             <Text style={[styles.statusBadge, { backgroundColor: theme.bg, color: theme.text }]}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {t(`orders_filter_${status}`, status.charAt(0).toUpperCase() + status.slice(1))}
             </Text>
-            <Text style={styles.paidMethod}>{order?.payment?.paymentMethod || 'Card payment'}</Text>
+            <Text style={styles.paidMethod}>{order?.payment?.paymentMethod || t('order_details_card_payment', 'Card payment')}</Text>
           </View>
         </View>
 
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Order history</Text>
+          <Text style={styles.sectionTitle}>{t('order_details_order_history', 'Order history')}</Text>
           {timeline.map((step, idx) => (
             <View key={`${step.title}-${idx}`} style={styles.timelineRow}>
               <View style={styles.timelineLeft}>
@@ -180,7 +183,7 @@ export default function OrderDetails() {
               <View>
                 <Text style={styles.timelineTitle}>{step.title}</Text>
                 <Text style={styles.timelineTime}>
-                  {step.time ? step.time.toLocaleString() : 'N/A'}
+                  {step.time ? step.time.toLocaleString() : t('orders_na', 'N/A')}
                 </Text>
               </View>
             </View>
@@ -190,7 +193,7 @@ export default function OrderDetails() {
 
       <View style={styles.bottomActions}>
         <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCancelModal(true)}>
-          <Text style={styles.cancelBtnText}>Cancel order</Text>
+          <Text style={styles.cancelBtnText}>{t('order_details_cancel_order', 'Cancel order')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.updateBtn}
@@ -199,21 +202,21 @@ export default function OrderDetails() {
             setShowUpdateStatusModal(true);
           }}
         >
-          <Text style={styles.updateBtnText}>Update Status</Text>
+          <Text style={styles.updateBtnText}>{t('order_details_update_status', 'Update Status')}</Text>
         </TouchableOpacity>
       </View>
 
       <Modal transparent visible={showCancelModal} animationType="fade" onRequestClose={() => setShowCancelModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Are you sure you want to update the order status?</Text>
-            <Text style={styles.modalSub}>This will mark this order as cancelled.</Text>
+            <Text style={styles.modalTitle}>{t('order_details_update_status_confirm_q', 'Are you sure you want to update the order status?')}</Text>
+            <Text style={styles.modalSub}>{t('order_details_cancelled_mark_note', 'This will mark this order as cancelled.')}</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalGhost} onPress={() => setShowCancelModal(false)}>
-                <Text style={styles.modalGhostText}>Cancel</Text>
+                <Text style={styles.modalGhostText}>{t('cancel', 'Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalSolid} onPress={() => handleStatusUpdate('cancelled')} disabled={isUpdating}>
-                {isUpdating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>Yes</Text>}
+                {isUpdating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>{t('order_details_yes', 'Yes')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -223,25 +226,25 @@ export default function OrderDetails() {
       <Modal transparent visible={showUpdateStatusModal} animationType="fade" onRequestClose={() => setShowUpdateStatusModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.statusModal}>
-            <Text style={styles.modalTitle}>Update Status</Text>
+            <Text style={styles.modalTitle}>{t('order_details_update_status', 'Update Status')}</Text>
             {STATUS_OPTIONS.map((option) => (
               <TouchableOpacity key={option.value} style={styles.statusOption} onPress={() => setSelectedStatus(option.value)}>
                 <Text style={[styles.statusOptionText, selectedStatus === option.value ? { color: '#278687', fontWeight: '700' } : null]}>
-                  {option.label}
+                  {t(`orders_filter_${option.value}`, option.label)}
                 </Text>
                 {selectedStatus === option.value ? <Feather name="check" size={18} color="#278687" /> : null}
               </TouchableOpacity>
             ))}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalGhost} onPress={() => setShowUpdateStatusModal(false)}>
-                <Text style={styles.modalGhostText}>Cancel</Text>
+                <Text style={styles.modalGhostText}>{t('cancel', 'Cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalSolid}
                 onPress={() => selectedStatus && handleStatusUpdate(selectedStatus)}
                 disabled={isUpdating}
               >
-                {isUpdating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>Update</Text>}
+                {isUpdating ? <ActivityIndicator color="#fff" /> : <Text style={styles.modalSolidText}>{t('order_details_update', 'Update')}</Text>}
               </TouchableOpacity>
             </View>
           </View>
@@ -254,7 +257,7 @@ export default function OrderDetails() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F2F6F5' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F6F5' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#202427', flex: 1, textAlign: 'center', marginHorizontal: 8 },
   downloadFab: { backgroundColor: '#278687', width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
@@ -273,7 +276,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '600', color: '#222C31', flex: 1, paddingRight: 8 },
   itemPrice: { fontSize: 14, fontWeight: '700', color: '#222C31' },
   itemDesc: { fontSize: 11, color: '#7B868D', marginTop: 2 },
-  itemQty: { textAlign: 'right', marginTop: 5, fontSize: 11, color: '#65727A' },
+  itemQty: { textAlign: I18nManager.isRTL ? 'left' : 'right', marginTop: 5, fontSize: 11, color: '#65727A' },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   paymentLabel: { color: '#66737C', fontSize: 13 },
   paymentValue: { color: '#222C31', fontSize: 13, fontWeight: '600' },

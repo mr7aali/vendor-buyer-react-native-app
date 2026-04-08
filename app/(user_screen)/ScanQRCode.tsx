@@ -1,11 +1,13 @@
 
 
 import Slider from "@react-native-community/slider";
+import { useTranslation } from "@/hooks/use-translation";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { ChevronLeft, Keyboard, Minus, Plus } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Dimensions,
   StyleSheet,
   Text,
@@ -13,18 +15,98 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import VendorModal from "./UserModal";
 
 import { useConnectToVendorMutation } from "@/store/api/connectionApiSlice";
 
 const { width } = Dimensions.get("window");
 
+const normalizeVendorCode = (rawCode: string) => {
+  const trimmed = String(rawCode || "").trim();
+  if (!trimmed) return "";
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string") {
+      return normalizeVendorCode(parsed);
+    }
+    if (parsed?.vendorCode) {
+      return normalizeVendorCode(parsed.vendorCode);
+    }
+    if (parsed?.code) {
+      return normalizeVendorCode(parsed.code);
+    }
+    if (parsed?.url) {
+      return normalizeVendorCode(parsed.url);
+    }
+  } catch {
+    // Not JSON, continue with string parsing.
+  }
+
+  const withoutQuery = trimmed.split("?")[0].split("#")[0];
+  const normalized = withoutQuery
+    .replace(/^https?:\/\/[^/]+\/v\//i, "")
+    .replace(/^https?:\/\/[^/]+\/v\./i, "")
+    .replace(/^yozietranceapp:\/\/v\//i, "")
+    .replace(/^v\//i, "")
+    .replace(/^v\./i, "")
+    .replace(/^[./]+/, "");
+
+  return normalized.split("/").filter(Boolean).pop() || normalized;
+};
+
+const buildVendorCodeCandidates = (rawCode: string) => {
+  const raw = String(rawCode || "").trim();
+  const normalized = normalizeVendorCode(raw);
+  const decoded = normalized ? decodeURIComponent(normalized) : "";
+
+  return Array.from(
+    new Set(
+      [normalized, decoded, raw, raw.toUpperCase(), raw.toLowerCase(), decoded.toUpperCase(), decoded.toLowerCase()]
+        .map((value) => String(value || "").trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
+const resolveChatVendor = (response: any) => {
+  const vendor =
+    response?.data?.vendor ||
+    response?.vendor ||
+    response?.connection?.vendor ||
+    response?.data?.vendorId ||
+    response?.connection?.vendorId ||
+    {};
+
+  const partnerId =
+    vendor?.userId ||
+    vendor?.vendor?.userId ||
+    vendor?._id ||
+    vendor?.id ||
+    response?.data?.vendorUserId ||
+    response?.data?.vendorId?.userId ||
+    response?.data?.vendorId?._id ||
+    response?.data?.vendorId?.id ||
+    "";
+
+  const name =
+    vendor?.storename ||
+    vendor?.businessName ||
+    vendor?.fullName ||
+    vendor?.name ||
+    "";
+
+  return {
+    partnerId: String(partnerId || ""),
+    name,
+  };
+};
+
 export default function ScanQRScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [zoom, setZoom] = useState(0);
-  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const [connectToVendor, { isLoading }] = useConnectToVendorMutation();
 
@@ -41,10 +123,10 @@ export default function ScanQRScreen() {
     return (
       <View style={styles.container}>
         <Text style={{ textAlign: "center", marginBottom: 20 }}>
-          We need your permission to show the camera
+          {t("scan_need_camera_permission", "We need your permission to show the camera")}
         </Text>
         <TouchableOpacity onPress={requestPermission} style={styles.button}>
-          <Text style={styles.buttonText}>Grant Permission</Text>
+          <Text style={styles.buttonText}>{t("scan_grant_permission", "Grant Permission")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -54,31 +136,50 @@ export default function ScanQRScreen() {
     if (!scanned) {
       setScanned(true);
       try {
-        // Assuming data is the vendor code
-        const res = await connectToVendor({ vendorCode: data }).unwrap();
+        const vendorCodeCandidates = buildVendorCodeCandidates(data);
+        if (!vendorCodeCandidates.length) {
+          throw new Error(t("scan_invalid_qr_code", "Invalid vendor QR code"));
+        }
+        let res: any = null;
+        let lastError: any = null;
 
-        const vendor = res.vendor || res.connection?.vendor || {};
+        for (const vendorCode of vendorCodeCandidates) {
+          try {
+            res = await connectToVendor({ vendorCode }).unwrap();
+            break;
+          } catch (error: any) {
+            lastError = error;
+            if (error?.status && error.status !== 404) {
+              throw error;
+            }
+          }
+        }
+
+        if (!res) {
+          throw lastError || new Error(t("scan_failed_connect_qr", "Failed to connect via QR code"));
+        }
+
+        const resolvedVendor = resolveChatVendor(res);
+        if (!resolvedVendor.partnerId) {
+          throw new Error(t("scan_failed_connect_qr", "Failed to connect via QR code"));
+        }
 
         router.push({
           pathname: "/(screens)/chat_box",
           params: {
-            partnerId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
-            conversationId: res.data.vendorId?.userId || res.data.vendorId?._id || res.data.vendorId?.id,
-            name: res.data.vendorId?.storename || res.data.vendorId?.businessName || 'Vendor'
+            role: "buyer",
+            partnerId: resolvedVendor.partnerId,
+            conversationId: resolvedVendor.partnerId,
+            name: resolvedVendor.name || t("scan_vendor", "Vendor"),
           }
         });
       } catch (err: any) {
         console.error("QR Connection error:", err);
-        alert(err?.data?.message || "Failed to connect via QR code");
+        Alert.alert(t("error", "Error"), err?.data?.message || t("scan_failed_connect_qr", "Failed to connect via QR code"));
         // Reset scanned so they can try again
         setTimeout(() => setScanned(false), 2000);
       }
     }
-  };
-
-  const handleManualConnect = (code: string) => {
-    setIsModalVisible(false);
-    // Connection handled in UserModal, which redirects.
   };
 
   return (
@@ -92,11 +193,11 @@ export default function ScanQRScreen() {
             onPress={() => router.back()}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scan QR Code</Text>
+        <Text style={styles.headerTitle}>{t("scan_qr_code", "Scan QR Code")}</Text>
         <View style={{ width: 28 }} />
       </View>
 
-      <Text style={styles.instructionText}>Scan for auto fill your info</Text>
+      <Text style={styles.instructionText}>{t("scan_autofill_info", "Scan for auto fill your info")}</Text>
 
       {/* Camera and Dynamic Focus Overlay */}
       <View style={styles.cameraWrapper}>
@@ -107,25 +208,23 @@ export default function ScanQRScreen() {
           barcodeScannerSettings={{
             barcodeTypes: ["qr"],
           }}
-        >
-          <View style={styles.overlayContainer}>
-            <View style={styles.maskOutter}>
-              <View
-                style={{
-                  width: dynamicSize,
-                  height: dynamicSize,
-                  position: "relative",
-                  transitionDuration: "0.1s",
-                }}
-              >
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
-              </View>
+        />
+        <View pointerEvents="none" style={styles.overlayContainer}>
+          <View style={styles.maskOutter}>
+            <View
+              style={{
+                width: dynamicSize,
+                height: dynamicSize,
+                position: "relative",
+              }}
+            >
+              <View style={[styles.corner, styles.topLeft]} />
+              <View style={[styles.corner, styles.topRight]} />
+              <View style={[styles.corner, styles.bottomLeft]} />
+              <View style={[styles.corner, styles.bottomRight]} />
             </View>
           </View>
-        </CameraView>
+        </View>
       </View>
 
       {/* Zoom Controls */}
@@ -151,23 +250,17 @@ export default function ScanQRScreen() {
       </View>
 
       <Text style={styles.bottomHint}>
-        Point your camera at the vendor s QR code or barcode
+        {t("scan_point_camera_vendor_qr", "Point your camera at the vendor's QR code or barcode")}
       </Text>
 
       <TouchableOpacity
         style={styles.manualButton}
         activeOpacity={0.8}
-        onPress={() => setIsModalVisible(true)}
+        onPress={() => router.push("/(user_screen)/ManualVendorSearch")}
       >
         <Keyboard color="#4A4A4A" size={20} />
-        <Text style={styles.manualButtonText}>Enter Code Manually</Text>
+        <Text style={styles.manualButtonText}>{t("scan_enter_code_manually", "Enter Code Manually")}</Text>
       </TouchableOpacity>
-
-      <VendorModal
-        isVisible={isModalVisible}
-        onClose={() => setIsModalVisible(false)}
-        onConnect={handleManualConnect}
-      />
     </SafeAreaView>
   );
 }
@@ -175,6 +268,7 @@ export default function ScanQRScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -198,7 +292,11 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#000",
   },
-  overlayContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   maskOutter: {
     flex: 1,
     width: "100%",

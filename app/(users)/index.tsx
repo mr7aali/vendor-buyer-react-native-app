@@ -148,6 +148,7 @@
 //     backgroundColor: "#F8FAF9",
 //   },
 //   header: {
+//     direction: 'ltr',
 //     flexDirection: "row",
 //     justifyContent: "space-between",
 //     alignItems: "center",
@@ -322,12 +323,14 @@
 
 // export default Dashboard;
 
-import { useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
+import { useGetProfileQuery, useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
-import { Bell, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
+import { StatusBar } from "expo-status-bar";
+import { Bell, Compass, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
 import {
   Dimensions,
@@ -341,7 +344,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
-
 const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -350,10 +352,31 @@ const toNumber = (value: any, fallback = 0) => {
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || "pending").toLowerCase();
 const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+const toAbsoluteImageUri = (value: any) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (
+    raw.startsWith("http://") ||
+    raw.startsWith("https://") ||
+    raw.startsWith("file://") ||
+    raw.startsWith("content://") ||
+    raw.startsWith("data:")
+  ) {
+    return raw;
+  }
+  if (raw.startsWith("/") && apiBaseUrl) return `${apiBaseUrl}${raw}`;
+  return raw;
+};
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation();
   const user = useAppSelector(selectCurrentUser);
   const { data: statsData } = useGetUserVendorStatisticsQuery(undefined, {
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+  const { data: profileData } = useGetProfileQuery(undefined, {
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
@@ -362,46 +385,62 @@ const Dashboard: React.FC = () => {
     refetchOnReconnect: true,
   });
 
+  const buyerProfile = React.useMemo(() => {
+    const profileRoot = (profileData as any)?.data;
+    const reduxRoot = user as any;
+    return (
+      profileRoot?.buyer ||
+      (String(profileRoot?.userType || "").toLowerCase() === "buyer" ? profileRoot : null) ||
+      reduxRoot?.buyer ||
+      (String(reduxRoot?.userType || "").toLowerCase() === "buyer" ? reduxRoot : null) ||
+      null
+    );
+  }, [profileData, user]);
+
   const userName = React.useMemo(() => {
     const displayName =
+      (buyerProfile as any)?.fullName ||
+      (buyerProfile as any)?.fulllName ||
+      (buyerProfile as any)?.name ||
       (user as any)?.fullName ||
       (user as any)?.fulllName ||
-      (user as any)?.name ||
-      (user as any)?.buyer?.fullName ||
-      (user as any)?.vendor?.fullName ||
-      (user as any)?.storename ||
-      (user as any)?.businessName;
+      (user as any)?.name;
 
     if (displayName && String(displayName).trim()) return String(displayName).trim();
 
-    const email = (user as any)?.email;
+    const email = (buyerProfile as any)?.email || (user as any)?.email;
     if (email && String(email).includes("@")) return String(email).split("@")[0];
 
     return "User";
-  }, [user]);
+  }, [buyerProfile, user]);
 
-  const avatarUri =
-    (user as any)?.buyer?.profilePhotoUrl ||
-    (user as any)?.vendor?.logoUrl ||
-    (user as any)?.vendor?.logo ||
-    (user as any)?.avatar ||
-    (user as any)?.image ||
-    (user as any)?.logo ||
-    "https://xsgames.co/randomusers/assets/avatars/male/74.jpg";
+  const avatarUri = React.useMemo(
+    () =>
+      toAbsoluteImageUri(
+        (buyerProfile as any)?.profilePhotoUrl ||
+          (buyerProfile as any)?.avatar ||
+          (buyerProfile as any)?.image ||
+          (buyerProfile as any)?.photoUrl ||
+          (user as any)?.profilePhotoUrl ||
+          (user as any)?.avatar ||
+          (user as any)?.image,
+      ) || "https://xsgames.co/randomusers/assets/avatars/male/74.jpg",
+    [buyerProfile, user],
+  );
 
   const statsCards = React.useMemo(() => {
     const role = String(statsData?.role || "").toLowerCase();
     if (role === "vendor") {
       return [
-        { key: "sales", label: "Total Sales", value: formatMoney(statsData?.totalSales?.value), Icon: TrendingUp },
-        { key: "active", label: "Active Orders", value: String(toNumber(statsData?.activeOrders?.value)), Icon: Zap },
+        { key: "sales", label: t("total_sales", "Total Sales"), value: formatMoney(statsData?.totalSales?.value), Icon: TrendingUp },
+        { key: "active", label: t("active_orders", "Active Orders"), value: String(toNumber(statsData?.activeOrders?.value)), Icon: Zap },
       ];
     }
     return [
-      { key: "completed", label: "Completed Order", value: String(toNumber(statsData?.completedOrders)), Icon: TrendingUp },
-      { key: "active", label: "Active Orders", value: String(toNumber(statsData?.activeOrders)), Icon: Zap },
+      { key: "completed", label: t("completed_order", "Completed Order"), value: String(toNumber(statsData?.completedOrders)), Icon: TrendingUp },
+      { key: "active", label: t("active_orders", "Active Orders"), value: String(toNumber(statsData?.activeOrders)), Icon: Zap },
     ];
-  }, [statsData]);
+  }, [statsData, t]);
 
   const recentOrders = React.useMemo(() => {
     const sorted = [...ordersData].sort((a: any, b: any) => {
@@ -426,6 +465,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar
+        style="dark"
+        backgroundColor={styles.container.backgroundColor}
+        translucent={false}
+      />
       <View style={styles.header}>
         <View style={styles.userInfo}>
           <TouchableOpacity
@@ -440,7 +484,7 @@ const Dashboard: React.FC = () => {
             />
           </TouchableOpacity>
           <View style={styles.userText}>
-            <Text style={styles.welcomeTitle}>Welcome back</Text>
+            <Text style={styles.welcomeTitle}>{t("welcome_back", "Welcome back")}</Text>
             <Text style={styles.userName}>{userName}</Text>
           </View>
         </View>
@@ -475,9 +519,9 @@ const Dashboard: React.FC = () => {
         {/* QR Scan Section */}
         <View style={styles.qrSection}>
           <View style={styles.qrTextContent}>
-            <Text style={styles.qrTitle}>Scan Vendor QR Code</Text>
+            <Text style={styles.qrTitle}>{t("scan_vendor_qr_code", "Scan Vendor QR Code")}</Text>
             <Text style={styles.qrSubtitle}>
-              Connect with local vendors instantly
+              {t("connect_local_vendors", "Connect with local vendors instantly")}
             </Text>
           </View>
           <TouchableOpacity
@@ -491,23 +535,32 @@ const Dashboard: React.FC = () => {
 
         {/* How It Works Section */}
         <View style={styles.howItWorksCard}>
-          <Text style={styles.sectionTitleWhite}>How It Works</Text>
+          <Text style={styles.sectionTitleWhite}>{t("how_it_works", "How It Works")}</Text>
           <View style={styles.stepsList}>
             <Text style={styles.stepItem}>
-              1. Scan a vendor s QR code or barcode
+              {t("how_step_1", "1. Scan a vendor s QR code or barcode")}
             </Text>
             <Text style={styles.stepItem}>
-              2. Browse their catalog and chat directly
+              {t("how_step_2", "2. Browse their catalog and chat directly")}
             </Text>
             <Text style={styles.stepItem}>
-              3. Negotiate prices and place orders
+              {t("how_step_3", "3. Negotiate prices and place orders")}
             </Text>
-            <Text style={styles.stepItem}>4. Track delivery in real-time</Text>
+            <Text style={styles.stepItem}>{t("how_step_4", "4. Track delivery in real-time")}</Text>
           </View>
         </View>
 
+        <TouchableOpacity
+          style={styles.exploreButton}
+          onPress={() => router.push("/(users)/explore")}
+          activeOpacity={0.85}
+        >
+          <Compass size={22} color="#E9F7F5" />
+          <Text style={styles.exploreButtonText}>{t("explore", "Explore")}</Text>
+        </TouchableOpacity>
+
         {/* Recent Order Section (Updated) */}
-        <Text style={styles.sectionTitleMain}>Recent order</Text>
+        <Text style={styles.sectionTitleMain}>{t("recent_order", "Recent order")}</Text>
 
         <View style={{ gap: 15 }}>
           {recentOrders.length ? (
@@ -524,7 +577,7 @@ const Dashboard: React.FC = () => {
                 order?.vendor?.fullName ||
                 order?.vendor?.storename ||
                 order?.buyer?.fullName ||
-                "Customer";
+                t("customer", "Customer");
               const itemTitle =
                 firstItem?.product?.name ||
                 firstItem?.product?.title ||
@@ -550,19 +603,21 @@ const Dashboard: React.FC = () => {
                 />
                 <View style={styles.orderInfoContainer}>
                   <View style={styles.orderHeaderRow}>
-                    <Text style={styles.orderIdText}>{order?.orderNumber || `#${orderId}`}</Text>
+                    <Text style={styles.orderIdText} numberOfLines={1} ellipsizeMode="tail">
+                      {order?.orderNumber || `#${orderId}`}
+                    </Text>
                     <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}>
                       <Text style={[styles.statusText, { color: statusTheme.text }]}>{toTitle(status)}</Text>
                     </View>
                   </View>
 
                   <Text style={styles.orderAddress} numberOfLines={1}>
-                    {order?.shippingAddress || "Address unavailable"}
+                    {order?.shippingAddress || t("address_unavailable", "Address unavailable")}
                   </Text>
 
                   <View style={styles.ratingRow}>
                     <Star color="#FFD700" size={16} fill="#FFD700" />
-                    <Text style={styles.ratingText}>
+                    <Text style={styles.ratingText} numberOfLines={2} ellipsizeMode="tail">
                       {" 4.5 "}
                       <Text style={styles.reviewCount}>({order?.buyer?.id || order?.vendor?.id || "N/A"})</Text>
                     </Text>
@@ -583,7 +638,7 @@ const Dashboard: React.FC = () => {
               );
             })
           ) : (
-            <Text style={{ fontSize: 13, color: "#6B7280" }}>No recent orders found.</Text>
+            <Text style={{ fontSize: 13, color: "#6B7280" }}>{t("no_recent_orders_found", "No recent orders found.")}</Text>
           )}
         </View>
       </ScrollView>
@@ -594,6 +649,7 @@ const Dashboard: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FAF9" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -662,7 +718,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2D8C8C",
     borderRadius: 16,
     padding: 20,
-    marginBottom: 25,
+    marginBottom: 14,
   },
   sectionTitleWhite: {
     fontSize: 16,
@@ -672,6 +728,26 @@ const styles = StyleSheet.create({
   },
   stepsList: { gap: 10 },
   stepItem: { color: "#E0F2F2", fontSize: 14, lineHeight: 20 },
+  exploreButton: {
+    backgroundColor: "#2D8C8C",
+    borderRadius: 16,
+    minHeight: 58,
+    marginBottom: 25,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#1D6C6D",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  exploreButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F5FFFE",
+  },
   sectionTitleMain: {
     fontSize: 18,
     fontWeight: "700",
@@ -707,17 +783,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
   },
   orderIdText: {
     fontSize: 16,
     fontWeight: "700",
     color: "#333",
+    flex: 1,
+    flexShrink: 1,
+    marginRight: 8,
   },
   statusBadge: {
     backgroundColor: "#E8F0FE",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
+    flexShrink: 0,
+    alignSelf: "flex-start",
   },
   statusText: {
     fontSize: 11,
@@ -737,6 +819,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     color: "#333",
+    flex: 1,
+    flexShrink: 1,
   },
   reviewCount: {
     fontWeight: "400",

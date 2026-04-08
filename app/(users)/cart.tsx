@@ -1,48 +1,64 @@
-
 import { useGetCartQuery, useRemoveFromCartMutation, useUpdateCartItemMutation } from "@/store/api/cartApiSlice";
+import { useGetCouponsByVendorQuery } from "@/store/api/couponApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-}
-
-const { width } = Dimensions.get("window");
-
 const MyCart: React.FC = () => {
+  const { t } = useTranslation();
   const router = useRouter();
   const { data: cartData, isLoading, isError, refetch } = useGetCartQuery();
   const [updateCartItem] = useUpdateCartItemMutation();
   const [removeFromCart] = useRemoveFromCartMutation();
 
-  const cartItems = useMemo(() => {
-    const rawItems = cartData?.data?.items || cartData?.items || (Array.isArray(cartData) ? cartData : []);
-    console.log('Raw Cart Data:', JSON.stringify(cartData, null, 2));
-    console.log('Raw Items:', JSON.stringify(rawItems, null, 2));
+  const [promoCode, setPromoCode] = useState("");
+  const [promoError, setPromoError] = useState("");
+  const [appliedPromoCode, setAppliedPromoCode] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState(0);
 
-    return rawItems.map((item: any) => {
-      console.log('Processing item:', JSON.stringify(item, null, 2));
-      const mappedItem = {
-        id: item.id || item._id,
-        name: item.product?.name || item.product?.title || item.productId?.title || item.productId?.name || item.title || item.name || "Unknown Product",
-        price: parseFloat(item.product?.price || item.productId?.price || item.price || 0),
-        quantity: item.quantity,
-        image: item.product?.images?.[0] || item.product?.imageUrl || item.productId?.images?.[0] || item.productId?.image || item.image || "https://via.placeholder.com/150",
-      };
-      console.log('Mapped item:', mappedItem);
-      return mappedItem;
-    });
+  const rawItems = useMemo(() => {
+    return cartData?.data?.items || cartData?.items || (Array.isArray(cartData) ? cartData : []);
   }, [cartData]);
 
-  // 1. Modal state define kora hoyeche
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const activeVendorId = useMemo(() => {
+    const vendorIds = rawItems
+      .map((item: any) =>
+        item?.vendorId?.id ||
+        item?.vendorId?._id ||
+        item?.vendorId ||
+        item?.product?.vendorId?.id ||
+        item?.product?.vendorId?._id ||
+        item?.product?.vendorId ||
+        item?.product?.vendor?.id ||
+        item?.product?.vendor?._id ||
+        item?.productId?.vendorId?.id ||
+        item?.productId?.vendorId?._id ||
+        item?.productId?.vendorId ||
+        item?.productId?.vendor?.id ||
+        item?.productId?.vendor?._id
+      )
+      .filter(Boolean)
+      .map((id: any) => String(id));
+
+    return vendorIds.length ? vendorIds[0] : "";
+  }, [rawItems]);
+
+  const { data: vendorCoupons = [] } = useGetCouponsByVendorQuery(activeVendorId, {
+    skip: !activeVendorId,
+  });
+
+  const cartItems = useMemo(() => {
+    return rawItems.map((item: any) => ({
+      id: item.id || item._id,
+      name: item.product?.name || item.product?.title || item.productId?.title || item.productId?.name || item.title || item.name || t("cart_unknown_product", "Unknown Product"),
+      price: parseFloat(item.product?.price || item.productId?.price || item.price || 0),
+      quantity: item.quantity,
+      image: item.product?.images?.[0] || item.product?.imageUrl || item.productId?.images?.[0] || item.productId?.image || item.image || "https://via.placeholder.com/150",
+    }));
+  }, [rawItems, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,7 +79,7 @@ const MyCart: React.FC = () => {
     try {
       await updateCartItem({ itemId: id, quantity: newQty }).unwrap();
     } catch (err: any) {
-      Alert.alert("Error", err?.data?.message || "Failed to update quantity");
+      Alert.alert(t("error", "Error"), err?.data?.message || t("cart_failed_update_quantity", "Failed to update quantity"));
     }
   };
 
@@ -71,7 +87,7 @@ const MyCart: React.FC = () => {
     try {
       await removeFromCart(id).unwrap();
     } catch (err: any) {
-      Alert.alert("Error", err?.data?.message || "Failed to remove item");
+      Alert.alert(t("error", "Error"), err?.data?.message || t("cart_failed_remove_item", "Failed to remove item"));
     }
   };
 
@@ -79,14 +95,76 @@ const MyCart: React.FC = () => {
     (acc: number, item: any) => acc + item.price * item.quantity,
     0
   );
-  const tax: number = subtotal * TAX_RATE;
-  const total: number = subtotal + tax + SHIPPING_FEE;
 
-  // 2. Checkout handle korar function
-  const handleConfirmPurchase = () => {
-    setIsModalVisible(false);
-    router.push("/(users)/Information" as any);
+  const handleApplyPromo = () => {
+    const code = promoCode.trim();
+    setPromoError("");
+
+    if (!code) {
+      setPromoError(t("cart_enter_promo_code", "Please enter a promo code"));
+      return;
+    }
+
+    if (!activeVendorId) {
+      setPromoError(t("cart_promo_vendor_missing", "Promo cannot be applied for this cart"));
+      return;
+    }
+
+    const coupons = Array.isArray(vendorCoupons) ? vendorCoupons : [];
+    const match = coupons.find(
+      (coupon: any) => String(coupon?.code || "").trim().toLowerCase() === code.toLowerCase()
+    );
+
+    if (!match) {
+      setPromoError(t("cart_promo_invalid", "Invalid promo code"));
+      return;
+    }
+
+    if (match.isActive === false) {
+      setPromoError(t("cart_promo_inactive", "This promo code is inactive"));
+      return;
+    }
+
+    const now = new Date();
+    const validFromRaw = match.validFrom || match.startDate || match.fromDate;
+    const validUntilRaw = match.validUntil || match.endDate || match.toDate;
+    const validFrom = validFromRaw ? new Date(validFromRaw) : null;
+    const validUntil = validUntilRaw ? new Date(validUntilRaw) : null;
+
+    if ((validFrom && !Number.isNaN(validFrom.getTime()) && now < validFrom) || (validUntil && !Number.isNaN(validUntil.getTime()) && now > validUntil)) {
+      setPromoError(t("cart_promo_expired", "This promo code is expired"));
+      return;
+    }
+
+    const minPurchase = Number(match.minPurchaseAmount || match.minimumPurchase || 0);
+    if (subtotal < minPurchase) {
+      setPromoError(t("cart_promo_min_purchase", `Minimum purchase amount is $${minPurchase.toFixed(2)}`));
+      return;
+    }
+
+    const discountType = String(match.discountType || match.type || "").toLowerCase();
+    const discountValue = Number(match.discountValue || match.value || 0);
+    const rawDiscount =
+      discountType === "percentage" || discountType === "%"
+        ? (subtotal * discountValue) / 100
+        : discountValue;
+
+    const discount = Math.max(0, Math.min(rawDiscount, subtotal));
+
+    setAppliedPromoCode(match.code);
+    setAppliedDiscount(discount);
+    setPromoError("");
   };
+
+  const clearAppliedPromo = () => {
+    setAppliedPromoCode("");
+    setAppliedDiscount(0);
+    setPromoCode("");
+    setPromoError("");
+  };
+
+  const tax: number = subtotal * TAX_RATE;
+  const total: number = Math.max(0, subtotal + tax + SHIPPING_FEE - appliedDiscount);
 
   if (isLoading) {
     return (
@@ -100,50 +178,23 @@ const MyCart: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 3. Modal Design (Image onujayi) */}
-      <Modal
-        transparent={true}
-        visible={isModalVisible}
-        animationType="fade"
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Are you sure you want to buy this product?
-            </Text>
-
-            <View style={styles.modalButtonRow}>
-              <TouchableOpacity
-                style={styles.noBtn}
-                onPress={() => setIsModalVisible(false)}
-              >
-                <Text style={styles.noBtnText}>NO</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.yesBtn}
-                onPress={handleConfirmPurchase}
-              >
-                <Text style={styles.yesBtnText}>Yes</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Cart</Text>
+        <Text style={styles.headerTitle}>{t("cart_title", "My Cart")}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
+        {isError ? (
+          <Text style={styles.errorText}>{t("cart_failed_load", "Failed to load cart")}</Text>
+        ) : null}
+
         {cartItems.map((item: any) => (
           <View key={item.id} style={styles.cartCard}>
             <View style={styles.itemMainRow}>
@@ -163,7 +214,7 @@ const MyCart: React.FC = () => {
                       onPress={() => updateQuantity(item.id, "dec")}
                       style={styles.stepBtn}
                     >
-                      <Text style={styles.stepText}>—</Text>
+                      <Text style={styles.stepText}>-</Text>
                     </TouchableOpacity>
                     <Text style={styles.qtyText}>{item.quantity}</Text>
                     <TouchableOpacity
@@ -191,43 +242,76 @@ const MyCart: React.FC = () => {
 
         <View style={styles.summaryCard}>
           <View style={styles.promoBox}>
-            <Text style={styles.promoText}>YYt34uri</Text>
-            <View style={styles.promoApplied}>
-              <Text style={styles.appliedText}>Promo code applied</Text>
-              <Ionicons name="checkmark-circle" size={18} color="#349488" />
-            </View>
+            <TextInput
+              style={styles.promoInput}
+              value={promoCode}
+              onChangeText={setPromoCode}
+              placeholder={t("cart_enter_promo", "Enter promo code")}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!isLoading}
+              selectTextOnFocus
+              onFocus={() => setPromoError("")}
+              returnKeyType="done"
+              placeholderTextColor="#94A3B8"
+            />
+            <TouchableOpacity style={styles.applyBtn} onPress={handleApplyPromo}>
+              <Text style={styles.applyBtnText}>{t("product_details_apply", "Apply")}</Text>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionTitle}>Payment details</Text>
+          {promoError ? <Text style={styles.promoErrorText}>{promoError}</Text> : null}
+
+          {appliedPromoCode ? (
+            <View style={styles.promoAppliedRow}>
+              <View style={styles.promoApplied}>
+                <Text style={styles.promoText}>{appliedPromoCode}</Text>
+                <Ionicons name="checkmark-circle" size={18} color="#349488" />
+                <Text style={styles.appliedText}>{t("cart_promo_applied", "Promo code applied")}</Text>
+              </View>
+              <TouchableOpacity onPress={clearAppliedPromo}>
+                <Text style={styles.clearPromoText}>{t("cart_remove_promo", "Remove")}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>{t("order_details_payment_details", "Payment details")}</Text>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Subtotal</Text>
+            <Text style={styles.detailLabel}>{t("order_details_subtotal", "Subtotal")}</Text>
             <Text style={styles.detailValue}>${subtotal.toFixed(2)}</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Tax(7.5%)</Text>
+            <Text style={styles.detailLabel}>{t("order_details_tax", "Tax(7.5%)")}</Text>
             <Text style={styles.detailValue}>${tax.toFixed(2)}</Text>
           </View>
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Shipping</Text>
+            <Text style={styles.detailLabel}>{t("order_details_shipping", "Shipping")}</Text>
             <Text style={styles.detailValue}>${SHIPPING_FEE.toFixed(2)}</Text>
           </View>
+
+          {appliedDiscount > 0 ? (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>{t("order_details_discount", "Discount")}</Text>
+              <Text style={[styles.detailValue, { color: "#349488" }]}>-${appliedDiscount.toFixed(2)}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.divider} />
 
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>{t("chat_total_label", "Total")}</Text>
             <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
           </View>
 
           <TouchableOpacity
             style={styles.checkoutBtn}
-            onPress={() => setIsModalVisible(true)} // Modal open hobe
+            onPress={() => router.push("/(users)/Information" as any)}
           >
             <Text style={styles.checkoutBtnText}>
-              Checkout (${total.toFixed(2)})
+              {t("cart_checkout", "Checkout")} (${total.toFixed(2)})
             </Text>
           </TouchableOpacity>
         </View>
@@ -237,9 +321,9 @@ const MyCart: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  // ... (Apnar baki styles thakbe)
   safeArea: { flex: 1, backgroundColor: "#F8FBFB" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -249,6 +333,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: "center" },
   headerTitle: { fontSize: 20, fontWeight: "bold", color: "#333" },
   scrollContent: { padding: 16 },
+  errorText: { color: "#EF4444", marginBottom: 10, textAlign: "center" },
   cartCard: {
     backgroundColor: "#FFF",
     borderRadius: 15,
@@ -312,12 +397,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEE",
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 25,
+    padding: 10,
+    marginBottom: 8,
   },
-  promoText: { fontSize: 16, color: "#333", fontWeight: "500" },
+  promoInput: {
+    flex: 1,
+    height: 42,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: "#0F172A",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  applyBtn: {
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: "#349488",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 14,
+  },
+  applyBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
+  promoText: { fontSize: 16, color: "#333", fontWeight: "500", marginRight: 6 },
   promoApplied: { flexDirection: "row", alignItems: "center" },
-  appliedText: { color: "#349488", fontSize: 13, marginRight: 6 },
+  appliedText: { color: "#349488", fontSize: 13, marginLeft: 6 },
+  promoAppliedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  promoErrorText: { color: "#EF4444", fontSize: 12, marginBottom: 10 },
+  clearPromoText: { color: "#EF4444", fontSize: 13, fontWeight: "600" },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "bold",
@@ -354,63 +468,6 @@ const styles = StyleSheet.create({
   },
   checkoutBtnText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
 
-  // --- Modal Styles ---
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "85%",
-    backgroundColor: "#FFF",
-    borderRadius: 25,
-    padding: 25,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 30,
-    lineHeight: 28,
-  },
-  modalButtonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-  },
-  noBtn: {
-    flex: 1,
-    height: 50,
-    borderWidth: 1.5,
-    borderColor: "#FF6B6B",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  noBtnText: {
-    color: "#FF6B6B",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  yesBtn: {
-    flex: 1,
-    height: 50,
-    backgroundColor: "#349488",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10,
-  },
-  yesBtnText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
 });
 
 export default MyCart;
-

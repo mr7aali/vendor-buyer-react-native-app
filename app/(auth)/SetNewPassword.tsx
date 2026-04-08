@@ -1,4 +1,5 @@
 import { useSetNewPasswordScreenMutation } from "@/store/api/authApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Eye, EyeOff } from "lucide-react-native";
 import React, { useState } from "react";
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const SetNewPasswordScreen: React.FC = () => {
+  const { language } = useTranslation();
   const router = useRouter();
   const { email, otp } = useLocalSearchParams<{ email: string; otp: string }>();
   const [newPassword, setNewPassword] = useState<string>("");
@@ -24,30 +26,78 @@ const SetNewPasswordScreen: React.FC = () => {
     useState<boolean>(false);
 
   const [resetPassword, { isLoading }] = useSetNewPasswordScreenMutation();
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        backToLogin: "חזרה להתחברות",
+        setNewPassword: "הגדר סיסמה חדשה",
+        subtitle: "אנא הגדר סיסמה חדשה כדי להמשיך",
+        newPassword: "סיסמה חדשה",
+        confirmPassword: "אימות סיסמה",
+        updatePassword: "עדכן סיסמה",
+        updating: "מעדכן...",
+        missingEmailOtp: "חסר אימייל או OTP. נסה את התהליך מחדש.",
+        passwordsMismatch: "הסיסמאות אינן תואמות",
+        enterNewPassword: "נא להזין סיסמה חדשה",
+        passwordUpdated: "הסיסמה עודכנה בהצלחה!",
+        resetFailed: "האיפוס נכשל",
+      };
+    }
+    if (language === "hi") {
+      return {
+        backToLogin: "लॉगिन पर वापस जाएं",
+        setNewPassword: "नया पासवर्ड सेट करें",
+        subtitle: "जारी रखने के लिए कृपया नया पासवर्ड सेट करें",
+        newPassword: "नया पासवर्ड",
+        confirmPassword: "पासवर्ड पुष्टि करें",
+        updatePassword: "पासवर्ड अपडेट करें",
+        updating: "अपडेट हो रहा है...",
+        missingEmailOtp: "ईमेल या OTP गायब है। कृपया प्रक्रिया फिर से करें।",
+        passwordsMismatch: "पासवर्ड मेल नहीं खाते",
+        enterNewPassword: "कृपया नया पासवर्ड दर्ज करें",
+        passwordUpdated: "पासवर्ड सफलतापूर्वक अपडेट हो गया!",
+        resetFailed: "रीसेट विफल रहा",
+      };
+    }
+    return {
+      backToLogin: "Back to Login",
+      setNewPassword: "Set a new password",
+      subtitle: "Please set a new password for your account to continue",
+      newPassword: "New Password",
+      confirmPassword: "Confirm Password",
+      updatePassword: "Update Password",
+      updating: "Updating...",
+      missingEmailOtp: "Missing email or OTP. Please try the reset process again.",
+      passwordsMismatch: "Passwords do not match",
+      enterNewPassword: "Please enter a new password",
+      passwordUpdated: "Password updated successfully!",
+      resetFailed: "Reset failed",
+    };
+  }, [language]);
 
   const handleUpdatePassword = async () => {
     if (!email || !otp) {
-      alert("Missing email or OTP. Please try the reset process again.");
+      alert(ui.missingEmailOtp);
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert("Passwords do not match");
+      alert(ui.passwordsMismatch);
       return;
     }
     if (!newPassword) {
-      alert("Please enter a new password");
+      alert(ui.enterNewPassword);
       return;
     }
 
     try {
       // Prepare payload with email, newPassword, and confirmPassword as required by the backend
       await resetPassword({ email, otp, newPassword, confirmPassword }).unwrap();
-      alert("Password updated successfully!");
+      alert(ui.passwordUpdated);
       router.push("/(auth)/login");
     } catch (err) {
       console.error("Reset password failed", err);
-      alert("Reset failed: " + ((err as any)?.data?.message || "Unknown error"));
+      alert(`${ui.resetFailed}: ` + ((err as any)?.data?.message || "Unknown error"));
     }
   };
 
@@ -62,7 +112,7 @@ const SetNewPasswordScreen: React.FC = () => {
             size={28}
           />
         </TouchableOpacity>
-        <Text style={styles.navTitle}>Back to Login</Text>
+        <Text style={styles.navTitle}>{ui.backToLogin}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -76,9 +126,9 @@ const SetNewPasswordScreen: React.FC = () => {
         >
           {/* Titles Section */}
           <View style={styles.textContainer}>
-            <Text style={styles.title}>Set a new password</Text>
+            <Text style={styles.title}>{ui.setNewPassword}</Text>
             <Text style={styles.subtitle}>
-              Please set a new password for your account to continue
+              {ui.subtitle}
             </Text>
           </View>
 
@@ -88,7 +138,7 @@ const SetNewPasswordScreen: React.FC = () => {
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
-                placeholder="New Password"
+                placeholder={ui.newPassword}
                 placeholderTextColor="#999"
                 secureTextEntry={!showNewPassword}
                 value={newPassword}
@@ -110,7 +160,7 @@ const SetNewPasswordScreen: React.FC = () => {
             <View style={styles.inputWrapper}>
               <TextInput
                 style={styles.input}
-                placeholder="Confirm Password"
+                placeholder={ui.confirmPassword}
                 placeholderTextColor="#999"
                 secureTextEntry={!showConfirmPassword}
                 value={confirmPassword}
@@ -135,7 +185,7 @@ const SetNewPasswordScreen: React.FC = () => {
               onPress={handleUpdatePassword}
               disabled={isLoading}
             >
-              <Text style={styles.updateButtonText}>{isLoading ? "Updating..." : "Update Password"}</Text>
+              <Text style={styles.updateButtonText}>{isLoading ? ui.updating : ui.updatePassword}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

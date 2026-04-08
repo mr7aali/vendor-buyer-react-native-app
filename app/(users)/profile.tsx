@@ -1,6 +1,9 @@
-import { useGetProfileQuery } from "@/store/api/authApiSlice";
-import { useAppDispatch } from "@/store/hooks";
-import { logOut } from "@/store/slices/authSlice";
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
+import { persistAuthState } from "@/services/authStorage";
+import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
+import { apiSlice } from "@/store/api/apiSlice";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { logOut, selectAvailableProfiles, setCredentials } from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -10,26 +13,33 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "../../hooks/use-translation";
 
 const ProfileScreen = () => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const [isBusinessProfile, setIsBusinessProfile] = useState(false);
+  const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
   const { data: profileData } = useGetProfileQuery({});
   const displayUser = profileData?.data;
 
   const onLogout = async () => {
     setShowLogoutModal(false);
     try {
+      const accessToken = await AsyncStorage.getItem("accessToken");
+      await unregisterPushTokenFromBackend(accessToken);
+
       // Clear AsyncStorage
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('userRole');
       await AsyncStorage.removeItem('userType');
+      await AsyncStorage.removeItem('availableProfiles');
 
       // Clear Redux state
       dispatch(logOut());
@@ -46,9 +56,57 @@ const ProfileScreen = () => {
     setShowSwitchModal(true);
   };
 
-  const onConfirmSwitch = () => {
-    setIsBusinessProfile(!isBusinessProfile);
+  const onConfirmSwitch = async () => {
     setShowSwitchModal(false);
+
+    try {
+      const response = await switchProfile("vendor").unwrap();
+      const payload = response?.data || response;
+
+      if (!payload?.accessToken || !payload?.user) {
+        throw new Error("Invalid switch profile response");
+      }
+
+      const normalizedUser = { ...payload.user, userType: "vendor" };
+      const nextAvailableProfiles = payload.availableProfiles || availableProfiles || null;
+
+      dispatch(apiSlice.util.resetApiState());
+      dispatch(
+        setCredentials({
+          user: normalizedUser,
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken || null,
+          availableProfiles: nextAvailableProfiles,
+        })
+      );
+
+      await persistAuthState({
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken || null,
+        user: normalizedUser,
+        availableProfiles: nextAvailableProfiles,
+      });
+
+      router.replace("/(tabs)");
+    } catch (error: any) {
+      const message = String(error?.data?.message || error?.message || "");
+
+      if (error?.status === 400) {
+        Alert.alert(
+          t("switch_profile", "Switch profile"),
+          message || "Vendor profile is not available. Please complete vendor registration first.",
+          [
+            {
+              text: t("ok", "OK"),
+              onPress: () => router.replace("/(screens)/CompleteProfileScreen"),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert(t("error", "Error"), message || "Failed to switch profile");
+    }
   };
 
   const ConfirmationModal = ({
@@ -75,7 +133,7 @@ const ProfileScreen = () => {
               style={{ flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", marginHorizontal: 5, backgroundColor: "#F5F5F5" }}
               onPress={onClose}
             >
-              <Text style={{ color: "#333", fontWeight: "bold" }}>Cancel</Text>
+              <Text style={{ color: "#333", fontWeight: "bold" }}>{t("cancel", "Cancel")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{ flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", marginHorizontal: 5, backgroundColor: confirmColor }}
@@ -95,10 +153,8 @@ const ProfileScreen = () => {
       displayUser?.buyer?.avatar ||
       displayUser?.avatar ||
       displayUser?.image ||
-      displayUser?.logo ||
-      "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
+      displayUser?.logo,
   };
-
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <ScrollView
@@ -143,7 +199,7 @@ const ProfileScreen = () => {
               marginBottom: 20,
             }}
           >
-            Account Information
+            {t("account_information", "Account Information")}
           </Text>
 
 
@@ -172,10 +228,10 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Personal info
+                {t("personal_info", "Personal info")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push("/(user_screen)/BuyerTransactionHistoryScreen")}
@@ -201,10 +257,10 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Transaction History
+                {t("transaction_history", "Transaction History")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 
@@ -231,10 +287,9 @@ const ProfileScreen = () => {
               marginBottom: 20,
             }}
           >
-            Setting
+            {t("setting", "Setting")}
           </Text>
 
-          {/* Switch Profile */}
           <View
             style={{
               flexDirection: "row",
@@ -258,15 +313,16 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Switch profile
+                {t("switch_profile", "Switch profile")}
               </Text>
             </View>
             <Switch
               trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-              thumbColor={isBusinessProfile ? "#278687" : "#fff"}
+              thumbColor="#278687"
               ios_backgroundColor="#3e3e3e"
               onValueChange={toggleSwitch}
-              value={isBusinessProfile}
+              value={false}
+              disabled={isSwitchingProfile}
             />
           </View>
 
@@ -296,10 +352,10 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Permission
+                {t("permission", "Permission")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
           {/* Settings Link */}
           <TouchableOpacity
@@ -326,10 +382,39 @@ const ProfileScreen = () => {
                   fontWeight: "500",
                 }}
               >
-                Settings
+                {t("settings", "Settings")}
               </Text>
             </View>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="black" />
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push("/(screens)/language")}
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingVertical: 14,
+              }}
+            >
+              <Ionicons name="language-outline" size={26} color="#4B5563" />
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: "#4B5563",
+                  marginLeft: 14,
+                  fontWeight: "500",
+                }}
+              >
+                {t("language", "Language")}
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
           </TouchableOpacity>
         </View>
 
@@ -358,7 +443,7 @@ const ProfileScreen = () => {
               fontWeight: "600",
             }}
           >
-            Log Out
+            {t("logout", "Log Out")}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -368,9 +453,9 @@ const ProfileScreen = () => {
         visible={showSwitchModal}
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
-        title="Switch Profile?"
-        subtitle={`Are you sure you want to switch to ${isBusinessProfile ? "Personal" : "Business"} profile?`}
-        confirmText="Confirm"
+        title={t("switch_profile_q", "Switch Profile?")}
+        subtitle={t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
+        confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />
 
@@ -379,9 +464,9 @@ const ProfileScreen = () => {
         visible={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
         onConfirm={onLogout}
-        title="Log Out?"
-        subtitle="Are you sure you want to log out?"
-        confirmText="Log Out"
+        title={t("logout_q", "Log Out?")}
+        subtitle={t("logout_desc", "Are you sure you want to log out?")}
+        confirmText={t("logout", "Log Out")}
         confirmColor="#FF3B30"
       />
     </SafeAreaView >

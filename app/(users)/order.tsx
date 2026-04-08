@@ -1,3 +1,4 @@
+﻿import { useTranslation } from "@/hooks/use-translation";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -9,7 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -22,9 +23,12 @@ const toNumber = (value: any, fallback = 0) => {
 
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 
-const getOrderItems = (order: any) => (Array.isArray(order?.orderItems) ? order.orderItems : []);
+const getOrderItems = (order: any) =>
+  Array.isArray(order?.orderItems) ? order.orderItems : [];
 const isProductPayload = (order: any) =>
-  !!order && !Array.isArray(order?.orderItems) && (order?.name || order?.price || order?.images?.length);
+  !!order &&
+  !Array.isArray(order?.orderItems) &&
+  (order?.name || order?.price || order?.images?.length);
 
 const getPrimaryItem = (order: any) => getOrderItems(order)[0];
 
@@ -43,7 +47,35 @@ const getProductImage = (order: any) => {
 
 const getProductName = (order: any) => {
   const item = getPrimaryItem(order);
-  return order?.name || order?.title || item?.product?.name || item?.productName || item?.name || item?.title || "Product";
+  return (
+    order?.name ||
+    order?.title ||
+    item?.product?.name ||
+    item?.productName ||
+    item?.name ||
+    item?.title ||
+    ""
+  );
+};
+
+const resolveEntityId = (value: any): string => {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+    if (typeof value._id === "string" || typeof value._id === "number") return String(value._id);
+  }
+  return "";
+};
+
+const getProductId = (order: any) => {
+  const item = getPrimaryItem(order);
+  return (
+    resolveEntityId(order?.product) ||
+    resolveEntityId(order?.productId) ||
+    resolveEntityId(item?.product) ||
+    resolveEntityId(item?.productId) ||
+    ""
+  );
 };
 
 const getOrderCode = (order: any) => {
@@ -52,19 +84,19 @@ const getOrderCode = (order: any) => {
 };
 
 const getShippingAddress = (order: any) => {
-  if (isProductPayload(order)) {
-    return order?.description || `SKU: ${order?.sku || "N/A"}`;
-  }
+  if (isProductPayload(order)) return order?.description || "";
   if (typeof order?.shippingAddress === "string" && order.shippingAddress.trim()) {
     return order.shippingAddress;
   }
   const addr = order?.shippingAddress;
   if (addr && typeof addr === "object") {
-    return [addr.addressLine1, addr.addressLine2, addr.city, addr.state, addr.postalCode]
-      .filter(Boolean)
-      .join(", ") || "N/A";
+    return (
+      [addr.addressLine1, addr.addressLine2, addr.city, addr.state, addr.postalCode]
+        .filter(Boolean)
+        .join(", ") || ""
+    );
   }
-  return "N/A";
+  return "";
 };
 
 const getOrderTotal = (order: any) => {
@@ -79,21 +111,37 @@ const getOrderTotal = (order: any) => {
   }, 0);
 };
 
-const getBottomLabel = (order: any) => {
+const getBottomLabel = (
+  order: any,
+  t: (key: string, fallback?: string) => string,
+) => {
   const items = getOrderItems(order);
   if (!items.length && isProductPayload(order)) {
-    return `Stock: ${order?.stockQuantity ?? 0} • SKU: ${order?.sku || "N/A"}`;
+    return `${t("orders_stock", "Stock")}: ${order?.stockQuantity ?? 0} • SKU: ${
+      order?.sku || t("orders_na", "N/A")
+    }`;
   }
-  if (!items.length) return "0 items";
-  const firstName = getProductName(order);
-  if (items.length === 1) return `1 item • ${firstName}`;
-  return `${items.length} items • ${firstName} +${items.length - 1} more`;
+  if (!items.length) return `0 ${t("orders_items_label", "items")}`;
+  const firstName = getProductName(order) || t("orders_product_fallback", "Product");
+  if (items.length === 1) return `1 ${t("orders_item_label", "item")} • ${firstName}`;
+  return `${items.length} ${t("orders_items_label", "items")} • ${firstName} +${
+    items.length - 1
+  } ${t("orders_more", "more")}`;
 };
 
 const normalizeStatus = (status?: string) => {
-  if (!status) return "";
-  if (status === "Cancelled") return "Canceled";
-  return status;
+  const raw = String(status || "").trim().toLowerCase();
+  if (!raw) return "";
+
+  // Unify backend variants to UI filter buckets
+  if (raw === "delivered" || raw === "complete" || raw === "completed") return "Delivered";
+  if (raw === "processing" || raw === "in_progress" || raw === "in progress") return "Processing";
+  if (raw === "shipped" || raw === "shipping" || raw === "out_for_delivery" || raw === "out for delivery") return "Shipped";
+  if (raw === "canceled" || raw === "cancelled") return "Canceled";
+  if (raw === "pending") return "Pending";
+
+  // Fallback: title case
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
 const getDisplayStatus = (item: any) => {
@@ -105,6 +153,7 @@ const getDisplayStatus = (item: any) => {
 };
 
 export default function OrdersScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState("All");
   const filters = ["All", "Delivered", "Processing", "Shipped", "Canceled"];
@@ -115,7 +164,7 @@ export default function OrdersScreen() {
   const filteredOrders =
     activeFilter === "All"
       ? orders
-      : orders.filter((o: any) => getDisplayStatus(o) === activeFilter);
+      : orders.filter((o: any) => normalizeStatus(getDisplayStatus(o)) === activeFilter);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -135,7 +184,7 @@ export default function OrdersScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-        <Text>Loading orders...</Text>
+        <Text>{t("orders_loading", "Loading orders...")}</Text>
       </SafeAreaView>
     );
   }
@@ -146,13 +195,17 @@ export default function OrdersScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Orders</Text>
+        <Text style={styles.headerTitle}>{t("orders_title", "Orders")}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#999" />
-        <TextInput placeholder="Search......" style={styles.searchInput} />
+        <TextInput
+          placeholder={t("orders_search", "Search......")}
+          placeholderTextColor="#9CA3AF"
+          style={styles.searchInput}
+        />
       </View>
 
       <View style={{ height: 50, marginBottom: 10 }}>
@@ -164,18 +217,12 @@ export default function OrdersScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => setActiveFilter(item)}
-              style={[
-                styles.filterBtn,
-                activeFilter === item && styles.filterBtnActive,
-              ]}
+              style={[styles.filterBtn, activeFilter === item && styles.filterBtnActive]}
             >
               <Text
-                style={[
-                  styles.filterText,
-                  activeFilter === item && { color: "#FFF" },
-                ]}
+                style={[styles.filterText, activeFilter === item && { color: "#FFF" }]}
               >
-                {item}
+                {t(`orders_filter_${item.toLowerCase()}`, item)}
               </Text>
             </TouchableOpacity>
           )}
@@ -191,17 +238,17 @@ export default function OrdersScreen() {
             onPress={() =>
               router.push({
                 pathname: "/(user_screen)/OrderDetails",
-                params: { id: item._id || item.id, status: item.status },
+                params: {
+                  id: item._id || item.id,
+                  status: item.status,
+                  productId: getProductId(item),
+                  productName: getProductName(item) || "",
+                },
               })
             }
           >
             <View style={styles.cardTop}>
-              <Image
-                source={{
-                  uri: getProductImage(item),
-                }}
-                style={styles.img}
-              />
+              <Image source={{ uri: getProductImage(item) }} style={styles.img} />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <View style={styles.row}>
                   <Text style={styles.orderNo}>{getOrderCode(item)}</Text>
@@ -218,11 +265,14 @@ export default function OrdersScreen() {
                         fontWeight: "700",
                       }}
                     >
-                      {getDisplayStatus(item)}
+                      {t(
+                        `orders_filter_${String(getDisplayStatus(item)).toLowerCase()}`,
+                        getDisplayStatus(item),
+                      )}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.address}>{getShippingAddress(item)}</Text>
+                <Text style={styles.address}>{getShippingAddress(item) || t("orders_na", "N/A")}</Text>
                 <View style={styles.row}>
                   <Ionicons name="time-outline" size={14} color="#666" />
                   <Text style={styles.rating}>
@@ -233,9 +283,11 @@ export default function OrdersScreen() {
             </View>
             <View style={styles.cardBottom}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.customer}>{item.vendor?.name || item.category?.name || item.storeName || "Store"}</Text>
+                <Text style={styles.customer}>
+                  {item.vendor?.name || item.category?.name || item.storeName || t("orders_store_fallback", "Store")}
+                </Text>
                 <Text numberOfLines={1} style={{ color: "#2A8383", fontSize: 12, marginTop: 2 }}>
-                  {getBottomLabel(item)}
+                  {getBottomLabel(item, t)}
                 </Text>
               </View>
               <Text style={styles.price}>{formatMoney(getOrderTotal(item))}</Text>
@@ -250,12 +302,13 @@ export default function OrdersScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FBF9" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 16,
     alignItems: "center",
   },
-  headerTitle: { fontSize: 18, fontWeight: "700" },
+  headerTitle: { fontSize: 22, fontWeight: "700" },
   searchContainer: {
     flexDirection: "row",
     backgroundColor: "#FFF",
@@ -266,7 +319,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EEE",
   },
-  searchInput: { marginLeft: 10, flex: 1 },
+  searchInput: { marginLeft: 10, flex: 1, color: "#1F2937" },
   filterBtn: {
     paddingHorizontal: 16,
     paddingVertical: 8,

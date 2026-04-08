@@ -1,4 +1,5 @@
 import { useDeactivateCouponMutation, useGetCouponsByVendorQuery } from "@/store/api/couponApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
 import { RootState } from "@/store/store";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -27,6 +28,7 @@ const CouponCard = ({
   minSpend,
   discount,
   onDelete,
+  labels,
 }: any) => {
   return (
     <View style={[styles.couponContainer, { borderColor: color }]}>
@@ -44,7 +46,7 @@ const CouponCard = ({
       <View style={styles.couponContent}>
         <View style={styles.topRow}>
           <View style={styles.codeRow}>
-            <Text style={styles.codeLabel}>Code:{code}</Text>
+            <Text style={styles.codeLabel}>{`${labels.code}: ${code}`}</Text>
             <TouchableOpacity hitSlop={10}>
               <MaterialCommunityIcons
                 name="content-copy"
@@ -64,7 +66,7 @@ const CouponCard = ({
           <View style={styles.infoBox}>
             <Ionicons name="time-outline" size={16} color="#666" />
             <View style={{ marginLeft: 6 }}>
-              <Text style={styles.infoLabel}>Valid until</Text>
+              <Text style={styles.infoLabel}>{labels.validUntil}</Text>
               <Text style={styles.infoValue}>{expiry}</Text>
             </View>
           </View>
@@ -72,7 +74,7 @@ const CouponCard = ({
           <View style={styles.infoBox}>
             <Ionicons name="bag-handle-outline" size={16} color="#666" />
             <View style={{ marginLeft: 6 }}>
-              <Text style={styles.infoLabel}>Min. transaction</Text>
+              <Text style={styles.infoLabel}>{labels.minTransaction}</Text>
               <Text style={styles.infoValue}>${minSpend}</Text>
             </View>
           </View>
@@ -91,6 +93,7 @@ const CouponCard = ({
 };
 
 const MakeCoupon: React.FC = () => {
+  const { language, t } = useTranslation();
   const router = useRouter();
   const user = useSelector((state: RootState) => state.auth.user);
   const vendorId = user?.userId || user?.id || "";
@@ -100,21 +103,49 @@ const MakeCoupon: React.FC = () => {
   });
   const [deactivateCoupon] = useDeactivateCouponMutation();
 
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        deleteCoupon: "מחיקת קופון",
+        deleteCouponConfirm: "האם למחוק את הקופון? פעולה זו בלתי הפיכה.",
+        failedLoadCoupons: "טעינת הקופונים נכשלה. נסו שוב.",
+        noCouponsYet: "עדיין אין קופונים",
+        tapToCreateFirst: "לחצו על + כדי ליצור קופון ראשון",
+      };
+    }
+    if (language === "hi") {
+      return {
+        deleteCoupon: "कूपन हटाएं",
+        deleteCouponConfirm: "क्या आप इस कूपन को हटाना चाहते हैं? यह क्रिया वापस नहीं होगी।",
+        failedLoadCoupons: "कूपन लोड नहीं हुए। कृपया फिर से प्रयास करें।",
+        noCouponsYet: "अभी तक कोई कूपन नहीं",
+        tapToCreateFirst: "अपना पहला कूपन बनाने के लिए + दबाएं",
+      };
+    }
+    return {
+      deleteCoupon: "Delete Coupon",
+      deleteCouponConfirm: "Are you sure you want to delete this coupon? This action cannot be undone.",
+      failedLoadCoupons: "Failed to load coupons. Please try again.",
+      noCouponsYet: "No coupons yet",
+      tapToCreateFirst: "Tap + to create your first coupon",
+    };
+  }, [language]);
+
   const handleDelete = (id: string) => {
     Alert.alert(
-      "Delete Coupon",
-      "Are you sure you want to delete this coupon? This action cannot be undone.",
+      ui.deleteCoupon,
+      ui.deleteCouponConfirm,
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("cancel", "Cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("notif_delete", "Delete"),
           style: "destructive",
           onPress: async () => {
             try {
               await deactivateCoupon(id).unwrap();
             } catch (err) {
               console.error("Failed to deactivate coupon:", err);
-              Alert.alert("Error", "Failed to delete coupon. Please try again.");
+              Alert.alert(t("error", "Error"), t("notif_failed_delete", "Failed to delete notification"));
             }
           }
         }
@@ -137,17 +168,17 @@ const MakeCoupon: React.FC = () => {
     console.log('MakeCoupon - mapping coupons, count:', couponsData.length);
     return couponsData
       .filter(c => c.isActive) // Only show active coupons
-      .map((coupon) => ({
+        .map((coupon) => ({
         id: coupon.id,
-        type: coupon.discountType === 'percentage' ? 'DISCOUNT' : 'CASHBACK',
+        type: coupon.discountType === 'percentage' ? t("chat_coupon_discount", "DISCOUNT") : t("chat_coupon_cashback", "CASHBACK"),
         color: coupon.discountType === 'percentage' ? '#FF9100' : '#FF4B6E',
         code: coupon.code,
-        description: `${coupon.discountType === 'percentage' ? 'DISCOUNT' : 'CASHBACK'} on Orders Over $${coupon.minPurchaseAmount || 0}`,
-        expiry: new Date(coupon.validUntil).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+        description: `${coupon.discountType === 'percentage' ? t("chat_coupon_discount", "DISCOUNT") : t("chat_coupon_cashback", "CASHBACK")} on Orders Over $${coupon.minPurchaseAmount || 0}`,
+        expiry: new Date(coupon.validUntil).toLocaleDateString(language === "he" ? "he-IL" : language === "hi" ? "hi-IN" : "en-US", { year: 'numeric', month: 'short', day: 'numeric' }),
         minSpend: coupon.minPurchaseAmount?.toString() || "0",
         discount: coupon.discountValue.toString(),
       }));
-  }, [couponsData]);
+  }, [couponsData, language, t]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,7 +189,7 @@ const MakeCoupon: React.FC = () => {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Make a Coupon</Text>
+        <Text style={styles.headerTitle}>{t("make_coupon", "Make a Coupon")}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => router.replace("/(screens)/MakeNewCoupon")}
@@ -173,7 +204,7 @@ const MakeCoupon: React.FC = () => {
         </View>
       ) : error ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ color: '#666', textAlign: 'center' }}>Failed to load coupons. Please try again.</Text>
+          <Text style={{ color: '#666', textAlign: 'center' }}>{ui.failedLoadCoupons}</Text>
         </View>
       ) : (
         <ScrollView
@@ -182,12 +213,21 @@ const MakeCoupon: React.FC = () => {
         >
           {coupons.length === 0 ? (
             <View style={{ padding: 40, alignItems: 'center' }}>
-              <Text style={{ color: '#666', fontSize: 16 }}>No coupons yet</Text>
-              <Text style={{ color: '#999', fontSize: 14, marginTop: 8 }}>Tap + to create your first coupon</Text>
+              <Text style={{ color: '#666', fontSize: 16 }}>{ui.noCouponsYet}</Text>
+              <Text style={{ color: '#999', fontSize: 14, marginTop: 8 }}>{ui.tapToCreateFirst}</Text>
             </View>
           ) : (
             coupons.map((item) => (
-              <CouponCard key={item.id} {...item} onDelete={handleDelete} />
+              <CouponCard
+                key={item.id}
+                {...item}
+                onDelete={handleDelete}
+                labels={{
+                  code: t("chat_coupon_code", "Code"),
+                  validUntil: t("chat_coupon_limited_time", "Limited Time"),
+                  minTransaction: t("chat_coupon_min_spend", "Min. Spend"),
+                }}
+              />
             ))
           )}
         </ScrollView>
@@ -199,6 +239,7 @@ const MakeCoupon: React.FC = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F8FBFB" },
   header: {
+    direction: 'ltr',
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
