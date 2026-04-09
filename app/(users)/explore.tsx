@@ -1,4 +1,5 @@
 import { useTranslation } from "@/hooks/use-translation";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import {
   useConnectToVendorMutation,
@@ -51,6 +52,27 @@ const resolveChatTargetFromVendor = (vendor: any) => ({
   vendorId: normalizeId(vendor?.id || vendor?.vendor?.id),
   name: getVendorDisplayName(vendor),
 });
+
+const ExploreGridSkeleton = () => (
+  <View style={styles.grid}>
+    {Array.from({ length: 6 }).map((_, index) => (
+      <View key={`explore-skeleton-${index}`} style={styles.card}>
+        <SkeletonBlock style={styles.cardImage} />
+        <SkeletonBlock style={styles.skeletonTitle} />
+        <SkeletonBlock style={styles.skeletonSubtitlePrimary} />
+        <SkeletonBlock style={styles.skeletonSubtitleSecondary} />
+
+        <View style={styles.metaRow}>
+          <SkeletonBlock style={styles.skeletonMetaBadge} />
+          <SkeletonBlock style={styles.skeletonMetaBadge} />
+          <SkeletonBlock style={styles.skeletonMetaBadge} />
+        </View>
+
+        <SkeletonBlock style={styles.skeletonButton} />
+      </View>
+    ))}
+  </View>
+);
 
 export default function ExploreScreen() {
   const { t } = useTranslation();
@@ -256,12 +278,7 @@ export default function ExploreScreen() {
         showsVerticalScrollIndicator={false}
       >
         {isLoading || isFetching ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator size="large" color="#2B6E6F" />
-            <Text style={styles.stateText}>
-              {t("explore_loading_vendors", "Loading vendors...")}
-            </Text>
-          </View>
+          <ExploreGridSkeleton />
         ) : vendors.length ? (
           <View style={styles.grid}>{vendors.map(renderVendorCard)}</View>
         ) : (
@@ -364,6 +381,13 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 4,
   },
+  skeletonTitle: {
+    width: "76%",
+    height: 16,
+    borderRadius: 8,
+    alignSelf: "center",
+    marginTop: 2,
+  },
   cardSubtitle: {
     fontSize: 12,
     lineHeight: 17,
@@ -374,11 +398,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 4,
   },
+  skeletonSubtitlePrimary: {
+    width: "92%",
+    height: 12,
+    borderRadius: 6,
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  skeletonSubtitleSecondary: {
+    width: "72%",
+    height: 12,
+    borderRadius: 6,
+    alignSelf: "center",
+    marginTop: 8,
+    marginBottom: 10,
+  },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 6,
     marginBottom: 10,
+  },
+  skeletonMetaBadge: {
+    flex: 1,
+    minHeight: 30,
+    borderRadius: 12,
   },
   metaBadge: {
     flex: 1,
@@ -404,6 +448,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#ECFBF9",
     justifyContent: "center",
     alignItems: "center",
+  },
+  skeletonButton: {
+    minHeight: 48,
+    borderRadius: 16,
   },
   cardButtonConnected: {
     backgroundColor: "#2B6E6F",

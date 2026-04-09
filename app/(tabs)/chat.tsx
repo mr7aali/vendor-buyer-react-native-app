@@ -1,4 +1,5 @@
 import { supportTickets } from "@/constants/common";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   useGetConversationsQuery,
@@ -100,6 +101,24 @@ const formatTime = (value: any) => {
     .toLowerCase();
 };
 
+const ChatListSkeleton = () => (
+  <View style={styles.listWrap}>
+    {Array.from({ length: 7 }).map((_, index) => (
+      <View key={`chat-skeleton-${index}`} style={styles.row}>
+        <SkeletonBlock style={styles.skeletonAvatar} />
+        <View style={styles.middle}>
+          <SkeletonBlock style={styles.skeletonName} />
+          <SkeletonBlock style={styles.skeletonPreview} />
+        </View>
+        <View style={styles.right}>
+          <SkeletonBlock style={styles.skeletonTime} />
+          <SkeletonBlock style={styles.skeletonBadge} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
 export default function ChatTabs() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -196,13 +215,12 @@ export default function ChatTabs() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "chat" ? (
-          <View style={styles.listWrap}>
-            {isConversationsLoading ? (
-              <Text style={styles.emptyText}>
-                {t("chat_loading_conversations", "Loading conversations...")}
-              </Text>
-            ) : filteredConversations.length ? (
-              filteredConversations.map((conversation: any, index: number) => {
+          isConversationsLoading ? (
+            <ChatListSkeleton />
+          ) : (
+            <View style={styles.listWrap}>
+              {filteredConversations.length ? (
+                filteredConversations.map((conversation: any, index: number) => {
                 const partner = resolveConversationPartner(
                   conversation,
                   currentUserId,
@@ -291,13 +309,14 @@ export default function ChatTabs() {
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            ) : (
-              <Text style={styles.emptyText}>
-                {t("chat_no_conversations_found", "No conversations found.")}
-              </Text>
-            )}
-          </View>
+                })
+              ) : (
+                <Text style={styles.emptyText}>
+                  {t("chat_no_conversations_found", "No conversations found.")}
+                </Text>
+              )}
+            </View>
+          )
         ) : (
           <View style={styles.listWrap}>
             {filteredTickets.map((ticket) => (
@@ -399,6 +418,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  skeletonAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  skeletonName: {
+    width: "62%",
+    height: 14,
+    borderRadius: 7,
+  },
+  skeletonPreview: {
+    width: "88%",
+    height: 12,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  skeletonTime: {
+    width: 38,
+    height: 10,
+    borderRadius: 5,
+    alignSelf: "flex-end",
+  },
+  skeletonBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginTop: 10,
+    alignSelf: "flex-end",
+  },
   emptyText: {
     textAlign: "center",
     color: "#6B7280",

@@ -1,4 +1,5 @@
 import { useTranslation } from "@/hooks/use-translation";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useSocket } from "@/context/SocketContext";
 import socketService from "@/services/socket";
 import { useGetCategoriesByVendorQuery } from "@/store/api/categoryApiSlice";
@@ -404,6 +405,65 @@ const CouponModal = ({ visible, onClose, onSelect, coupons, labels }: any) => (
   </Modal>
 );
 
+const ChatThreadSkeleton = () => (
+  <View style={styles.chatList}>
+    {Array.from({ length: 6 }).map((_, index) => {
+      const isOwn = index % 2 === 1;
+      return (
+        <View
+          key={`chat-thread-skeleton-${index}`}
+          style={[styles.messageRow, isOwn ? styles.rowReverse : {}]}
+        >
+          {!isOwn && <SkeletonBlock style={styles.skeletonMsgAvatar} />}
+          <View style={[styles.bubbleWrapper, isOwn ? styles.alignEnd : styles.alignStart]}>
+            <SkeletonBlock
+              style={[
+                styles.skeletonBubble,
+                isOwn ? styles.skeletonBubbleOwn : styles.skeletonBubbleOther,
+                index % 3 === 0 && styles.skeletonBubbleShort,
+              ]}
+            />
+            <SkeletonBlock
+              style={[
+                styles.skeletonTimestamp,
+                isOwn ? styles.skeletonTimestampOwn : styles.skeletonTimestampOther,
+              ]}
+            />
+          </View>
+        </View>
+      );
+    })}
+  </View>
+);
+
+const CategoryGridSkeleton = () => (
+  <ScrollView contentContainerStyle={styles.skeletonPanelContent} showsVerticalScrollIndicator={false}>
+    <View style={styles.skeletonCategoryGrid}>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <View key={`category-skeleton-${index}`} style={styles.categoryCard}>
+          <SkeletonBlock style={styles.skeletonCategoryImage} />
+          <SkeletonBlock style={styles.skeletonCategoryLabel} />
+        </View>
+      ))}
+    </View>
+  </ScrollView>
+);
+
+const OrderHistorySkeleton = () => (
+  <ScrollView contentContainerStyle={styles.skeletonPanelContent} showsVerticalScrollIndicator={false}>
+    {Array.from({ length: 4 }).map((_, index) => (
+      <View key={`order-skeleton-${index}`} style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <SkeletonBlock style={styles.skeletonOrderNo} />
+          <SkeletonBlock style={styles.skeletonOrderStatus} />
+        </View>
+        <SkeletonBlock style={styles.skeletonOrderDate} />
+        <SkeletonBlock style={styles.skeletonOrderTotal} />
+      </View>
+    ))}
+  </ScrollView>
+);
+
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -429,10 +489,11 @@ const ChatBox: React.FC = () => {
     explicitPartnerId,
   );
 
-  const { data: conversationsData } = useGetConversationsQuery(currentUserId, {
-    skip: !currentUserId,
-    refetchOnMountOrArgChange: true,
-  });
+  const { data: conversationsData, isLoading: isConversationsLoading } =
+    useGetConversationsQuery(currentUserId, {
+      skip: !currentUserId,
+      refetchOnMountOrArgChange: true,
+    });
 
   // If we only have a conversationId, try to find the partner ID from conversations
   React.useEffect(() => {
@@ -611,6 +672,8 @@ const ChatBox: React.FC = () => {
 
   const displayName = partnerData.name || t("chat_partner_fallback", "Partner");
   const partnerAvatar = partnerData.avatar;
+  const shouldShowHeaderSkeleton =
+    isConversationsLoading && !String(fullname || name || "").trim();
   const buyerVendorProfileId =
     normalizeId((partnerData as any)?.vendorProfileId) || explicitVendorProfileId;
 
@@ -1232,6 +1295,19 @@ const ChatBox: React.FC = () => {
   }, [resolvedPinnedMessage, chatMessages]);
 
   const renderPinnedBanner = () => {
+    if (messagesLoading) {
+      return (
+        <View style={styles.pinnedBanner}>
+          <View style={styles.pinnedBannerInner}>
+            <SkeletonBlock style={styles.skeletonPinnedIcon} />
+            <View style={styles.pinnedBannerContent}>
+              <SkeletonBlock style={styles.skeletonPinnedTitle} />
+              <SkeletonBlock style={styles.skeletonPinnedText} />
+            </View>
+          </View>
+        </View>
+      );
+    }
     if (!resolvedPinnedMessage || shouldHidePinnedBanner) return null;
     const pinnedBanner = resolvePinnedBannerLines(resolvedPinnedMessage);
 
@@ -1372,27 +1448,42 @@ const ChatBox: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerPartnerContainer}>
           <View style={styles.avatarContainer}>
-            <Image
-              source={{ uri: partnerAvatar }}
-              style={styles.headerAvatar}
-            />
-            <View
-              style={[styles.onlineDotOverlay, { backgroundColor: "#4CAF50" }]}
-            />
+            {shouldShowHeaderSkeleton ? (
+              <SkeletonBlock style={styles.headerAvatar} />
+            ) : (
+              <>
+                <Image
+                  source={{ uri: partnerAvatar }}
+                  style={styles.headerAvatar}
+                />
+                <View
+                  style={[styles.onlineDotOverlay, { backgroundColor: "#4CAF50" }]}
+                />
+              </>
+            )}
           </View>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.headerName}>{displayName}</Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {isVendorSide && (
-                <Text style={styles.headerId}>
-                  {t("chat_id_fallback", "ID")}: #
-                  {(activePartnerId || "").slice(-6).toUpperCase()} -{" "}
-                </Text>
-              )}
-              <Text style={styles.headerStatus}>
-                {t("chat_online", "Online")}
-              </Text>
-            </View>
+            {shouldShowHeaderSkeleton ? (
+              <>
+                <SkeletonBlock style={styles.skeletonHeaderName} />
+                <SkeletonBlock style={styles.skeletonHeaderMeta} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.headerName}>{displayName}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  {isVendorSide && (
+                    <Text style={styles.headerId}>
+                      {t("chat_id_fallback", "ID")}: #
+                      {(activePartnerId || "").slice(-6).toUpperCase()} -{" "}
+                    </Text>
+                  )}
+                  <Text style={styles.headerStatus}>
+                    {t("chat_online", "Online")}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -1426,7 +1517,7 @@ const ChatBox: React.FC = () => {
         return (
           <View style={{ flex: 1, padding: 16 }}>
             {categoriesLoading ? (
-              <ActivityIndicator color="#2A8383" />
+              <CategoryGridSkeleton />
             ) : (
               <FlatList
                 data={Array.isArray(categoriesData) ? categoriesData : []}
@@ -1456,7 +1547,7 @@ const ChatBox: React.FC = () => {
         return (
           <View style={{ flex: 1, padding: 16 }}>
             {ordersLoading ? (
-              <ActivityIndicator color="#2A8383" />
+              <OrderHistorySkeleton />
             ) : (
               <FlatList
                 data={filteredOrders}
@@ -1508,7 +1599,7 @@ const ChatBox: React.FC = () => {
         );
       default:
         return messagesLoading ? (
-          <ActivityIndicator color="#2A8383" />
+          <ChatThreadSkeleton />
         ) : (
           <FlatList
             ref={flatListRef}
@@ -1683,6 +1774,17 @@ const styles = StyleSheet.create({
   headerStatus: { fontSize: 12, color: "#9CA3AF" },
   headerId: { fontSize: 12, color: "#9CA3AF" },
   moreBtn: { padding: 4 },
+  skeletonHeaderName: {
+    width: 120,
+    height: 14,
+    borderRadius: 7,
+  },
+  skeletonHeaderMeta: {
+    width: 92,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 7,
+  },
 
   tabsContainer: {
     direction: "ltr",
@@ -1734,6 +1836,24 @@ const styles = StyleSheet.create({
   pinnedBannerContent: { flex: 1 },
   pinnedBadgeText: { fontSize: 12, fontWeight: "700", color: "#115E59" },
   pinnedBannerText: { fontSize: 12, lineHeight: 17, color: "#134E4A", marginTop: 1 },
+  skeletonPinnedIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 10,
+  },
+  skeletonPinnedTitle: {
+    width: 110,
+    height: 10,
+    borderRadius: 5,
+  },
+  skeletonPinnedText: {
+    width: 180,
+    maxWidth: "90%",
+    height: 12,
+    borderRadius: 6,
+    marginTop: 7,
+  },
 
   chatList: { padding: 16, flexGrow: 1, backgroundColor: "#F9FAFB" },
   messageRow: {
@@ -1777,6 +1897,40 @@ const styles = StyleSheet.create({
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
   timeText: { fontSize: 10, color: "#9CA3AF", marginTop: 4 },
+  skeletonMsgAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginHorizontal: 8,
+  },
+  skeletonBubble: {
+    height: 54,
+    borderRadius: 18,
+    width: 220,
+    maxWidth: "100%",
+  },
+  skeletonBubbleOwn: {
+    borderBottomRightRadius: 4,
+  },
+  skeletonBubbleOther: {
+    borderBottomLeftRadius: 4,
+  },
+  skeletonBubbleShort: {
+    width: 168,
+    height: 46,
+  },
+  skeletonTimestamp: {
+    width: 54,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 8,
+  },
+  skeletonTimestampOwn: {
+    alignSelf: "flex-end",
+  },
+  skeletonTimestampOther: {
+    alignSelf: "flex-start",
+  },
   orderMessageCard: {
     minWidth: 220,
     maxWidth: 280,
@@ -1986,6 +2140,26 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   categoryImg: { width: "100%", height: 90, borderRadius: 8, marginBottom: 8 },
+  skeletonPanelContent: {
+    paddingBottom: 8,
+  },
+  skeletonCategoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    rowGap: 20,
+  },
+  skeletonCategoryImage: {
+    width: "100%",
+    height: 90,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  skeletonCategoryLabel: {
+    width: "80%",
+    height: 12,
+    borderRadius: 6,
+  },
   categoryLabel: {
     fontSize: 13,
     fontWeight: "600",
@@ -2014,6 +2188,27 @@ const styles = StyleSheet.create({
   orderStatus: { fontSize: 12, fontWeight: "700" },
   orderDate: { fontSize: 12, color: "#6B7280", marginBottom: 4 },
   orderTotal: { fontSize: 15, fontWeight: "700", color: "#2A8383" },
+  skeletonOrderNo: {
+    width: 116,
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonOrderStatus: {
+    width: 68,
+    height: 12,
+    borderRadius: 6,
+  },
+  skeletonOrderDate: {
+    width: 90,
+    height: 10,
+    borderRadius: 5,
+    marginBottom: 8,
+  },
+  skeletonOrderTotal: {
+    width: 124,
+    height: 14,
+    borderRadius: 7,
+  },
   emptyText: {
     textAlign: "center",
     marginTop: 40,
