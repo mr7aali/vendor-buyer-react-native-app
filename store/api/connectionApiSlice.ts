@@ -17,6 +17,15 @@ export const connectionApiSlice = apiSlice.injectEndpoints({
             }),
             providesTags: ['Connection'],
         }),
+        getExploreVendors: builder.query<any, { search?: string } | void>({
+            query: (params) => ({
+                url: '/connections/vendors',
+                method: 'GET',
+                params,
+            }),
+            transformResponse: (response: any) => response?.data || response,
+            providesTags: ['Connection'],
+        }),
         disconnectFromVendor: builder.mutation<any, string>({
             query: (vendorId) => ({
                 url: `/connections/disconnect/${vendorId}`,
@@ -38,6 +47,7 @@ export const connectionApiSlice = apiSlice.injectEndpoints({
 export const {
     useConnectToVendorMutation,
     useGetMyConnectionsQuery,
+    useGetExploreVendorsQuery,
     useDisconnectFromVendorMutation,
     useGetVendorQrQuery,
 } = connectionApiSlice;
