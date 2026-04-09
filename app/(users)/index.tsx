@@ -325,6 +325,7 @@
 
 import { useGetProfileQuery, useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAppSelector } from "@/store/hooks";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import { selectCurrentUser } from "@/store/slices/authSlice";
@@ -641,7 +642,11 @@ const Dashboard: React.FC = () => {
               );
             })
           ) : (
-            <Text style={{ fontSize: 13, color: "#6B7280" }}>{t("no_recent_orders_found", "No recent orders found.")}</Text>
+            <EmptyState
+              iconName="time-outline"
+              message={t("no_recent_orders_found", "No Recent Orders Found")}
+              subtitle={t("recent_orders_empty_hint", "Once you place orders, your latest activity will show up here.")}
+            />
           )}
         </View>
       </ScrollView>

@@ -1,4 +1,5 @@
 import { SkeletonBlock } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useGetOrdersQuery } from '@/store/api/orderApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -194,7 +195,11 @@ export default function OrderTabs() {
           );
         })}
         {!isLoading && !filteredOrders.length && (
-          <Text style={styles.emptyText}>{t('orders_no_orders_found', 'No orders found.')}</Text>
+          <EmptyState
+            iconName="receipt-outline"
+            message={t('orders_no_orders_found', 'No Recent Orders Found')}
+            subtitle={t('orders_empty_hint', 'New orders will appear here once customers start placing them.')}
+          />
         )}
       </ScrollView>
     </SafeAreaView>

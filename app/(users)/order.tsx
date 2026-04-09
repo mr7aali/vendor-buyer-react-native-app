@@ -1,5 +1,6 @@
 ﻿import { useTranslation } from "@/hooks/use-translation";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -317,6 +318,15 @@ export default function OrdersScreen() {
             </View>
           </TouchableOpacity>
         )}
+        ListEmptyComponent={
+          !isLoading ? (
+            <EmptyState
+              iconName="bag-handle-outline"
+              message={t("orders_no_orders_found", "No Recent Orders Found")}
+              subtitle={t("orders_empty_hint", "Your latest purchases and deliveries will show up here.")}
+            />
+          ) : null
+        }
       />
     </SafeAreaView>
   );
