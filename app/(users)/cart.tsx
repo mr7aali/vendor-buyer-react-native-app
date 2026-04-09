@@ -1,11 +1,56 @@
 import { useGetCartQuery, useRemoveFromCartMutation, useUpdateCartItemMutation } from "@/store/api/cartApiSlice";
 import { useGetCouponsByVendorQuery } from "@/store/api/couponApiSlice";
 import { useTranslation } from "@/hooks/use-translation";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Image, ScrollView, StatusBar, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const CartItemSkeleton = () => (
+  <View style={styles.cartCard}>
+    <View style={styles.itemMainRow}>
+      <SkeletonBlock style={styles.skeletonImageWrapper} />
+      <View style={styles.itemDetails}>
+        <SkeletonBlock style={styles.skeletonItemName} />
+        <SkeletonBlock style={styles.skeletonItemPrice} />
+        <View style={styles.actionRow}>
+          <SkeletonBlock style={styles.skeletonStepper} />
+          <SkeletonBlock style={styles.skeletonDeleteBtn} />
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+const CartSummarySkeleton = () => (
+  <View style={styles.summaryCard}>
+    <View style={styles.promoBox}>
+      <SkeletonBlock style={styles.skeletonPromoInput} />
+      <SkeletonBlock style={styles.skeletonApplyBtn} />
+    </View>
+    <SkeletonBlock style={styles.skeletonSectionTitle} />
+    <View style={styles.detailRow}>
+      <SkeletonBlock style={styles.skeletonDetailLabel} />
+      <SkeletonBlock style={styles.skeletonDetailValue} />
+    </View>
+    <View style={styles.detailRow}>
+      <SkeletonBlock style={styles.skeletonDetailLabel} />
+      <SkeletonBlock style={styles.skeletonDetailValue} />
+    </View>
+    <View style={styles.detailRow}>
+      <SkeletonBlock style={styles.skeletonDetailLabel} />
+      <SkeletonBlock style={styles.skeletonDetailValue} />
+    </View>
+    <View style={styles.divider} />
+    <View style={styles.totalRow}>
+      <SkeletonBlock style={styles.skeletonTotalLabel} />
+      <SkeletonBlock style={styles.skeletonTotalValue} />
+    </View>
+    <SkeletonBlock style={styles.skeletonCheckoutBtn} />
+  </View>
+);
 
 const MyCart: React.FC = () => {
   const { t } = useTranslation();
@@ -166,14 +211,6 @@ const MyCart: React.FC = () => {
   const tax: number = subtotal * TAX_RATE;
   const total: number = Math.max(0, subtotal + tax + SHIPPING_FEE - appliedDiscount);
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#349488" />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -191,11 +228,15 @@ const MyCart: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        {isError ? (
+        {isError && !isLoading ? (
           <Text style={styles.errorText}>{t("cart_failed_load", "Failed to load cart")}</Text>
         ) : null}
 
-        {cartItems.map((item: any) => (
+        {isLoading
+          ? Array.from({ length: 3 }).map((_, index) => (
+              <CartItemSkeleton key={`cart-skeleton-${index}`} />
+            ))
+          : cartItems.map((item: any) => (
           <View key={item.id} style={styles.cartCard}>
             <View style={styles.itemMainRow}>
               <View style={styles.imageWrapper}>
@@ -240,6 +281,9 @@ const MyCart: React.FC = () => {
           </View>
         ))}
 
+        {isLoading ? (
+          <CartSummarySkeleton />
+        ) : (
         <View style={styles.summaryCard}>
           <View style={styles.promoBox}>
             <TextInput
@@ -315,6 +359,7 @@ const MyCart: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -352,9 +397,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   productImg: { width: "80%", height: "80%" },
+  skeletonImageWrapper: {
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+  },
   itemDetails: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
   itemName: { fontSize: 16, fontWeight: "600", color: "#333" },
   itemPrice: { fontSize: 16, fontWeight: "bold", color: "#349488" },
+  skeletonItemName: { width: "78%", height: 16, borderRadius: 8 },
+  skeletonItemPrice: { width: 70, height: 16, borderRadius: 8, marginTop: 8 },
   actionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -382,6 +434,8 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   deleteBtn: { backgroundColor: "#FFF0F0", padding: 8, borderRadius: 8 },
+  skeletonStepper: { width: 120, height: 38, borderRadius: 10 },
+  skeletonDeleteBtn: { width: 38, height: 38, borderRadius: 8 },
   summaryCard: {
     backgroundColor: "#FFF",
     borderRadius: 20,
@@ -421,6 +475,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   applyBtnText: { color: "#FFF", fontWeight: "700", fontSize: 14 },
+  skeletonPromoInput: { flex: 1, height: 42, borderRadius: 10, marginRight: 10 },
+  skeletonApplyBtn: { width: 78, height: 42, borderRadius: 10 },
+  skeletonSectionTitle: { width: 150, height: 20, borderRadius: 10, marginBottom: 18 },
+  skeletonDetailLabel: { width: 110, height: 14, borderRadius: 7 },
+  skeletonDetailValue: { width: 54, height: 14, borderRadius: 7 },
+  skeletonTotalLabel: { width: 68, height: 18, borderRadius: 9 },
+  skeletonTotalValue: { width: 82, height: 18, borderRadius: 9 },
+  skeletonCheckoutBtn: { height: 55, borderRadius: 15 },
   promoText: { fontSize: 16, color: "#333", fontWeight: "500", marginRight: 6 },
   promoApplied: { flexDirection: "row", alignItems: "center" },
   appliedText: { color: "#349488", fontSize: 13, marginLeft: 6 },

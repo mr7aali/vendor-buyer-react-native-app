@@ -1,5 +1,6 @@
 ﻿import { useTranslation } from "@/hooks/use-translation";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -144,6 +145,34 @@ const normalizeStatus = (status?: string) => {
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
+const OrderCardSkeleton = () => (
+  <View style={styles.card}>
+    <View style={styles.cardTop}>
+      <SkeletonBlock style={styles.skeletonImg} />
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <View style={styles.row}>
+          <SkeletonBlock style={styles.skeletonOrderNo} />
+          <SkeletonBlock style={styles.skeletonBadge} />
+        </View>
+        <SkeletonBlock style={styles.skeletonAddress} />
+        <View style={styles.row}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <SkeletonBlock style={styles.skeletonMetaIcon} />
+            <SkeletonBlock style={styles.skeletonMetaText} />
+          </View>
+        </View>
+      </View>
+    </View>
+    <View style={styles.cardBottom}>
+      <View style={{ flex: 1, marginRight: 8 }}>
+        <SkeletonBlock style={styles.skeletonCustomer} />
+        <SkeletonBlock style={styles.skeletonSummary} />
+      </View>
+      <SkeletonBlock style={styles.skeletonPrice} />
+    </View>
+  </View>
+);
+
 const getDisplayStatus = (item: any) => {
   const normalized = normalizeStatus(item?.status);
   if (normalized) return normalized;
@@ -180,14 +209,6 @@ export default function OrdersScreen() {
         return { bg: "#FFF4E8", text: "#F2994A" };
     }
   };
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
-        <Text>{t("orders_loading", "Loading orders...")}</Text>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -230,9 +251,11 @@ export default function OrdersScreen() {
       </View>
 
       <FlatList
-        data={filteredOrders}
+        data={isLoading ? Array.from({ length: 5 }, (_, index) => ({ id: `skeleton-${index}` })) : filteredOrders}
         keyExtractor={(item, index) => String(item?._id || item?.id || index)}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => isLoading ? (
+          <OrderCardSkeleton />
+        ) : (
           <TouchableOpacity
             style={styles.card}
             onPress={() =>
@@ -342,6 +365,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: "row" },
   img: { width: 60, height: 60, borderRadius: 10 },
+  skeletonImg: { width: 60, height: 60, borderRadius: 10 },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -361,4 +385,12 @@ const styles = StyleSheet.create({
   },
   customer: { color: "#2A8383", fontWeight: "600" },
   price: { fontWeight: "bold", color: "#2A8383", fontSize: 16 },
+  skeletonOrderNo: { width: 88, height: 18, borderRadius: 8 },
+  skeletonBadge: { width: 74, height: 24, borderRadius: 8 },
+  skeletonAddress: { width: "90%", height: 12, borderRadius: 6, marginVertical: 8 },
+  skeletonMetaIcon: { width: 14, height: 14, borderRadius: 7 },
+  skeletonMetaText: { width: 96, height: 12, borderRadius: 6, marginLeft: 6 },
+  skeletonCustomer: { width: 110, height: 14, borderRadius: 7 },
+  skeletonSummary: { width: "75%", height: 12, borderRadius: 6, marginTop: 6 },
+  skeletonPrice: { width: 62, height: 18, borderRadius: 8 },
 });
