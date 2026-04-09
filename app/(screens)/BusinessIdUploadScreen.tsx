@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 import { useRegisterVendorMutation } from "../../store/api/authApiSlice";
+import { buildApiUrl } from "@/services/apiConfig";
 import { persistAuthState } from "@/services/authStorage";
 import { setCredentials } from "../../store/slices/authSlice";
 import { updateVendorRegistration } from "../../store/slices/registrationSlice";
@@ -194,11 +195,11 @@ const BusinessIdUploadScreen: React.FC = () => {
           throw err;
         }
 
-        const apiUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
-        if (!apiUrl) throw err;
+        const registerVendorUrl = buildApiUrl("/auth/register/vendor");
+        if (!registerVendorUrl) throw err;
 
         const fallbackFormData = buildVendorFormData();
-        const fallbackResponse = await fetch(`${apiUrl}/auth/register/vendor`, {
+        const fallbackResponse = await fetch(registerVendorUrl, {
           method: "POST",
           headers: {
             ...(auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}),

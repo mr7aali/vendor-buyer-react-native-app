@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useDispatch, useSelector } from "react-redux";
 
 import { useRegisterBuyerMutation } from "@/store/api/authApiSlice";
+import { buildApiUrl } from "@/services/apiConfig";
 import { persistAuthState } from "@/services/authStorage";
 import { setCredentials } from "@/store/slices/authSlice";
 import { updateBuyerRegistration } from "../../store/slices/registrationSlice";
@@ -126,10 +127,10 @@ const UploadPictureScreen = () => {
         } catch (err: any) {
           // Fallback for cases where fetchBaseQuery fails multipart upload on some Android builds
           if (err?.status === "FETCH_ERROR") {
-            const apiUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
-            if (!apiUrl) throw err;
+            const registerBuyerUrl = buildApiUrl("/auth/register/buyer");
+            if (!registerBuyerUrl) throw err;
 
-            const fallbackResponse = await fetch(`${apiUrl}/auth/register/buyer`, {
+            const fallbackResponse = await fetch(registerBuyerUrl, {
               method: "POST",
               headers: {
                 ...(auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}),

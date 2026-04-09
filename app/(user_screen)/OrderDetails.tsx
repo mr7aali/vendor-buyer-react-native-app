@@ -1,11 +1,13 @@
 import { useGetOrderByIdQuery } from '@/store/api/orderApiSlice';
 import { useCreateReviewMutation, useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
+import { RootState } from '@/store/store';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, I18nManager, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSelector } from 'react-redux';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/100';
 
@@ -38,6 +40,8 @@ const getProductName = (item: any) =>
 const OrderDetails = () => {
   const { t } = useTranslation();
   const router = useRouter();
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserType = String(authUser?.userType || '').toLowerCase();
   const { id: routeIdParam, productId: fallbackProductIdParam, productName: fallbackProductNameParam } = useLocalSearchParams();
   const routeId = Array.isArray(routeIdParam) ? routeIdParam[0] : routeIdParam;
   const routeOrderId = String(routeId || '');
@@ -115,6 +119,13 @@ const OrderDetails = () => {
   }
 
   const handleConfirmPickup = async () => {
+    if (currentUserType !== 'buyer') {
+      Alert.alert(
+        t('error', 'Error'),
+        t('order_details_only_buyer_review', 'Only buyers can confirm pickup and submit a review.'),
+      );
+      return;
+    }
     setShowFeedbackModal(true);
   };
 
@@ -163,7 +174,7 @@ const OrderDetails = () => {
     }
   };
 
-  const canConfirmPickup = status === 'delivered';
+  const canConfirmPickup = status === 'delivered' && currentUserType === 'buyer';
 
   return (
     <SafeAreaView style={styles.container}>

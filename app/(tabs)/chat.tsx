@@ -1,4 +1,5 @@
 import { supportTickets } from "@/constants/common";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   useGetConversationsQuery,
@@ -32,6 +33,65 @@ const resolveChatUserId = (entity: any) =>
       entity?._id ??
       entity,
   );
+
+const resolveDisplayName = (partner: any, fallback: string) => {
+  return (
+    partner?.fullName ||
+    partner?.buyer?.fullName ||
+    partner?.vendor?.businessName ||
+    partner?.businessName ||
+    partner?.vendor?.storename ||
+    partner?.storename ||
+    partner?.vendor?.fullName ||
+    partner?.displayName ||
+    partner?.user?.displayName ||
+    partner?.email ||
+    fallback
+  );
+};
+
+const resolveConversationPartner = (
+  conversation: any,
+  currentUserId: string,
+) => {
+  const directPartner = conversation?.partner || conversation?.participant;
+  if (
+    directPartner?.fullName ||
+    directPartner?.buyer?.fullName ||
+    directPartner?.vendor?.businessName ||
+    directPartner?.businessName ||
+    directPartner?.vendor?.storename ||
+    directPartner?.storename ||
+    directPartner?.vendor?.fullName
+  ) {
+    return directPartner;
+  }
+
+  const sender = conversation?.lastMessage?.sender;
+  const receiver = conversation?.lastMessage?.receiver;
+  const senderId = resolveChatUserId(sender);
+  const receiverId = resolveChatUserId(receiver);
+
+  if (sender && senderId && senderId !== currentUserId) {
+    return sender;
+  }
+
+  if (receiver && receiverId && receiverId !== currentUserId) {
+    return receiver;
+  }
+
+  return directPartner || sender || receiver || {};
+};
+
+const resolveConversationAvatar = (partner: any) =>
+  partner?.avatar ||
+  partner?.profilePhotoUrl ||
+  partner?.buyer?.profilePhotoUrl ||
+  partner?.vendor?.logoUrl ||
+  partner?.logoUrl ||
+  partner?.avatarUrl ||
+  "https://via.placeholder.com/48";
+
 const formatTime = (value: any) => {
   if (!value) return "";
   const date = new Date(value);
@@ -40,6 +100,24 @@ const formatTime = (value: any) => {
     .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
     .toLowerCase();
 };
+
+const ChatListSkeleton = () => (
+  <View style={styles.listWrap}>
+    {Array.from({ length: 7 }).map((_, index) => (
+      <View key={`chat-skeleton-${index}`} style={styles.row}>
+        <SkeletonBlock style={styles.skeletonAvatar} />
+        <View style={styles.middle}>
+          <SkeletonBlock style={styles.skeletonName} />
+          <SkeletonBlock style={styles.skeletonPreview} />
+        </View>
+        <View style={styles.right}>
+          <SkeletonBlock style={styles.skeletonTime} />
+          <SkeletonBlock style={styles.skeletonBadge} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
 
 export default function ChatTabs() {
   const router = useRouter();
@@ -62,20 +140,15 @@ export default function ChatTabs() {
     const rows = Array.isArray(conversationsData) ? conversationsData : [];
     if (!q) return rows;
     return rows.filter((row: any) => {
-      const partner = row?.partner || row?.participant || {};
-      const name =
-        partner?.fullName ||
-        partner?.businessName ||
-        partner?.storename ||
-        partner?.email ||
-        t("chat_user_fallback", "User");
+      const partner = resolveConversationPartner(row, currentUserId);
+      const name = resolveDisplayName(partner, t("chat_user_fallback", "User"));
       const text = row?.lastMessage?.messageText || "";
       return (
         String(name).toLowerCase().includes(q) ||
         String(text).toLowerCase().includes(q)
       );
     });
-  }, [conversationsData, searchQuery, t]);
+  }, [conversationsData, currentUserId, searchQuery, t]);
 
   const filteredTickets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -142,29 +215,26 @@ export default function ChatTabs() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "chat" ? (
-          <View style={styles.listWrap}>
-            {isConversationsLoading ? (
-              <Text style={styles.emptyText}>
-                {t("chat_loading_conversations", "Loading conversations...")}
-              </Text>
-            ) : filteredConversations.length ? (
-              filteredConversations.map((conversation: any, index: number) => {
-                const partner =
-                  conversation?.partner || conversation?.participant || {};
+          isConversationsLoading ? (
+            <ChatListSkeleton />
+          ) : (
+            <View style={styles.listWrap}>
+              {filteredConversations.length ? (
+                filteredConversations.map((conversation: any, index: number) => {
+                const partner = resolveConversationPartner(
+                  conversation,
+                  currentUserId,
+                );
                 const partnerId =
                   resolveChatUserId(partner?.userId ? partner : null) ||
                   resolveChatUserId(partner) ||
+                  resolveChatUserId(conversation?.partner) ||
                   normalizeId(conversation?.partnerId);
-                const displayName =
-                  partner?.fullName ||
-                  partner?.businessName ||
-                  partner?.storename ||
-                  partner?.email ||
-                  t("chat_user_fallback", "User");
-                const avatar =
-                  partner?.avatar ||
-                  partner?.logoUrl ||
-                  "https://via.placeholder.com/48";
+                const displayName = resolveDisplayName(
+                  partner,
+                  t("chat_user_fallback", "User"),
+                );
+                const avatar = resolveConversationAvatar(partner);
                 const lastText =
                   conversation?.lastMessage?.messageText ||
                   t("chat_no_messages_yet", "No messages yet");
@@ -204,7 +274,20 @@ export default function ChatTabs() {
                   >
                     <Image source={{ uri: avatar }} style={styles.avatar} />
                     <View style={styles.middle}>
-                      <Text style={styles.name}>{displayName}</Text>
+                      {/* 1px solid red */}
+                      <Text
+                        style={styles.name}
+                        onPress={() => {
+                          console.log(
+                            displayName,
+                            avatar,
+                            partner,
+                            conversation,
+                          );
+                        }}
+                      >
+                        {displayName}
+                      </Text>
                       <Text style={styles.preview} numberOfLines={1}>
                         {lastText}
                       </Text>
@@ -226,13 +309,14 @@ export default function ChatTabs() {
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            ) : (
-              <Text style={styles.emptyText}>
-                {t("chat_no_conversations_found", "No conversations found.")}
-              </Text>
-            )}
-          </View>
+                })
+              ) : (
+                <Text style={styles.emptyText}>
+                  {t("chat_no_conversations_found", "No conversations found.")}
+                </Text>
+              )}
+            </View>
+          )
         ) : (
           <View style={styles.listWrap}>
             {filteredTickets.map((ticket) => (
@@ -334,6 +418,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  skeletonAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  skeletonName: {
+    width: "62%",
+    height: 14,
+    borderRadius: 7,
+  },
+  skeletonPreview: {
+    width: "88%",
+    height: 12,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  skeletonTime: {
+    width: 38,
+    height: 10,
+    borderRadius: 5,
+    alignSelf: "flex-end",
+  },
+  skeletonBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginTop: 10,
+    alignSelf: "flex-end",
+  },
   emptyText: {
     textAlign: "center",
     color: "#6B7280",

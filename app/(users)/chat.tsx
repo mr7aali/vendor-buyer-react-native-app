@@ -1,5 +1,7 @@
 import { supportTickets } from "@/constants/common";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
+import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import {
   useGetConversationsQuery,
   useMarkAsReadMutation,
@@ -43,9 +45,6 @@ const resolveVendorProfileId = (entity: any) =>
       entity?.vendorId?._id ??
       "",
   );
-const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "")
-  .trim()
-  .replace(/\/+$/, "");
 const resolveEntityId = (entity: any) =>
   normalizeId(
     entity?.userId ??
@@ -68,10 +67,7 @@ const toAbsoluteImageUri = (value: any) => {
   ) {
     return raw;
   }
-  if (raw.startsWith("/") && apiBaseUrl) {
-    return `${apiBaseUrl}${raw}`;
-  }
-  return raw;
+  return resolveAbsoluteUrl(raw);
 };
 const resolveAvatarUri = (partner: any) =>
   toAbsoluteImageUri(
@@ -97,6 +93,24 @@ const formatTime = (value: any) => {
     .toLowerCase();
 };
 
+const ChatListSkeleton = () => (
+  <View style={styles.listWrap}>
+    {Array.from({ length: 7 }).map((_, index) => (
+      <View key={`chat-skeleton-${index}`} style={styles.row}>
+        <SkeletonBlock style={styles.skeletonAvatar} />
+        <View style={styles.middle}>
+          <SkeletonBlock style={styles.skeletonName} />
+          <SkeletonBlock style={styles.skeletonPreview} />
+        </View>
+        <View style={styles.right}>
+          <SkeletonBlock style={styles.skeletonTime} />
+          <SkeletonBlock style={styles.skeletonBadge} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
 export default function ChatScreen() {
   const router = useRouter();
   const { t } = useTranslation();
@@ -112,7 +126,7 @@ export default function ChatScreen() {
       refetchOnMountOrArgChange: true,
     },
   );
-  const { data: connectionsData = [] } = useGetMyConnectionsQuery(
+  const { data: connectionsData = [], isLoading: isConnectionsLoading } = useGetMyConnectionsQuery(
     currentUserId,
     {
       skip: !currentUserId,
@@ -262,13 +276,12 @@ export default function ChatScreen() {
         showsVerticalScrollIndicator={false}
       >
         {activeTab === "chat" ? (
-          <View style={styles.listWrap}>
-            {isLoading ? (
-              <Text style={styles.emptyText}>
-                {t("chat_loading_conversations", "Loading conversations...")}
-              </Text>
-            ) : filteredRows.length ? (
-              filteredRows.map((conversation: any, index: number) => {
+          isLoading || isConnectionsLoading ? (
+            <ChatListSkeleton />
+          ) : (
+            <View style={styles.listWrap}>
+              {filteredRows.length ? (
+                filteredRows.map((conversation: any, index: number) => {
                 const partner =
                   conversation?.partner ||
                   conversation?.participant ||
@@ -382,13 +395,14 @@ export default function ChatScreen() {
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            ) : (
-              <Text style={styles.emptyText}>
-                {t("chat_no_conversations_found", "No conversations found.")}
-              </Text>
-            )}
-          </View>
+                })
+              ) : (
+                <Text style={styles.emptyText}>
+                  {t("chat_no_conversations_found", "No conversations found.")}
+                </Text>
+              )}
+            </View>
+          )
         ) : (
           <View style={styles.listWrap}>
             {filteredTickets.map((ticket) => (
@@ -483,6 +497,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700" },
+  skeletonAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  skeletonName: {
+    width: "62%",
+    height: 14,
+    borderRadius: 7,
+  },
+  skeletonPreview: {
+    width: "88%",
+    height: 12,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  skeletonTime: {
+    width: 38,
+    height: 10,
+    borderRadius: 5,
+    alignSelf: "flex-end",
+  },
+  skeletonBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginTop: 10,
+    alignSelf: "flex-end",
+  },
   emptyText: {
     textAlign: "center",
     color: "#6B7280",

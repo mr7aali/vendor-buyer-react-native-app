@@ -1,5 +1,39 @@
 import { apiSlice } from './apiSlice';
 
+const normalizeReview = (review: any) => {
+    const user = review?.user || review?.buyer || null;
+
+    return {
+        ...review,
+        _id: review?._id || review?.id,
+        id: review?.id || review?._id,
+        user: user
+            ? {
+                ...user,
+                _id: user?._id || user?.id,
+                id: user?.id || user?._id,
+                fullName: user?.fullName || 'Unknown User',
+                profilePhotoUrl: user?.profilePhotoUrl || '',
+            }
+            : null,
+    };
+};
+
+const normalizeReviewsResponse = (response: any) => {
+    const payload = response?.data || response || {};
+    const reviews = Array.isArray(payload?.reviews)
+        ? payload.reviews.map(normalizeReview)
+        : [];
+
+    return {
+        ...response,
+        data: {
+            ...payload,
+            reviews,
+        },
+    };
+};
+
 interface Review {
     _id: string;
     user: {
@@ -40,6 +74,7 @@ export const reviewApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder) => ({
         getProductReviews: builder.query<ReviewsResponse, { productId: string; page?: number; limit?: number }>({
             query: ({ productId, page = 1, limit = 10 }) => `/reviews/product/${productId}?page=${page}&limit=${limit}`,
+            transformResponse: (response: any) => normalizeReviewsResponse(response),
             providesTags: (result, error, { productId }) => [
                 { type: 'Review', id: productId },
                 { type: 'Review', id: 'LIST' }
@@ -47,6 +82,7 @@ export const reviewApiSlice = apiSlice.injectEndpoints({
         }),
         getBuyerReviews: builder.query<ReviewsResponse, void>({
             query: () => '/reviews/buyer/vendors',
+            transformResponse: (response: any) => normalizeReviewsResponse(response),
             providesTags: [{ type: 'Review', id: 'BUYER_LIST' }],
         }),
         createReview: builder.mutation<any, { productId: string; orderId: string; rating: number; comment: string }>({
