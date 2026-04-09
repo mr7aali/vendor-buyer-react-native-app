@@ -329,11 +329,13 @@ import { useAppSelector } from "@/store/hooks";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { useTranslation } from "@/hooks/use-translation";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Bell, Compass, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
 import {
+  BackHandler,
   Dimensions,
   Image,
   ScrollView,
@@ -447,6 +449,22 @@ const Dashboard: React.FC = () => {
     };
     return map[statusValue] || { bg: "#E8F0FE", text: "#3B82F6" };
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.container}>
