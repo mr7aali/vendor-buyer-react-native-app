@@ -326,6 +326,7 @@
 import { useGetProfileQuery, useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { useAppSelector } from "@/store/hooks";
+import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { useTranslation } from "@/hooks/use-translation";
 import { router } from "expo-router";
@@ -352,22 +353,6 @@ const toNumber = (value: any, fallback = 0) => {
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const normalizeStatus = (value: any) => String(value || "pending").toLowerCase();
 const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
-const toAbsoluteImageUri = (value: any) => {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (
-    raw.startsWith("http://") ||
-    raw.startsWith("https://") ||
-    raw.startsWith("file://") ||
-    raw.startsWith("content://") ||
-    raw.startsWith("data:")
-  ) {
-    return raw;
-  }
-  if (raw.startsWith("/") && apiBaseUrl) return `${apiBaseUrl}${raw}`;
-  return raw;
-};
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -416,7 +401,7 @@ const Dashboard: React.FC = () => {
 
   const avatarUri = React.useMemo(
     () =>
-      toAbsoluteImageUri(
+      resolveAbsoluteUrl(
         (buyerProfile as any)?.profilePhotoUrl ||
           (buyerProfile as any)?.avatar ||
           (buyerProfile as any)?.image ||

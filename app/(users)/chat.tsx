@@ -1,5 +1,6 @@
 import { supportTickets } from "@/constants/common";
 import { useTranslation } from "@/hooks/use-translation";
+import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import {
   useGetConversationsQuery,
   useMarkAsReadMutation,
@@ -43,9 +44,6 @@ const resolveVendorProfileId = (entity: any) =>
       entity?.vendorId?._id ??
       "",
   );
-const apiBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "")
-  .trim()
-  .replace(/\/+$/, "");
 const resolveEntityId = (entity: any) =>
   normalizeId(
     entity?.userId ??
@@ -68,10 +66,7 @@ const toAbsoluteImageUri = (value: any) => {
   ) {
     return raw;
   }
-  if (raw.startsWith("/") && apiBaseUrl) {
-    return `${apiBaseUrl}${raw}`;
-  }
-  return raw;
+  return resolveAbsoluteUrl(raw);
 };
 const resolveAvatarUri = (partner: any) =>
   toAbsoluteImageUri(

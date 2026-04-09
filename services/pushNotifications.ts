@@ -2,6 +2,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { buildApiUrl } from "@/services/apiConfig";
 import { Platform } from "react-native";
 
 Notifications.setNotificationHandler({
@@ -17,9 +18,6 @@ Notifications.setNotificationHandler({
   
 });
 
-const rawApiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
-const apiUrl = rawApiUrl.trim().replace(/\/+$/, "");
-
 const rawPushTokenEndpoint = process.env.EXPO_PUBLIC_PUSH_TOKEN_ENDPOINT ?? "/notifications/fcm-token";
 const pushTokenEndpoint = rawPushTokenEndpoint.trim();
 const STORAGE_PUSH_TOKEN_KEY = "pushDeviceToken";
@@ -27,8 +25,7 @@ const STORAGE_PUSH_TOKEN_KEY = "pushDeviceToken";
 const buildEndpointUrl = () => {
   if (!pushTokenEndpoint) return "";
   if (/^https?:\/\//i.test(pushTokenEndpoint)) return pushTokenEndpoint;
-  if (!apiUrl) return "";
-  return `${apiUrl}${pushTokenEndpoint.startsWith("/") ? pushTokenEndpoint : `/${pushTokenEndpoint}`}`;
+  return buildApiUrl(pushTokenEndpoint);
 };
 
 export const registerForPushNotificationsAsync = async () => {

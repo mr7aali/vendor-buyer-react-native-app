@@ -1,8 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { apiBaseUrl } from '@/services/apiConfig';
 
-const SOCKET_URL = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000')
-    .trim()
-    .replace(/\/+$/, '');
+const SOCKET_URL = apiBaseUrl || 'http://localhost:3000';
 
 class SocketService {
     private static instance: SocketService;
