@@ -32,6 +32,65 @@ const resolveChatUserId = (entity: any) =>
       entity?._id ??
       entity,
   );
+
+const resolveDisplayName = (partner: any, fallback: string) => {
+  return (
+    partner?.fullName ||
+    partner?.buyer?.fullName ||
+    partner?.vendor?.businessName ||
+    partner?.businessName ||
+    partner?.vendor?.storename ||
+    partner?.storename ||
+    partner?.vendor?.fullName ||
+    partner?.displayName ||
+    partner?.user?.displayName ||
+    partner?.email ||
+    fallback
+  );
+};
+
+const resolveConversationPartner = (
+  conversation: any,
+  currentUserId: string,
+) => {
+  const directPartner = conversation?.partner || conversation?.participant;
+  if (
+    directPartner?.fullName ||
+    directPartner?.buyer?.fullName ||
+    directPartner?.vendor?.businessName ||
+    directPartner?.businessName ||
+    directPartner?.vendor?.storename ||
+    directPartner?.storename ||
+    directPartner?.vendor?.fullName
+  ) {
+    return directPartner;
+  }
+
+  const sender = conversation?.lastMessage?.sender;
+  const receiver = conversation?.lastMessage?.receiver;
+  const senderId = resolveChatUserId(sender);
+  const receiverId = resolveChatUserId(receiver);
+
+  if (sender && senderId && senderId !== currentUserId) {
+    return sender;
+  }
+
+  if (receiver && receiverId && receiverId !== currentUserId) {
+    return receiver;
+  }
+
+  return directPartner || sender || receiver || {};
+};
+
+const resolveConversationAvatar = (partner: any) =>
+  partner?.avatar ||
+  partner?.profilePhotoUrl ||
+  partner?.buyer?.profilePhotoUrl ||
+  partner?.vendor?.logoUrl ||
+  partner?.logoUrl ||
+  partner?.avatarUrl ||
+  "https://via.placeholder.com/48";
+
 const formatTime = (value: any) => {
   if (!value) return "";
   const date = new Date(value);
@@ -62,20 +121,15 @@ export default function ChatTabs() {
     const rows = Array.isArray(conversationsData) ? conversationsData : [];
     if (!q) return rows;
     return rows.filter((row: any) => {
-      const partner = row?.partner || row?.participant || {};
-      const name =
-        partner?.fullName ||
-        partner?.businessName ||
-        partner?.storename ||
-        partner?.email ||
-        t("chat_user_fallback", "User");
+      const partner = resolveConversationPartner(row, currentUserId);
+      const name = resolveDisplayName(partner, t("chat_user_fallback", "User"));
       const text = row?.lastMessage?.messageText || "";
       return (
         String(name).toLowerCase().includes(q) ||
         String(text).toLowerCase().includes(q)
       );
     });
-  }, [conversationsData, searchQuery, t]);
+  }, [conversationsData, currentUserId, searchQuery, t]);
 
   const filteredTickets = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -149,22 +203,20 @@ export default function ChatTabs() {
               </Text>
             ) : filteredConversations.length ? (
               filteredConversations.map((conversation: any, index: number) => {
-                const partner =
-                  conversation?.partner || conversation?.participant || {};
+                const partner = resolveConversationPartner(
+                  conversation,
+                  currentUserId,
+                );
                 const partnerId =
                   resolveChatUserId(partner?.userId ? partner : null) ||
                   resolveChatUserId(partner) ||
+                  resolveChatUserId(conversation?.partner) ||
                   normalizeId(conversation?.partnerId);
-                const displayName =
-                  partner?.fullName ||
-                  partner?.businessName ||
-                  partner?.storename ||
-                  partner?.email ||
-                  t("chat_user_fallback", "User");
-                const avatar =
-                  partner?.avatar ||
-                  partner?.logoUrl ||
-                  "https://via.placeholder.com/48";
+                const displayName = resolveDisplayName(
+                  partner,
+                  t("chat_user_fallback", "User"),
+                );
+                const avatar = resolveConversationAvatar(partner);
                 const lastText =
                   conversation?.lastMessage?.messageText ||
                   t("chat_no_messages_yet", "No messages yet");
@@ -204,7 +256,20 @@ export default function ChatTabs() {
                   >
                     <Image source={{ uri: avatar }} style={styles.avatar} />
                     <View style={styles.middle}>
-                      <Text style={styles.name}>{displayName}</Text>
+                      {/* 1px solid red */}
+                      <Text
+                        style={styles.name}
+                        onPress={() => {
+                          console.log(
+                            displayName,
+                            avatar,
+                            partner,
+                            conversation,
+                          );
+                        }}
+                      >
+                        {displayName}
+                      </Text>
                       <Text style={styles.preview} numberOfLines={1}>
                         {lastText}
                       </Text>

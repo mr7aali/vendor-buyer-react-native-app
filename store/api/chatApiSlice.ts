@@ -34,6 +34,75 @@ const toEntityList = (value: any): any[] => {
     return Array.isArray(value) ? value : [value];
 };
 
+const normalizePartner = (partner: any) => {
+    if (!partner) return null;
+
+    const buyer = partner?.buyer ?? null;
+    const vendor = partner?.vendor ?? null;
+
+    return {
+        ...partner,
+        id: normalizeId(partner?.id ?? partner?._id ?? partner?.userId),
+        userId: normalizeId(
+            partner?.userId ??
+            buyer?.userId ??
+            vendor?.userId ??
+            partner?.id ??
+            partner?._id
+        ),
+        fullName:
+            partner?.fullName ??
+            buyer?.fullName ??
+            vendor?.businessName ??
+            partner?.businessName ??
+            vendor?.storename ??
+            partner?.storename ??
+            vendor?.fullName ??
+            partner?.displayName ??
+            partner?.user?.displayName ??
+            null,
+        businessName: partner?.businessName ?? vendor?.businessName ?? null,
+        storename: partner?.storename ?? vendor?.storename ?? null,
+        profilePhotoUrl: partner?.profilePhotoUrl ?? buyer?.profilePhotoUrl ?? null,
+        logoUrl: partner?.logoUrl ?? vendor?.logoUrl ?? null,
+        avatar:
+            partner?.avatar ??
+            partner?.profilePhotoUrl ??
+            buyer?.profilePhotoUrl ??
+            partner?.logoUrl ??
+            vendor?.logoUrl ??
+            partner?.avatarUrl ??
+            null,
+        buyer,
+        vendor,
+    };
+};
+
+const hasPartnerProfile = (partner: any) =>
+    !!(
+        partner?.fullName ||
+        partner?.buyer?.fullName ||
+        partner?.vendor?.businessName ||
+        partner?.businessName ||
+        partner?.vendor?.storename ||
+        partner?.storename ||
+        partner?.vendor?.fullName
+    );
+
+const resolvePartnerFromMessage = (conv: any, currentUserId?: string) => {
+    const sender = conv?.lastMessage?.sender;
+    const receiver = conv?.lastMessage?.receiver;
+    const senderId = resolveChatUserId(sender);
+    const receiverId = resolveChatUserId(receiver);
+
+    if (currentUserId) {
+        if (senderId && senderId !== currentUserId) return sender;
+        if (receiverId && receiverId !== currentUserId) return receiver;
+    }
+
+    return sender ?? receiver ?? null;
+};
+
 const normalizeMessage = (msg: any) => ({
     ...msg,
     id: msg?.id || msg?._id,
@@ -64,7 +133,12 @@ const normalizeConversation = (conv: any, currentUserId?: string) => {
         conv?.participant ||
         null;
 
+    const messagePartner = resolvePartnerFromMessage(conv, currentUserId);
+    const partnerSource = hasPartnerProfile(selectedPartner) ? selectedPartner : (messagePartner ?? selectedPartner);
+    const partner = normalizePartner(partnerSource);
+
     let partnerId =
+        resolveChatUserId(partner) ||
         resolveChatUserId(selectedPartner) ||
         normalizeId(conv?.partnerId) ||
         normalizeId(conv?.conversationPartnerId) ||
@@ -97,8 +171,8 @@ const normalizeConversation = (conv: any, currentUserId?: string) => {
         ...conv,
         id: conv?.id || conv?._id || partnerId,
         partnerId,
-        partner: selectedPartner,
-        participant: selectedPartner,
+        partner,
+        participant: partner,
         lastMessage,
         unreadCount: Number(conv?.unreadCount || 0),
     };
