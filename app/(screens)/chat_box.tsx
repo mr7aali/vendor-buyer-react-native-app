@@ -23,11 +23,12 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
+  Animated,
   Alert,
+  Easing,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -39,7 +40,6 @@ import {
 } from "react-native";
 import {
   SafeAreaView,
-  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -466,7 +466,10 @@ const OrderHistorySkeleton = () => (
 
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const closedComposerInset = 30;
+  const openComposerInset = 30;
+  const composerBottomInset = isKeyboardVisible ? openComposerInset : closedComposerInset;
   const { socket } = useSocket();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = resolveChatUserId(user);
@@ -689,6 +692,8 @@ const ChatBox: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const autoPinnedMessageKeyRef = useRef("");
   const [highlightedMessageId, setHighlightedMessageId] = useState("");
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+  const [composerHeight, setComposerHeight] = useState(88);
 
   // Load role from AsyncStorage on mount
   React.useEffect(() => {
@@ -704,6 +709,44 @@ const ChatBox: React.FC = () => {
     };
     loadRole();
   }, []);
+
+  React.useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const animateComposer = (toValue: number, duration?: number) => {
+      Animated.timing(keyboardOffset, {
+        toValue,
+        duration: duration ?? 250,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      });
+    };
+
+    const showSubscription = Keyboard.addListener(showEvent, (event) => {
+      setIsKeyboardVisible(true);
+      const keyboardHeight = Math.max(
+        0,
+        (event.endCoordinates?.height || 0) -
+          (Platform.OS === "ios" ? openComposerInset : 0),
+      );
+      animateComposer(-keyboardHeight, event.duration);
+    });
+
+    const hideSubscription = Keyboard.addListener(hideEvent, (event) => {
+      setIsKeyboardVisible(false);
+      animateComposer(0, event.duration);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardOffset, openComposerInset]);
 
   // 1. Detect role from global state & storage (strictly vendor/buyer only)
   const normalizedRoleParam = String(roleParam || "").toLowerCase();
@@ -1605,7 +1648,10 @@ const ChatBox: React.FC = () => {
             ref={flatListRef}
             data={chatMessages}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.chatList}
+            contentContainerStyle={[
+              styles.chatList,
+              { paddingBottom: composerHeight + 15 },
+            ]}
             renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
               const fallbackIndex = Math.max(0, info.index - 1);
@@ -1635,81 +1681,97 @@ const ChatBox: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       {renderHeader()}
       {renderTabs()}
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? Math.max(insets.top, 12) : 0}
-      >
-        <View style={{ flex: 1 }}>
-          {activeTab === "chat" ? renderPinnedBanner() : null}
-          {renderContent()}
+      <View style={styles.contentShell}>
+        {activeTab === "chat" ? renderPinnedBanner() : null}
+        {renderContent()}
 
-          {activeTab === "chat" && (
-            <>
-              {showOptions && (
-                <View style={styles.attachmentMenu}>
-                  <View style={styles.attachmentRow}>
-                    <AttachmentBtn
-                      icon="image"
-                      label={t("chat_attachment_photo", "Photo")}
-                      onPress={handlePickPhoto}
-                    />
-                    {isVendorSide && (
-                      <AttachmentBtn
-                        icon="confirmation-number"
-                        label={t("chat_attachment_coupon", "Coupon")}
-                        onPress={() => setShowCouponModal(true)}
-                      />
-                    )}
-                  </View>
-                </View>
-              )}
-
-              <View
-                style={[
-                  styles.inputArea,
-                  { paddingBottom: Math.max(insets.bottom, 10), paddingHorizontal: 14 },
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={() => setShowOptions(!showOptions)}
-                  style={styles.plusBtn}
-                >
-                  <Feather
-                    name={showOptions ? "x" : "plus"}
-                    size={28}
-                    color="#2A8383"
+        {activeTab === "chat" && (
+          <Animated.View
+            style={[
+              styles.composerDock,
+              { transform: [{ translateY: keyboardOffset }] },
+            ]}
+            onLayout={(event) => {
+              const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+              if (nextHeight && nextHeight !== composerHeight) {
+                setComposerHeight(nextHeight);
+              }
+            }}
+          >
+            {showOptions && (
+              <View style={styles.attachmentMenu}>
+                <View style={styles.attachmentRow}>
+                  <AttachmentBtn
+                    icon="image"
+                    label={t("chat_attachment_photo", "Photo")}
+                    onPress={handlePickPhoto}
                   />
-                </TouchableOpacity>
-                <TextInput
-                  placeholder={t("chat_type_message", "Type a message...")}
-                  style={styles.textInput}
-                  value={messageText}
-                  onChangeText={setMessageText}
-                  multiline
-                  blurOnSubmit={false}
-                />
-                <TouchableOpacity
-                  onPress={() => handleSendMessage(messageText)}
-                >
-                  <View
-                    style={[
-                      styles.sendBtn,
-                      !messageText.trim() && { backgroundColor: "#DDD" },
-                    ]}
-                  >
-                    <Ionicons name="send" size={18} color="white" />
-                  </View>
-                </TouchableOpacity>
+                  {isVendorSide && (
+                    <AttachmentBtn
+                      icon="confirmation-number"
+                      label={t("chat_attachment_coupon", "Coupon")}
+                      onPress={() => setShowCouponModal(true)}
+                    />
+                  )}
+                </View>
               </View>
-            </>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+            )}
+
+            <View
+              style={[
+                styles.inputArea,
+                isKeyboardVisible
+                  ? styles.inputAreaKeyboardOpen
+                  : styles.inputAreaKeyboardClosed,
+                { paddingBottom: composerBottomInset, paddingHorizontal: 14 },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => setShowOptions(!showOptions)}
+                style={styles.plusBtn}
+              >
+                <Feather
+                  name={showOptions ? "x" : "plus"}
+                  size={28}
+                  color="#2A8383"
+                />
+              </TouchableOpacity>
+              <TextInput
+                placeholder={t("chat_type_message", "Type a message...")}
+                style={[
+                  styles.textInput,
+                  isKeyboardVisible
+                    ? styles.textInputKeyboardOpen
+                    : styles.textInputKeyboardClosed,
+                ]}
+                value={messageText}
+                onChangeText={setMessageText}
+                multiline
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity
+                onPress={() => handleSendMessage(messageText)}
+              >
+                <View
+                  style={[
+                    styles.sendBtn,
+                    isKeyboardVisible
+                      ? styles.sendBtnKeyboardOpen
+                      : styles.sendBtnKeyboardClosed,
+                    !messageText.trim() && { backgroundColor: "#DDD" },
+                  ]}
+                >
+                  <Ionicons name="send" size={18} color="white" />
+                </View>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
+      </View>
 
       <CouponModal
         visible={showCouponModal}
@@ -1734,6 +1796,7 @@ const ChatBox: React.FC = () => {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff", direction: "ltr" },
+  contentShell: { flex: 1, position: "relative" },
   header: {
     direction: 'ltr',
     flexDirection: "row",
@@ -2029,10 +2092,28 @@ const styles = StyleSheet.create({
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
     backgroundColor: "#fff",
+  },
+  inputAreaKeyboardClosed: {
+    paddingTop: 7,
+
+  },
+  inputAreaKeyboardOpen: {
+    paddingTop: 7,
+  },
+  composerDock: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#fff",
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 8,
   },
   plusBtn: { padding: 8 },
   textInput: {
@@ -2040,19 +2121,33 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderRadius: 25,
     paddingHorizontal: 16,
-    paddingVertical: 10,
     fontSize: 14,
     maxHeight: 120,
     marginHorizontal: 8,
     color: "#1F2937",
   },
+  textInputKeyboardClosed: {
+    minHeight: 40,
+    paddingVertical: 10,
+  },
+  textInputKeyboardOpen: {
+    minHeight: 44,
+    paddingVertical: 10,
+  },
   sendBtn: {
-    width: 40,
-    height: 40,
     borderRadius: 20,
     backgroundColor: "#2A8383",
     justifyContent: "center",
     alignItems: "center",
+  },
+  sendBtnKeyboardClosed: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  sendBtnKeyboardOpen: {
+    width: 40,
+    height: 40,
   },
 
   attachmentMenu: {
