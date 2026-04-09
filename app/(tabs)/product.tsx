@@ -1,8 +1,9 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -22,6 +23,13 @@ import { useDeleteCategoryMutation, useGetCategoriesByVendorQuery } from "../../
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 48) / 2;
+
+const CategoryCardSkeleton = () => (
+  <View style={styles.card}>
+    <SkeletonBlock style={styles.skeletonImageContainer} />
+    <SkeletonBlock style={styles.skeletonNameBadge} />
+  </View>
+);
 
 const ProductScreen = () => {
   const { language } = useTranslation();
@@ -49,7 +57,7 @@ const ProductScreen = () => {
   const ui = React.useMemo(() => {
     if (language === "he") {
       return {
-        title: "מוצרים",
+        title: "קטגוריות",
         searchByCategory: "חיפוש לפי קטגוריה",
         deleteCategory: "מחיקת קטגוריה",
         deleteCategoryConfirm: (name: string) => `האם למחוק את "${name}"?`,
@@ -67,7 +75,7 @@ const ProductScreen = () => {
     }
     if (language === "hi") {
       return {
-        title: "प्रोडक्ट",
+        title: "श्रेणियाँ",
         searchByCategory: "कैटेगरी से खोजें",
         deleteCategory: "कैटेगरी हटाएं",
         deleteCategoryConfirm: (name: string) => `क्या आप "${name}" को हटाना चाहते हैं?`,
@@ -84,7 +92,7 @@ const ProductScreen = () => {
       };
     }
     return {
-      title: "Product",
+      title: "Categories",
       searchByCategory: "Search by Category",
       deleteCategory: "Delete Category",
       deleteCategoryConfirm: (name: string) => `Are you sure you want to delete "${name}"?`,
@@ -179,8 +187,10 @@ const ProductScreen = () => {
         }
       >
         {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#349488" />
+          <View style={styles.grid}>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <CategoryCardSkeleton key={`category-skeleton-${index}`} />
+            ))}
           </View>
         ) : error ? (
           <View style={styles.emptyContainer}>
@@ -192,9 +202,11 @@ const ProductScreen = () => {
           </View>
         ) : filteredCategories.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {searchQuery ? ui.noCategoriesMatching(searchQuery) : ui.noCategoriesFound}
-            </Text>
+            <EmptyState
+              iconName="grid-outline"
+              message={searchQuery ? ui.noCategoriesMatching(searchQuery) : ui.noCategoriesFound}
+              subtitle={ui.completeVendorProfile}
+            />
           </View>
         ) : (
           <View style={styles.grid}>
@@ -301,6 +313,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEE",
   },
   catImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  skeletonImageContainer: {
+    width: "100%",
+    height: 120,
+    borderRadius: 15,
+  },
   nameBadge: {
     marginTop: 10,
     borderWidth: 1,
@@ -314,6 +331,11 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingTop: 50,
     alignItems: "center",
+  },
+  skeletonNameBadge: {
+    marginTop: 10,
+    height: 34,
+    borderRadius: 8,
   },
   emptyContainer: {
     paddingTop: 100,

@@ -5,11 +5,13 @@ import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { Feather } from "@expo/vector-icons";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
   ActivityIndicator,
+  BackHandler,
   Image,
   ScrollView,
   Text,
@@ -238,6 +240,22 @@ export default function HomeScreen() {
     day: "numeric",
     year: "numeric",
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, []),
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>

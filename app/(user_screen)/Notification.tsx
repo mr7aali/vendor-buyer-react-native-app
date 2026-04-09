@@ -1,4 +1,5 @@
 import { useSocket } from "@/context/SocketContext";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   UserNotification,
@@ -8,6 +9,7 @@ import {
   useMarkMyNotificationReadMutation,
 } from "@/store/api/notificationApiSlice";
 import { Entypo, Ionicons } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import React, { useEffect, useMemo } from "react";
 import {
@@ -35,6 +37,19 @@ const timeAgo = (value: string, t: (key: string, fallback?: string) => string) =
   if (diff < day) return `${Math.floor(diff / hour)}${t("notif_h_ago", "h ago")}`;
   return `${Math.floor(diff / day)}${t("notif_d_ago", "d ago")}`;
 };
+
+const NotificationCardSkeleton = () => (
+  <View style={styles.card}>
+    <SkeletonBlock style={styles.skeletonAvatar} />
+    <View style={styles.textContainer}>
+      <SkeletonBlock style={styles.skeletonTitle} />
+      <SkeletonBlock style={styles.skeletonMessageLine} />
+      <SkeletonBlock style={styles.skeletonMessageShort} />
+      <SkeletonBlock style={styles.skeletonTime} />
+    </View>
+    <SkeletonBlock style={styles.skeletonMore} />
+  </View>
+);
 
 export default function NotificationsScreen() {
   const { t } = useTranslation();
@@ -135,6 +150,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#F8FBF9" />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace("/(users)")}>
           <Ionicons name="chevron-back" size={28} color="black" />
@@ -157,9 +173,12 @@ export default function NotificationsScreen() {
       </View>
 
       {isLoading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#278687" />
-        </View>
+        <FlatList
+          data={Array.from({ length: 6 }, (_, index) => ({ id: `notification-skeleton-${index}` }))}
+          keyExtractor={(item) => item.id}
+          renderItem={() => <NotificationCardSkeleton />}
+          contentContainerStyle={styles.listContent}
+        />
       ) : (
         <FlatList
           data={notifications}
@@ -223,7 +242,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   textContainer: { flex: 1, marginLeft: 15, marginRight: 10 },
+  skeletonAvatar: { width: 50, height: 50, borderRadius: 25 },
   titleText: { fontSize: 14, color: "#1F2937", fontWeight: "700" },
+  skeletonTitle: { width: "58%", height: 15, borderRadius: 8 },
   messageText: {
     fontSize: 14,
     color: "#666",
@@ -232,7 +253,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   timeText: { fontSize: 13, color: "#999", marginTop: 8 },
+  skeletonMessageLine: { width: "96%", height: 14, borderRadius: 7, marginTop: 8 },
+  skeletonMessageShort: { width: "72%", height: 14, borderRadius: 7, marginTop: 6 },
+  skeletonTime: { width: 62, height: 13, borderRadius: 7, marginTop: 10 },
   moreButton: { padding: 10, position: "relative" },
+  skeletonMore: { width: 18, height: 18, borderRadius: 9, marginTop: 8 },
   unreadDot: {
     width: 8,
     height: 8,

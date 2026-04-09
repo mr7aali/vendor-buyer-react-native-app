@@ -1,4 +1,5 @@
 import { useSocket } from "@/context/SocketContext";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import {
   UserNotification,
@@ -11,7 +12,6 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -35,6 +35,34 @@ const timeAgo = (value: string, t: (key: string, fallback?: string) => string) =
   if (diff < day) return `${Math.floor(diff / hour)} ${t("notif_h_ago", "h ago")}`;
   return `${Math.floor(diff / day)} ${t("notif_d_ago", "d ago")}`;
 };
+
+const NotificationCardSkeleton = () => (
+  <View
+    style={{
+      backgroundColor: "#FFF",
+      flexDirection: "row",
+      padding: 16,
+      marginHorizontal: 1,
+      borderRadius: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 1,
+      alignItems: "flex-start",
+      gap: 12,
+    }}
+  >
+    <SkeletonBlock style={{ width: 50, height: 50, borderRadius: 25 }} />
+    <View style={{ flex: 1, gap: 8 }}>
+      <SkeletonBlock style={{ width: "55%", height: 15, borderRadius: 8 }} />
+      <SkeletonBlock style={{ width: "95%", height: 14, borderRadius: 7 }} />
+      <SkeletonBlock style={{ width: "70%", height: 14, borderRadius: 7 }} />
+      <SkeletonBlock style={{ width: 64, height: 13, borderRadius: 7, marginTop: 4 }} />
+    </View>
+    <SkeletonBlock style={{ width: 18, height: 18, borderRadius: 9, marginTop: 6 }} />
+  </View>
+);
 
 const Notifications = () => {
   const { t } = useTranslation();
@@ -135,9 +163,13 @@ const Notifications = () => {
         </View>
 
         {isLoading ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#278687" />
-          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ gap: 12, paddingBottom: 20 }}>
+              {Array.from({ length: 6 }).map((_, index) => (
+                <NotificationCardSkeleton key={`notification-skeleton-${index}`} />
+              ))}
+            </View>
+          </ScrollView>
         ) : (
           <ScrollView
             showsVerticalScrollIndicator={false}

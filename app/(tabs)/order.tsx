@@ -1,9 +1,11 @@
+import { SkeletonBlock } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useGetOrdersQuery } from '@/store/api/orderApiSlice';
 import { useTranslation } from '@/hooks/use-translation';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IMAGE_FALLBACK = 'https://via.placeholder.com/80';
@@ -53,6 +55,33 @@ const statusPillStyle = (status: string) => {
 
 const FILTERS = ['all', 'delivered', 'processing', 'shipped', 'cancelled'];
 
+const OrderCardSkeleton = () => (
+  <View style={styles.card}>
+    <View style={styles.cardTop}>
+      <SkeletonBlock style={styles.skeletonCover} />
+      <View style={{ flex: 1 }}>
+        <View style={styles.orderTopRow}>
+          <SkeletonBlock style={styles.skeletonOrderNumber} />
+          <SkeletonBlock style={styles.skeletonStatusPill} />
+        </View>
+        <SkeletonBlock style={styles.skeletonAddress} />
+        <View style={styles.ratingRow}>
+          <SkeletonBlock style={styles.skeletonRatingIcon} />
+          <SkeletonBlock style={styles.skeletonRatingText} />
+        </View>
+      </View>
+    </View>
+
+    <View style={styles.cardBottom}>
+      <View style={{ flex: 1 }}>
+        <SkeletonBlock style={styles.skeletonCustomerName} />
+        <SkeletonBlock style={styles.skeletonSummaryText} />
+      </View>
+      <SkeletonBlock style={styles.skeletonPriceText} />
+    </View>
+  </View>
+);
+
 export default function OrderTabs() {
   const { t } = useTranslation();
   const [activeFilter, setActiveFilter] = useState('all');
@@ -74,14 +103,6 @@ export default function OrderTabs() {
       return statusMatch && (orderNumber.includes(q) || customer.includes(q));
     });
   }, [ordersData, activeFilter, searchQuery]);
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color="#278687" />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -124,7 +145,11 @@ export default function OrderTabs() {
       </View>
 
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-        {filteredOrders.map((order: any) => {
+        {isLoading
+          ? Array.from({ length: 5 }).map((_, index) => (
+              <OrderCardSkeleton key={`order-skeleton-${index}`} />
+            ))
+          : filteredOrders.map((order: any) => {
           const status = getStatus(order);
           const pill = statusPillStyle(status);
           return (
@@ -169,8 +194,12 @@ export default function OrderTabs() {
             </TouchableOpacity>
           );
         })}
-        {!filteredOrders.length && (
-          <Text style={styles.emptyText}>{t('orders_no_orders_found', 'No orders found.')}</Text>
+        {!isLoading && !filteredOrders.length && (
+          <EmptyState
+            iconName="receipt-outline"
+            message={t('orders_no_orders_found', 'No Recent Orders Found')}
+            subtitle={t('orders_empty_hint', 'New orders will appear here once customers start placing them.')}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
@@ -218,6 +247,7 @@ const styles = StyleSheet.create({
   },
   cardTop: { flexDirection: 'row' },
   cover: { width: 72, height: 72, borderRadius: 10, marginRight: 12, backgroundColor: '#E7EDF0' },
+  skeletonCover: { width: 72, height: 72, borderRadius: 10, marginRight: 12 },
   orderTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   orderNumber: { fontSize: 18, color: '#2A3237', fontWeight: '600', flex: 1, paddingRight: 8 },
   statusPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
@@ -238,4 +268,12 @@ const styles = StyleSheet.create({
   summaryText: { fontSize: 13, color: '#278687', marginTop: 2 },
   priceText: { marginLeft: 8, fontSize: 30, color: '#278687', fontWeight: '700' },
   emptyText: { textAlign: 'center', color: '#7B868D', marginTop: 32, fontSize: 15 },
+  skeletonOrderNumber: { width: 118, height: 18, borderRadius: 8, flexShrink: 1, marginRight: 8 },
+  skeletonStatusPill: { width: 78, height: 24, borderRadius: 999 },
+  skeletonAddress: { width: '88%', height: 13, borderRadius: 6, marginTop: 8 },
+  skeletonRatingIcon: { width: 14, height: 14, borderRadius: 7 },
+  skeletonRatingText: { width: 84, height: 12, borderRadius: 6, marginLeft: 6 },
+  skeletonCustomerName: { width: 132, height: 18, borderRadius: 8 },
+  skeletonSummaryText: { width: '72%', height: 12, borderRadius: 6, marginTop: 6 },
+  skeletonPriceText: { width: 70, height: 26, borderRadius: 10, marginLeft: 8 },
 });

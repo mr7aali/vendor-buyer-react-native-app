@@ -1,5 +1,6 @@
 import { useGetCategoriesByVendorQuery } from "@/store/api/categoryApiSlice";
 import { useGetMyConnectionsQuery } from "@/store/api/connectionApiSlice";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useTranslation } from "@/hooks/use-translation";
 import { RootState } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,7 +11,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  ImageSourcePropType,
   StyleSheet,
   Text,
   TextInput,
@@ -20,12 +20,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
-interface Category {
-  id: string;
-  title: string;
-  image: ImageSourcePropType;
-}
-
 
 
 const { width } = Dimensions.get("window");
@@ -34,9 +28,8 @@ const COLUMN_WIDTH = (width - 48) / 2;
 const CategoriesScreen: React.FC = () => {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
-  const { vendorId: vendorIdParam, vendorName } = useLocalSearchParams<{
+  const { vendorId: vendorIdParam } = useLocalSearchParams<{
     vendorId?: string;
-    vendorName?: string;
   }>();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = user?.userId || user?.id || (user as any)?._id;
@@ -140,11 +133,7 @@ const CategoriesScreen: React.FC = () => {
         <View style={{ width: 28 }} />
       </View>
 
-      {vendorName ? (
-        <Text style={{ marginHorizontal: 16, marginBottom: 6, color: "#6B7280", fontSize: 13 }}>
-          {String(vendorName)}
-        </Text>
-      ) : null}
+
 
       <View style={styles.searchContainer}>
         <Ionicons
@@ -170,9 +159,11 @@ const CategoriesScreen: React.FC = () => {
         columnWrapperStyle={styles.columnWrapper}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={{ textAlign: "center", color: "#6B7280", marginTop: 40 }}>
-            {t("categories_no_categories", "No categories found")}
-          </Text>
+          <EmptyState
+            iconName="apps-outline"
+            message={t("categories_no_categories", "No Products Found")}
+            subtitle={t("categories_empty_hint", "Available categories from this vendor will appear here.")}
+          />
         }
       />
     </SafeAreaView>

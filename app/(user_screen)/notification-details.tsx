@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useTranslation } from "@/hooks/use-translation";
 import React from "react";
+import { StatusBar } from "expo-status-bar";
 import {
   Image,
   ScrollView,
@@ -26,6 +27,7 @@ export default function NotificationDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#F8FBF9" />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
