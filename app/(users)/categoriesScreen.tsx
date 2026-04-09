@@ -140,11 +140,7 @@ const CategoriesScreen: React.FC = () => {
         <View style={{ width: 28 }} />
       </View>
 
-      {vendorName ? (
-        <Text style={{ marginHorizontal: 16, marginBottom: 6, color: "#6B7280", fontSize: 13 }}>
-          {String(vendorName)}
-        </Text>
-      ) : null}
+
 
       <View style={styles.searchContainer}>
         <Ionicons
