@@ -112,12 +112,6 @@ export default function TabLayout() {
           title: t("tab_electronics", "Electronics"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
-          tabBarStyle: {
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            display: "flex",
-          },
         }}
       />
     </Tabs>
