@@ -2,6 +2,7 @@ import { supportTickets } from "@/constants/common";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
+import { formatRoleLabel, resolveConversationRole, resolveCurrentRole } from "@/services/chatRole";
 import {
   useGetConversationsQuery,
   useMarkAsReadMutation,
@@ -116,6 +117,7 @@ export default function ChatScreen() {
   const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = resolveChatUserId(user);
+  const currentRole = resolveCurrentRole(user);
   const [activeTab, setActiveTab] = useState<"chat" | "support">("chat");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -332,6 +334,9 @@ export default function ChatScreen() {
                   t("chat_user_fallback", "User");
                 const avatar = resolveAvatarUri(partner);
                 const unreadCount = Number(conversation?.unreadCount || 0);
+                const conversationRole =
+                  resolveConversationRole(conversation, user) || "buyer";
+                const isRoleMismatch = conversationRole !== currentRole;
                 const messageId =
                   conversation?.lastMessage?.id ||
                   conversation?.lastMessage?._id;
@@ -359,7 +364,7 @@ export default function ChatScreen() {
                       router.push({
                         pathname: "/(screens)/chat_box",
                         params: {
-                          role: "buyer",
+                          role: conversationRole,
                           partnerId,
                           vendorId: vendorProfileId,
                           conversationId: normalizeId(
@@ -372,10 +377,24 @@ export default function ChatScreen() {
                   >
                     <Image source={{ uri: avatar }} style={styles.avatar} />
                     <View style={styles.middle}>
-                      <Text style={styles.name}>{displayName}</Text>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.name}>{displayName}</Text>
+                        <View
+                          style={[
+                            styles.roleBadge,
+                            isRoleMismatch && styles.roleBadgeMuted,
+                          ]}
+                        >
+                          <Text style={styles.roleBadgeText}>
+                            {formatRoleLabel(conversationRole)} Chat
+                          </Text>
+                        </View>
+                      </View>
                       <Text style={styles.preview} numberOfLines={1}>
-                        {conversation?.lastMessage?.messageText ||
-                          t("chat_no_messages_yet", "No messages yet")}
+                        {isRoleMismatch
+                          ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                          : conversation?.lastMessage?.messageText ||
+                            t("chat_no_messages_yet", "No messages yet")}
                       </Text>
                     </View>
                     <View style={styles.right}>
@@ -471,6 +490,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#CCEFDB",
   },
   middle: { flex: 1, marginLeft: 12, marginRight: 8, direction: "ltr" },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   name: {
     fontSize: 31 / 2,
     fontWeight: "600",
@@ -482,6 +506,20 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginTop: 2,
     textAlign: "left",
+  },
+  roleBadge: {
+    backgroundColor: "#DDF2F0",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  roleBadgeMuted: {
+    backgroundColor: "#FDECEC",
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#206C69",
   },
   right: { alignItems: "flex-start", minWidth: 64, direction: "ltr" },
   time: { fontSize: 14, color: "#4B5563", textAlign: "left" },
