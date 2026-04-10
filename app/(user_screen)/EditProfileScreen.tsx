@@ -183,14 +183,14 @@ const EditProfileScreen = () => {
             />
           </View>
 
-          <TouchableOpacity style={styles.inputContainer} onPress={() => setShowDatePicker(true)}>
+          {/* <TouchableOpacity style={styles.inputContainer} onPress={() => setShowDatePicker(true)}>
             <Text style={styles.inputText}>
               {formData.dob ? formData.dob.toLocaleDateString("en-US") : ui.date}
             </Text>
             <MaterialCommunityIcons name="calendar-month-outline" size={20} color="#8B9494" />
           </TouchableOpacity>
 
-          {showDatePicker && <DateTimePicker value={formData.dob} mode="date" onChange={onDateChange} />}
+          {showDatePicker && <DateTimePicker value={formData.dob} mode="date" onChange={onDateChange} />} */}
 
           <TouchableOpacity style={styles.inputContainer} onPress={() => setShowGenderModal(true)}>
             <Text style={[styles.inputText, { color: formData.gender ? "#2F3437" : "#7C8585" }]}>
