@@ -29,17 +29,26 @@ const findCouponArrayDeep = (input: any): any[] => {
     return [];
 };
 
-const normalizeCoupon = (coupon: any) => ({
-    ...coupon,
-    id: coupon?.id || coupon?._id || coupon?.couponId || '',
-    code: coupon?.code || coupon?.couponCode || '',
-    discountType: coupon?.discountType || coupon?.discount_type || coupon?.type || 'fixed',
-    discountValue: Number(coupon?.discountValue ?? coupon?.discount ?? coupon?.value ?? 0),
-    minPurchaseAmount: Number(coupon?.minPurchaseAmount ?? coupon?.minimumPurchase ?? coupon?.min_purchase_amount ?? 0),
-    validFrom: coupon?.validFrom || coupon?.startDate || coupon?.fromDate || coupon?.createdAt,
-    validUntil: coupon?.validUntil || coupon?.endDate || coupon?.toDate || coupon?.expiresAt,
-    isActive: coupon?.isActive !== undefined ? coupon.isActive : coupon?.active !== undefined ? coupon.active : true,
-});
+const normalizeCoupon = (coupon: any) => {
+    const source = coupon?.coupon && typeof coupon.coupon === 'object'
+        ? { ...coupon, ...coupon.coupon, assignment: coupon }
+        : coupon;
+
+    return {
+        ...source,
+        id: source?.id || source?._id || source?.couponId || source?.coupon?.id || source?.coupon?._id || '',
+        assignmentId: coupon?.coupon ? coupon?.id || coupon?._id || '' : undefined,
+        code: source?.code || source?.couponCode || source?.coupon?.code || source?.coupon?.couponCode || '',
+        discountType: source?.discountType || source?.discount_type || source?.type || source?.coupon?.discountType || 'fixed',
+        discountValue: Number(source?.discountValue ?? source?.discount ?? source?.value ?? source?.coupon?.discountValue ?? 0),
+        minPurchaseAmount: Number(source?.minPurchaseAmount ?? source?.minimumPurchase ?? source?.min_purchase_amount ?? source?.coupon?.minPurchaseAmount ?? 0),
+        validFrom: source?.validFrom || source?.startDate || source?.fromDate || source?.coupon?.validFrom || source?.createdAt,
+        validUntil: source?.validUntil || source?.endDate || source?.toDate || source?.expiresAt || source?.coupon?.validUntil,
+        isActive: source?.isActive !== undefined ? source.isActive : source?.active !== undefined ? source.active : true,
+        vendorId: source?.vendorId || source?.coupon?.vendorId || '',
+        isUsed: coupon?.isUsed ?? source?.isUsed ?? false,
+    };
+};
 
 export interface Coupon {
     id: string;
@@ -76,6 +85,39 @@ export interface AssignCouponRequest {
 export const couponApiSlice = apiSlice.injectEndpoints({
     overrideExisting: true,
     endpoints: (builder) => ({
+        getMyCoupons: builder.query({
+            query: () => '/coupons',
+            transformResponse: (response: any) => {
+                try {
+                    console.log('Coupon API - getMyCoupons transformResponse called');
+                    if (!response) return [];
+                    if (Array.isArray(response)) return response.map(normalizeCoupon);
+                    if (response.data && Array.isArray(response.data)) return response.data.map(normalizeCoupon);
+                    if (response.data?.coupons && Array.isArray(response.data.coupons)) return response.data.coupons.map(normalizeCoupon);
+                    if (response.data?.items && Array.isArray(response.data.items)) return response.data.items.map(normalizeCoupon);
+                    if (response.coupons && Array.isArray(response.coupons)) return response.coupons.map(normalizeCoupon);
+                    if (response.items && Array.isArray(response.items)) return response.items.map(normalizeCoupon);
+                    const deepFound = findCouponArrayDeep(response);
+                    if (deepFound.length) {
+                        return deepFound.map(normalizeCoupon);
+                    }
+                    return [];
+                } catch (error) {
+                    console.error('Coupon API - getMyCoupons transformResponse error:', error);
+                    return [];
+                }
+            },
+            providesTags: (result) => {
+                const tags: any[] = [{ type: 'Coupon', id: 'LIST' }];
+                if (Array.isArray(result)) {
+                    result.forEach((item: any) => {
+                        if (item && item.id) tags.push({ type: 'Coupon' as const, id: item.id });
+                    });
+                }
+                return tags;
+            },
+        }),
+
         // Get all coupons for a vendor
         getCouponsByVendor: builder.query({
             query: (vendorId) => {
@@ -95,12 +137,12 @@ export const couponApiSlice = apiSlice.injectEndpoints({
                 try {
                     console.log('Coupon API - transformResponse called');
                     if (!response) return [];
-                    if (Array.isArray(response)) return response;
-                    if (response.data && Array.isArray(response.data)) return response.data;
-                    if (response.data?.coupons && Array.isArray(response.data.coupons)) return response.data.coupons;
-                    if (response.data?.items && Array.isArray(response.data.items)) return response.data.items;
-                    if (response.coupons && Array.isArray(response.coupons)) return response.coupons;
-                    if (response.items && Array.isArray(response.items)) return response.items;
+                    if (Array.isArray(response)) return response.map(normalizeCoupon);
+                    if (response.data && Array.isArray(response.data)) return response.data.map(normalizeCoupon);
+                    if (response.data?.coupons && Array.isArray(response.data.coupons)) return response.data.coupons.map(normalizeCoupon);
+                    if (response.data?.items && Array.isArray(response.data.items)) return response.data.items.map(normalizeCoupon);
+                    if (response.coupons && Array.isArray(response.coupons)) return response.coupons.map(normalizeCoupon);
+                    if (response.items && Array.isArray(response.items)) return response.items.map(normalizeCoupon);
                     const deepFound = findCouponArrayDeep(response);
                     if (deepFound.length) {
                         return deepFound.map(normalizeCoupon);
@@ -167,6 +209,7 @@ export const couponApiSlice = apiSlice.injectEndpoints({
 });
 
 export const {
+    useGetMyCouponsQuery,
     useGetCouponsByVendorQuery,
     useGetCouponByIdQuery,
     useCreateCouponMutation,

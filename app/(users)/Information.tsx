@@ -369,7 +369,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useCreateOrderMutation } from "@/store/api/orderApiSlice";
 import { RootState } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -390,9 +390,11 @@ import { useSelector } from "react-redux";
 export default function InformationScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { promoCode: promoCodeParam } = useLocalSearchParams();
   const user = useSelector((state: RootState) => state.auth.user);
-  const { data: cartData, isLoading: isCartLoading } = useGetCartQuery();
+  const { data: cartData } = useGetCartQuery();
   const [createOrder, { isLoading: isCreatingOrder }] = useCreateOrderMutation();
+  const appliedPromoCode = String(promoCodeParam || "").trim();
 
   // Form States
   const [fullName, setFullName] = useState((user as any)?.buyer?.fullName || user?.name || "");
@@ -472,6 +474,7 @@ export default function InformationScreen() {
           shippingAddress,
           optionalAddress: address2.trim(),
           country: countryName,
+          ...(appliedPromoCode ? { couponCode: appliedPromoCode } : {}),
         };
 
         console.log('Creating order with data:', JSON.stringify(orderData, null, 2));

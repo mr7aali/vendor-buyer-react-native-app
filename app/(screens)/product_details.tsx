@@ -1,13 +1,29 @@
-import { useDeleteProductMutation, useGetProductByIdQuery } from '@/store/api/product_api_slice';
-import { useGetProductReviewsQuery } from '@/store/api/reviewApiSlice';
-import { useTranslation } from '@/hooks/use-translation';
-import { Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, I18nManager, Image, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  useDeleteProductMutation,
+  useGetProductByIdQuery,
+} from "@/store/api/product_api_slice";
+import { useGetProductReviewsQuery } from "@/store/api/reviewApiSlice";
+import { useTranslation } from "@/hooks/use-translation";
+import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  I18nManager,
+  Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const FALLBACK = 'https://via.placeholder.com/200';
+const FALLBACK = "https://via.placeholder.com/200";
 
 const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
@@ -16,12 +32,15 @@ const toNumber = (value: any, fallback = 0) => {
 
 const money = (value: any) => `$${toNumber(value).toFixed(2)}`;
 const resolveEntityId = (value: any): string => {
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (value && typeof value === 'object') {
-    if (typeof value.id === 'string' || typeof value.id === 'number') return String(value.id);
-    if (typeof value._id === 'string' || typeof value._id === 'number') return String(value._id);
+  if (typeof value === "string" || typeof value === "number")
+    return String(value);
+  if (value && typeof value === "object") {
+    if (typeof value.id === "string" || typeof value.id === "number")
+      return String(value.id);
+    if (typeof value._id === "string" || typeof value._id === "number")
+      return String(value._id);
   }
-  return '';
+  return "";
 };
 
 export default function ProductDetails() {
@@ -29,126 +48,155 @@ export default function ProductDetails() {
   const { width } = useWindowDimensions();
   const { id: idParam } = useLocalSearchParams();
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
-  const requestId = String(id || '');
-  const { data: product, isLoading, isError } = useGetProductByIdQuery(requestId, {
+  const requestId = String(id || "");
+  const {
+    data: product,
+    isLoading,
+    isError,
+  } = useGetProductByIdQuery(requestId, {
     skip: !requestId,
     refetchOnMountOrArgChange: true,
     refetchOnFocus: true,
   });
   const reviewProductId = resolveEntityId(product) || requestId;
-  const { data: reviewsData, isLoading: isReviewsLoading } = useGetProductReviewsQuery(
-    { productId: reviewProductId, page: 1, limit: 10 },
-    { skip: !reviewProductId },
-  );
+  const { data: reviewsData, isLoading: isReviewsLoading } =
+    useGetProductReviewsQuery(
+      { productId: reviewProductId, page: 1, limit: 10 },
+      { skip: !reviewProductId },
+    );
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const ui = useMemo(() => {
-    if (language === 'he') {
+    if (language === "he") {
       return {
-        draft: 'טיוטה',
-        lowStock: 'מלאי נמוך',
-        active: 'פעיל',
-        onStock: 'במלאי',
-        processing: 'בעיבוד',
+        draft: "טיוטה",
+        lowStock: "מלאי נמוך",
+        active: "פעיל",
+        onStock: "במלאי",
+        processing: "בעיבוד",
         totalSold: 'נמכרו סה"כ',
-        media: 'מדיה',
-        description: 'תיאור',
-        specification: 'מפרט',
-        noDescription: 'לא סופק תיאור.',
-        deleteProduct: 'מחיקת מוצר',
-        deleteConfirm: 'האם למחוק את המוצר הזה?',
-        deleting: 'מוחק...',
-        delete: 'מחיקה',
-        editProduct: 'עריכת מוצר',
-        failedDeleteProduct: 'מחיקת המוצר נכשלה',
+        media: "מדיה",
+        description: "תיאור",
+        specification: "מפרט",
+        noDescription: "לא סופק תיאור.",
+        deleteProduct: "מחיקת מוצר",
+        deleteConfirm: "האם למחוק את המוצר הזה?",
+        deleting: "מוחק...",
+        delete: "מחיקה",
+        editProduct: "עריכת מוצר",
+        failedDeleteProduct: "מחיקת המוצר נכשלה",
       };
     }
-    if (language === 'hi') {
+    if (language === "hi") {
       return {
-        draft: 'ड्राफ्ट',
-        lowStock: 'कम स्टॉक',
-        active: 'सक्रिय',
-        onStock: 'स्टॉक में',
-        processing: 'प्रोसेसिंग',
-        totalSold: 'कुल बिके',
-        media: 'मीडिया',
-        description: 'विवरण',
-        specification: 'स्पेसिफिकेशन',
-        noDescription: 'कोई विवरण उपलब्ध नहीं है।',
-        deleteProduct: 'प्रोडक्ट हटाएं',
-        deleteConfirm: 'क्या आप इस प्रोडक्ट को हटाना चाहते हैं?',
-        deleting: 'हटाया जा रहा है...',
-        delete: 'हटाएं',
-        editProduct: 'प्रोडक्ट एडिट करें',
-        failedDeleteProduct: 'प्रोडक्ट हटाना विफल रहा',
+        draft: "ड्राफ्ट",
+        lowStock: "कम स्टॉक",
+        active: "सक्रिय",
+        onStock: "स्टॉक में",
+        processing: "प्रोसेसिंग",
+        totalSold: "कुल बिके",
+        media: "मीडिया",
+        description: "विवरण",
+        specification: "स्पेसिफिकेशन",
+        noDescription: "कोई विवरण उपलब्ध नहीं है।",
+        deleteProduct: "प्रोडक्ट हटाएं",
+        deleteConfirm: "क्या आप इस प्रोडक्ट को हटाना चाहते हैं?",
+        deleting: "हटाया जा रहा है...",
+        delete: "हटाएं",
+        editProduct: "प्रोडक्ट एडिट करें",
+        failedDeleteProduct: "प्रोडक्ट हटाना विफल रहा",
       };
     }
     return {
-      draft: 'Draft',
-      lowStock: 'Low Stock',
-      active: 'Active',
-      onStock: 'On Stock',
-      processing: 'Processing',
-      totalSold: 'Total Sold',
-      media: 'Media',
-      description: 'Description',
-      specification: 'Specification',
-      noDescription: 'No description provided.',
-      deleteProduct: 'Delete Product',
-      deleteConfirm: 'Are you sure you want to delete this product?',
-      deleting: 'Deleting...',
-      delete: 'Delete',
-      editProduct: 'Edit Product',
-      failedDeleteProduct: 'Failed to delete product',
+      draft: "Draft",
+      lowStock: "Low Stock",
+      active: "Active",
+      onStock: "On Stock",
+      processing: "Processing",
+      totalSold: "Total Sold",
+      media: "Media",
+      description: "Description",
+      specification: "Specification",
+      noDescription: "No description provided.",
+      deleteProduct: "Delete Product",
+      deleteConfirm: "Are you sure you want to delete this product?",
+      deleting: "Deleting...",
+      delete: "Delete",
+      editProduct: "Edit Product",
+      failedDeleteProduct: "Failed to delete product",
     };
   }, [language]);
 
   const specs = useMemo(() => {
-    const formatLabel = (key: string) => key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1');
+    const formatLabel = (key: string) =>
+      key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, " $1");
     const mapArrayToSpecs = (list: any[]) =>
       list
         .map((item: any) => {
-          const key = item?.key || item?.label || item?.name || item?.specificationLabel;
-          const value = item?.value ?? item?.specificationValue ?? item?.content ?? item?.description;
+          const key =
+            item?.key || item?.label || item?.name || item?.specificationLabel;
+          const value =
+            item?.value ??
+            item?.specificationValue ??
+            item?.content ??
+            item?.description;
           return {
-            label: key ? formatLabel(String(key)) : '',
-            value: Array.isArray(value) ? value.join(', ') : value != null ? String(value) : '',
+            label: key ? formatLabel(String(key)) : "",
+            value: Array.isArray(value)
+              ? value.join(", ")
+              : value != null
+                ? String(value)
+                : "",
           };
         })
-        .filter((spec: { label: string; value: string }) => spec.label && spec.value.trim() !== '');
+        .filter(
+          (spec: { label: string; value: string }) =>
+            spec.label && spec.value.trim() !== "",
+        );
 
     const objectSpec =
-      product?.specification && typeof product.specification === 'object' && !Array.isArray(product.specification)
+      product?.specification &&
+      typeof product.specification === "object" &&
+      !Array.isArray(product.specification)
         ? Object.entries(product.specification)
-            .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
+            .filter(
+              ([, value]) =>
+                value !== undefined &&
+                value !== null &&
+                String(value).trim() !== "",
+            )
             .map(([key, value]) => ({
               label: formatLabel(String(key)),
-              value: Array.isArray(value) ? value.join(', ') : String(value),
+              value: Array.isArray(value) ? value.join(", ") : String(value),
             }))
         : [];
 
     if (objectSpec.length > 0) return objectSpec;
-    if (Array.isArray(product?.specification)) return mapArrayToSpecs(product.specification);
-    if (Array.isArray(product?.specifications)) return mapArrayToSpecs(product.specifications);
-    if (Array.isArray(product?.productSpecifications)) return mapArrayToSpecs(product.productSpecifications);
-    if (Array.isArray(product?.specificationList)) return mapArrayToSpecs(product.specificationList);
+    if (Array.isArray(product?.specification))
+      return mapArrayToSpecs(product.specification);
+    if (Array.isArray(product?.specifications))
+      return mapArrayToSpecs(product.specifications);
+    if (Array.isArray(product?.productSpecifications))
+      return mapArrayToSpecs(product.productSpecifications);
+    if (Array.isArray(product?.specificationList))
+      return mapArrayToSpecs(product.specificationList);
     return [];
   }, [product]);
   const reviews = reviewsData?.data?.reviews || [];
 
   const handleDelete = () => {
     Alert.alert(ui.deleteProduct, ui.deleteConfirm, [
-      { text: t('cancel', 'Cancel'), style: 'cancel' },
+      { text: t("cancel", "Cancel"), style: "cancel" },
       {
         text: ui.delete,
-        style: 'destructive',
+        style: "destructive",
         onPress: async () => {
           try {
             await deleteProduct(requestId).unwrap();
             router.back();
           } catch {
-            Alert.alert(t('error', 'Error'), ui.failedDeleteProduct);
+            Alert.alert(t("error", "Error"), ui.failedDeleteProduct);
           }
         },
       },
@@ -166,24 +214,33 @@ export default function ProductDetails() {
   if (!product || isError) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={{ color: '#2A3237' }}>{t('product_details_not_found', 'Product not found')}</Text>
+        <Text style={{ color: "#2A3237" }}>
+          {t("product_details_not_found", "Product not found")}
+        </Text>
       </SafeAreaView>
     );
   }
 
   const status = !product.isAvailable
-    ? { label: ui.draft, bg: '#F0F3F4', text: '#56616A' }
+    ? { label: ui.draft, bg: "#F0F3F4", text: "#56616A" }
     : Number(product.stockQuantity) < 10
-      ? { label: ui.lowStock, bg: '#FFF4D9', text: '#A56700' }
-      : { label: ui.active, bg: '#E8F8EE', text: '#248D5A' };
+      ? { label: ui.lowStock, bg: "#FFF4D9", text: "#A56700" }
+      : { label: ui.active, bg: "#E8F8EE", text: "#248D5A" };
 
-  const images = Array.isArray(product.images) && product.images.length ? product.images : [FALLBACK];
+  const images =
+    Array.isArray(product.images) && product.images.length
+      ? product.images
+      : [FALLBACK];
   const imageCountLabel = `${Math.min(activeImageIndex + 1, images.length)}/${images.length}`;
   const heroImageWidth = Math.max(width - 52, 0);
 
-  const handleImageScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleImageScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
     const { contentOffset, layoutMeasurement } = event.nativeEvent;
-    const nextIndex = Math.round(contentOffset.x / Math.max(layoutMeasurement.width, 1));
+    const nextIndex = Math.round(
+      contentOffset.x / Math.max(layoutMeasurement.width, 1),
+    );
     if (nextIndex !== activeImageIndex) {
       setActiveImageIndex(Math.max(0, Math.min(nextIndex, images.length - 1)));
     }
@@ -195,11 +252,16 @@ export default function ProductDetails() {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={22} color="#1F2A30" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('product_details_title', 'Details')}</Text>
+        <Text style={styles.headerTitle}>
+          {t("product_details_title", "Details")}
+        </Text>
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.card}>
           <View style={styles.mediaHeader}>
             <Text style={styles.sectionTitle}>{ui.media}</Text>
@@ -213,7 +275,11 @@ export default function ProductDetails() {
             style={styles.heroCarousel}
           >
             {images.map((uri, index) => (
-              <Image key={`${uri}-${index}`} source={{ uri }} style={[styles.heroImage, { width: heroImageWidth }]} />
+              <Image
+                key={`${uri}-${index}`}
+                source={{ uri }}
+                style={[styles.heroImage, { width: heroImageWidth }]}
+              />
             ))}
           </ScrollView>
           {images.length > 1 ? (
@@ -221,7 +287,12 @@ export default function ProductDetails() {
               {images.map((_, index) => (
                 <View
                   key={`dot-${index}`}
-                  style={[styles.paginationDot, index === activeImageIndex ? styles.paginationDotActive : null]}
+                  style={[
+                    styles.paginationDot,
+                    index === activeImageIndex
+                      ? styles.paginationDotActive
+                      : null,
+                  ]}
                 />
               ))}
             </View>
@@ -232,14 +303,21 @@ export default function ProductDetails() {
           <View style={styles.titleRow}>
             <Text style={styles.productName}>{product.name}</Text>
             <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-              <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+              <Text style={[styles.statusText, { color: status.text }]}>
+                {status.label}
+              </Text>
             </View>
           </View>
           <View style={styles.skuRatingRow}>
-            <Text style={styles.sku}>{`${t('product_details_sku', 'Sku')}: ${product.sku || t('product_details_na', 'N/A')}`}</Text>
+            <Text
+              style={styles.sku}
+            >{`${t("product_details_sku", "Sku")}: ${product.sku || t("product_details_na", "N/A")}`}</Text>
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={13} color="#F0B429" />
-              <Text style={styles.ratingText}>{toNumber(product.averageRating).toFixed(1)} ({product.totalReviews || 0})</Text>
+              <Text style={styles.ratingText}>
+                {toNumber(product.averageRating).toFixed(1)} (
+                {product.totalReviews || 0})
+              </Text>
             </View>
           </View>
           <Text style={styles.price}>{money(product.price)}</Text>
@@ -251,25 +329,37 @@ export default function ProductDetails() {
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>{ui.processing}</Text>
-              <Text style={styles.statValue}>{product?._count?.orderItems || 0}</Text>
+              <Text style={styles.statValue}>
+                {product?._count?.orderItems || 0}
+              </Text>
             </View>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>{ui.totalSold}</Text>
-              <Text style={styles.statValue}>{product?._count?.orderItems || 0}</Text>
+              <Text style={styles.statValue}>
+                {product?._count?.orderItems || 0}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{ui.description}</Text>
-          <Text style={styles.description}>{product.description || ui.noDescription}</Text>
+          <Text style={styles.description}>
+            {product.description || ui.noDescription}
+          </Text>
         </View>
 
         {specs.length > 0 ? (
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>{ui.specification}</Text>
             {specs.map((spec, index) => (
-              <View key={`${spec.label}-${index}`} style={[styles.specRow, index < specs.length - 1 ? styles.specBorder : null]}>
+              <View
+                key={`${spec.label}-${index}`}
+                style={[
+                  styles.specRow,
+                  index < specs.length - 1 ? styles.specBorder : null,
+                ]}
+              >
                 <Text style={styles.specLabel}>{spec.label}</Text>
                 <Text style={styles.specValue}>{spec.value}</Text>
               </View>
@@ -278,37 +368,81 @@ export default function ProductDetails() {
         ) : null}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>{t('product_details_customer_reviews', 'Customer Reviews')}</Text>
+          <Text style={styles.sectionTitle}>
+            {t("product_details_customer_reviews", "Customer Reviews")}
+          </Text>
           {isReviewsLoading ? (
-            <ActivityIndicator size="small" color="#278687" style={{ marginTop: 8 }} />
+            <ActivityIndicator
+              size="small"
+              color="#278687"
+              style={{ marginTop: 8 }}
+            />
           ) : reviews.length > 0 ? (
             reviews.map((review: any, index: number) => (
-              <View key={review._id || `${index}`} style={[styles.reviewRow, index < reviews.length - 1 ? styles.reviewBorder : null]}>
+              <View
+                key={review._id || `${index}`}
+                style={[
+                  styles.reviewRow,
+                  index < reviews.length - 1 ? styles.reviewBorder : null,
+                ]}
+              >
                 <View style={styles.reviewHead}>
-                  <Text style={styles.reviewName}>{review.user?.fullName || t('product_details_unknown_user', 'Unknown User')}</Text>
-                  <Text style={styles.reviewDate}>{review?.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}</Text>
+                  <Text style={styles.reviewName}>
+                    {review.user?.fullName ||
+                      t("product_details_unknown_user", "Unknown User")}
+                  </Text>
+                  <Text style={styles.reviewDate}>
+                    {review?.createdAt
+                      ? new Date(review.createdAt).toLocaleDateString()
+                      : ""}
+                  </Text>
                 </View>
                 <View style={styles.reviewStars}>
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <Ionicons key={s} name="star" size={12} color={s <= Number(review.rating || 0) ? '#F0B429' : '#D7E0E5'} />
+                    <Ionicons
+                      key={s}
+                      name="star"
+                      size={12}
+                      color={
+                        s <= Number(review.rating || 0) ? "#F0B429" : "#D7E0E5"
+                      }
+                    />
                   ))}
                 </View>
-                <Text style={styles.reviewComment}>{review.comment || '-'}</Text>
+                <Text style={styles.reviewComment}>
+                  {review.comment || "-"}
+                </Text>
               </View>
             ))
           ) : (
-            <Text style={styles.reviewEmpty}>{t('product_details_no_reviews', 'No reviews yet for this product.')}</Text>
+            <Text style={styles.reviewEmpty}>
+              {t(
+                "product_details_no_reviews",
+                "No reviews yet for this product.",
+              )}
+            </Text>
           )}
         </View>
 
         <View style={styles.footerRow}>
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={isDeleting}>
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={handleDelete}
+            disabled={isDeleting}
+          >
             <Ionicons name="trash-outline" size={18} color="#EF595A" />
-            <Text style={styles.deleteText}>{isDeleting ? ui.deleting : ui.delete}</Text>
+            <Text style={styles.deleteText}>
+              {isDeleting ? ui.deleting : ui.delete}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.editBtn}
-            onPress={() => router.push({ pathname: '/(screens)/EditProduct', params: { id: product.id } })}
+            onPress={() =>
+              router.push({
+                pathname: "/(screens)/EditProduct",
+                params: { id: product.id },
+              })
+            }
           >
             <Feather name="edit-2" size={16} color="#FFF" />
             <Text style={styles.editText}>{ui.editProduct}</Text>
@@ -320,49 +454,153 @@ export default function ProductDetails() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F6F5' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F2F6F5' },
-  header: { direction: 'ltr', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1F2A30' },
+  container: { flex: 1, backgroundColor: "#F2F6F5" },
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F2F6F5",
+  },
+  header: {
+    direction: "ltr",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "#1F2A30" },
   content: { paddingHorizontal: 14, paddingBottom: 20 },
-  card: { backgroundColor: '#FFF', borderWidth: 1, borderColor: '#DDE6EA', borderRadius: 12, padding: 12, marginBottom: 10 },
-  mediaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1F2A30' },
-  mediaCount: { color: '#8A969D', fontSize: 12 },
+  card: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#DDE6EA",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  mediaHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#1F2A30" },
+  mediaCount: { color: "#8A969D", fontSize: 12 },
   heroCarousel: { marginHorizontal: -12 },
-  heroImage: { width: 336, height: 190, borderRadius: 10, backgroundColor: '#E8EEF1', marginHorizontal: 12 },
-  paginationRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 10, gap: 6 },
-  paginationDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D5DFE4' },
-  paginationDotActive: { width: 16, backgroundColor: '#278687' },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  productName: { fontSize: 18, fontWeight: '700', color: '#1F2A30', flex: 1, paddingRight: 8 },
+  heroImage: {
+    width: 336,
+    height: 190,
+    borderRadius: 10,
+    backgroundColor: "#E8EEF1",
+    marginHorizontal: 12,
+  },
+  paginationRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 6,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#D5DFE4",
+  },
+  paginationDotActive: { width: 16, backgroundColor: "#278687" },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1F2A30",
+    flex: 1,
+    paddingRight: 8,
+  },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  skuRatingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
-  sku: { fontSize: 12, color: '#6E7B84' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center' },
-  ratingText: { fontSize: 12, color: '#4F5D66', marginLeft: 6 },
-  price: { marginTop: 8, fontSize: 20, fontWeight: '700', color: '#278687' },
-  statsRow: { flexDirection: 'row', marginTop: 10, gap: 8 },
-  statBox: { flex: 1, backgroundColor: '#F4F8F8', borderRadius: 8, paddingVertical: 8, alignItems: 'center' },
-  statLabel: { fontSize: 11, color: '#6E7B84' },
-  statValue: { marginTop: 2, fontSize: 16, fontWeight: '700', color: '#1F2A30' },
-  description: { marginTop: 4, fontSize: 13, color: '#58656E', lineHeight: 20 },
-  specRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 9 },
-  specBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
-  specLabel: { fontSize: 13, color: '#6E7B84' },
-  specValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600', maxWidth: '55%', textAlign: I18nManager.isRTL ? 'left' : 'right' },
+  statusText: { fontSize: 11, fontWeight: "700" },
+  skuRatingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  sku: { fontSize: 12, color: "#6E7B84" },
+  ratingRow: { flexDirection: "row", alignItems: "center" },
+  ratingText: { fontSize: 12, color: "#4F5D66", marginLeft: 6 },
+  price: { marginTop: 8, fontSize: 20, fontWeight: "700", color: "#278687" },
+  statsRow: { flexDirection: "row", marginTop: 10, gap: 8 },
+  statBox: {
+    flex: 1,
+    backgroundColor: "#F4F8F8",
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  statLabel: { fontSize: 11, color: "#6E7B84" },
+  statValue: {
+    marginTop: 2,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2A30",
+  },
+  description: { marginTop: 4, fontSize: 13, color: "#58656E", lineHeight: 20 },
+  specRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 9,
+  },
+  specBorder: { borderBottomWidth: 1, borderBottomColor: "#EDF2F4" },
+  specLabel: { fontSize: 13, color: "#6E7B84" },
+  specValue: {
+    fontSize: 13,
+    color: "#1F2A30",
+    fontWeight: "600",
+    maxWidth: "55%",
+    textAlign: I18nManager.isRTL ? "left" : "right",
+  },
   reviewRow: { paddingVertical: 10 },
-  reviewBorder: { borderBottomWidth: 1, borderBottomColor: '#EDF2F4' },
-  reviewHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  reviewName: { fontSize: 13, color: '#1F2A30', fontWeight: '700' },
-  reviewDate: { fontSize: 11, color: '#8A969D' },
-  reviewStars: { flexDirection: 'row', gap: 3, marginTop: 3 },
-  reviewComment: { marginTop: 5, fontSize: 12, color: '#55626A' },
-  reviewEmpty: { marginTop: 8, fontSize: 12, color: '#8A969D' },
-  footerRow: { flexDirection: 'row', marginTop: 4, marginBottom: 6 },
-  deleteBtn: { flex: 1, height: 44, borderRadius: 10, borderWidth: 1.4, borderColor: '#F2B6BA', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginRight: 8, gap: 6, backgroundColor: '#FFF6F6' },
-  deleteText: { color: '#EF595A', fontWeight: '700' },
-  editBtn: { flex: 1, height: 44, borderRadius: 10, backgroundColor: '#278687', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', marginLeft: 8, gap: 6 },
-  editText: { color: '#FFF', fontWeight: '700' },
+  reviewBorder: { borderBottomWidth: 1, borderBottomColor: "#EDF2F4" },
+  reviewHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  reviewName: { fontSize: 13, color: "#1F2A30", fontWeight: "700" },
+  reviewDate: { fontSize: 11, color: "#8A969D" },
+  reviewStars: { flexDirection: "row", gap: 3, marginTop: 3 },
+  reviewComment: { marginTop: 5, fontSize: 12, color: "#55626A" },
+  reviewEmpty: { marginTop: 8, fontSize: 12, color: "#8A969D" },
+  footerRow: { flexDirection: "row", marginTop: 4, marginBottom: 6 },
+  deleteBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.4,
+    borderColor: "#F2B6BA",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginRight: 8,
+    gap: 6,
+    backgroundColor: "#FFF6F6",
+  },
+  deleteText: { color: "#EF595A", fontWeight: "700" },
+  editBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: "#278687",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginLeft: 8,
+    gap: 6,
+  },
+  editText: { color: "#FFF", fontWeight: "700" },
 });
