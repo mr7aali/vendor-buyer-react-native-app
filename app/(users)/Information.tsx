@@ -25,6 +25,8 @@ import CountryPicker, { Country, CountryCode } from 'react-native-country-picker
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
+const INPUT_PLACEHOLDER_COLOR = "#8A969D";
+
 export default function InformationScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -187,7 +189,7 @@ export default function InformationScreen() {
               value={fullName}
               onChangeText={setFullName}
               placeholder={t("info_full_name_placeholder", "Rokey Mahmud")}
-              placeholderTextColor="#999"
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             />
           </View>
 
@@ -199,6 +201,7 @@ export default function InformationScreen() {
               value={email}
               editable={false}
               placeholder={t("info_email_placeholder", "example@email.com")}
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -212,6 +215,7 @@ export default function InformationScreen() {
               value={phone}
               onChangeText={setPhone}
               placeholder={t("info_phone_placeholder", "+1 9999999999")}
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               keyboardType="phone-pad"
             />
           </View>
@@ -224,6 +228,7 @@ export default function InformationScreen() {
               value={address1}
               onChangeText={setAddress1}
               placeholder={t("info_address_placeholder", "123 Main Street, Jersey City, New Jersey 07302, USA")}
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               multiline
             />
           </View>
@@ -236,6 +241,7 @@ export default function InformationScreen() {
               value={address2}
               onChangeText={setAddress2}
               placeholder={t("info_address_placeholder", "123 Main Street, Jersey City, New Jersey 07302, USA")}
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               multiline
             />
           </View>
@@ -249,6 +255,7 @@ export default function InformationScreen() {
                 value={city}
                 onChangeText={setCity}
                 placeholder=""
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               />
             </View>
 
@@ -259,6 +266,7 @@ export default function InformationScreen() {
                 value={stateValue}
                 onChangeText={setStateValue}
                 placeholder={t("info_state", "State")}
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               />
             </View>
             <View style={[styles.formGroup, { flex: 0.8 }]}>
@@ -267,6 +275,7 @@ export default function InformationScreen() {
                 style={styles.input}
                 value={zipCode}
                 onChangeText={setZipCode}
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 keyboardType="numeric"
                 maxLength={5}
               />

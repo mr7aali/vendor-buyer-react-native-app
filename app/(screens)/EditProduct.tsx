@@ -51,6 +51,8 @@ const getProductIdFromResponse = (response: any) =>
   response?.result?.product?._id ||
   "";
 
+const INPUT_PLACEHOLDER_COLOR = "#8A969D";
+
 const toCleanNumberString = (value: string) => value.replace(/[^0-9.]/g, "");
 const imagePickerMediaTypes: ImagePicker.MediaType[] = ["images"];
 
@@ -508,6 +510,7 @@ export default function EditProduct() {
           <TextInput
             style={styles.input}
             placeholder={t("enter_product_name", "Enter product name")}
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             value={name}
             onChangeText={setName}
           />
@@ -520,6 +523,7 @@ export default function EditProduct() {
               "enter_product_description",
               "Enter product description",
             )}
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             multiline
             value={description}
             onChangeText={setDescription}
@@ -539,6 +543,7 @@ export default function EditProduct() {
           <TextInput
             style={styles.input}
             placeholder="123"
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             keyboardType="numeric"
             value={stockQuantity}
             onChangeText={setStockQuantity}
@@ -549,6 +554,7 @@ export default function EditProduct() {
           <TextInput
             style={styles.input}
             placeholder="0"
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             keyboardType="numeric"
             value={minimumQuantity}
             onChangeText={setMinimumQuantity}
@@ -561,6 +567,7 @@ export default function EditProduct() {
           <TextInput
             style={styles.input}
             placeholder={t("price_placeholder", "0.00")}
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             keyboardType="numeric"
             value={price}
             onChangeText={(text) => setPrice(toCleanNumberString(text))}
@@ -653,12 +660,14 @@ export default function EditProduct() {
               <TextInput
                 style={styles.modalInput}
                 placeholder="e.g. Brand"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 value={newSpecLabel}
                 onChangeText={setNewSpecLabel}
               />
               <TextInput
                 style={styles.modalInput}
                 placeholder="e.g. JBL"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 value={newSpecValue}
                 onChangeText={setNewSpecValue}
               />

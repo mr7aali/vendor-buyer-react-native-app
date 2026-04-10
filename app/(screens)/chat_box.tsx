@@ -96,6 +96,8 @@ const normalizeId = (value: any): string => {
   return "";
 };
 
+const INPUT_PLACEHOLDER_COLOR = "#98A2B3";
+
 const resolveEntityId = (entity: any): string => {
   if (entity === undefined || entity === null) return "";
   if (typeof entity === "string" || typeof entity === "number")
@@ -1772,6 +1774,7 @@ const ChatBox: React.FC = () => {
               </TouchableOpacity>
               <TextInput
                 placeholder={t("chat_type_message", "Type a message...")}
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 style={[
                   styles.textInput,
                   isKeyboardVisible
