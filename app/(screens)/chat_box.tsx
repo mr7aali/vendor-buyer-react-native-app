@@ -129,6 +129,15 @@ const resolveVendorProfileId = (entity: any): string =>
       '',
   );
 
+const resolveBuyerProfileId = (entity: any): string =>
+  normalizeId(
+    entity?.buyer?.id ??
+      entity?.buyer?._id ??
+      entity?.buyerId?.id ??
+      entity?.buyerId?._id ??
+      '',
+  );
+
 const normalizeMessageType = (value: any): CustomChatMessage["type"] => {
   const normalized = String(value || "").toUpperCase();
   if (normalized === "TEXT") return "TEXT";
@@ -528,6 +537,7 @@ const ChatBox: React.FC = () => {
       name: (fullname || name) as string,
       id: resolveChatUserId(activePartnerId) || explicitPartnerId,
       vendorProfileId: explicitVendorProfileId,
+      buyerProfileId: "",
       avatar: "https://via.placeholder.com/44",
     };
 
@@ -565,6 +575,8 @@ const ChatBox: React.FC = () => {
           id: resolveChatUserId(p),
           vendorProfileId:
             resolveVendorProfileId(p) || fromParams.vendorProfileId,
+          buyerProfileId:
+            resolveBuyerProfileId(p) || fromParams.buyerProfileId,
           avatar: p.avatar || p.logoUrl || fromParams.avatar,
         };
       }
@@ -1014,10 +1026,12 @@ const ChatBox: React.FC = () => {
       // If sending a coupon, assign it to the buyer first
       if (type === "coupon" && coupon) {
         // Try to find the actual buyer profile ID from messages if possible
-        const buyerProfileId = messagesData?.find(
-          (m: any) => m.buyerId,
-        )?.buyerId;
-        const targetBuyerId = resolveChatUserId(buyerProfileId) || targetPartnerId;
+        const buyerProfileId =
+          normalizeId((partnerData as any)?.buyerProfileId) ||
+          normalizeId(
+            messagesData?.find((m: any) => normalizeId(m?.buyerId))?.buyerId,
+          );
+        const targetBuyerId = buyerProfileId || targetPartnerId;
 
         console.log("ChatBox.handleSendMessage - Triggered with type:", type);
         console.log("ChatBox.handleSendMessage - Coupon:", coupon?.id);
@@ -1054,11 +1068,25 @@ const ChatBox: React.FC = () => {
           }).unwrap();
         } catch (assignErr: any) {
           console.error("Failed to assign coupon:", assignErr);
-          // If 403, it might mean the buyer isn't connected. We can still try to send the message but the coupon won't be usable.
-          if (assignErr?.status === 403) {
-            console.warn(
-              "Assignment forbidden - likely buyer not connected to vendor",
+          const assignMessage =
+            assignErr?.data?.message ||
+            assignErr?.error ||
+            "Coupon assignment failed";
+          const alreadyAssigned =
+            typeof assignMessage === "string" &&
+            assignMessage.toLowerCase().includes("already assigned");
+
+          if (!alreadyAssigned) {
+            Alert.alert(
+              t("error", "Error"),
+              typeof assignMessage === "string"
+                ? assignMessage
+                : t(
+                    "chat_coupon_assign_error",
+                    "Error: Cannot assign coupon. Buyer ID not resolved.",
+                  ),
             );
+            return;
           }
         }
       }

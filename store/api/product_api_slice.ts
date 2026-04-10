@@ -51,6 +51,7 @@ const normalizeProduct = (product: any) => {
         images: Array.isArray(product.images) ? product.images : (product.imageUrl ? [product.imageUrl] : []),
         price: toNumber(product.price),
         stockQuantity: toNumber(product.stockQuantity),
+        minimulAuantity: toNumber(product.minimulAuantity),
         averageRating: toNumber(product.averageRating),
         totalReviews: toNumber(product.totalReviews),
         specification: normalizeSpecification(product),

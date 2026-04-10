@@ -41,6 +41,40 @@ const getProductIdFromResponse = (response: any) =>
   response?.data?.data?._id ||
   "";
 
+const toCleanNumberString = (value: string) => value.replace(/[^0-9.]/g, "");
+const imagePickerMediaTypes: ImagePicker.MediaType[] = ["images"];
+
+const isNonNegativeNumber = (value: string) => {
+  const parsed = Number(value);
+  return value.trim() !== "" && Number.isFinite(parsed) && parsed >= 0;
+};
+
+const formatApiErrorMessage = (error: any, fallback: string) => {
+  const messages = error?.data?.messages;
+  if (Array.isArray(messages) && messages.length > 0) {
+    return messages.join("\n");
+  }
+
+  const responseMessage = error?.data?.response?.message;
+  if (Array.isArray(responseMessage) && responseMessage.length > 0) {
+    return responseMessage.join("\n");
+  }
+
+  if (typeof responseMessage === "string" && responseMessage.trim()) {
+    return responseMessage;
+  }
+
+  if (typeof error?.data?.message === "string" && error.data.message.trim()) {
+    return error.data.message;
+  }
+
+  if (typeof error?.message === "string" && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 export default function EditProduct() {
   const { language, t } = useTranslation();
   const router = useRouter();
@@ -156,9 +190,16 @@ export default function EditProduct() {
       specification: "Specification",
       addSpecification: "Add Specification",
       noSpecAddedYet: "No specification added yet.",
-      missingFields: "Missing fields",
+        missingFields: "Missing fields",
       missingFieldsMsg:
         "Please fill product name, price, quantity and category.",
+      invalidMinimumQuantity: "Invalid minimum quantity",
+      invalidMinimumQuantityMsg:
+        "Enter a minimum quantity of 0 or more before saving.",
+      invalidPrice: "Invalid price",
+      invalidPriceMsg: "Enter a valid price of 0 or more.",
+      invalidStockQuantity: "Invalid stock quantity",
+      invalidStockQuantityMsg: "Enter a stock quantity of 0 or more.",
       missingMedia: "Missing media",
       missingMediaMsg: "Please add at least one product image.",
       limitReached: "Limit Reached",
@@ -242,11 +283,11 @@ export default function EditProduct() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: imagePickerMediaTypes,
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.length) {
       setSelectedImages((prev) => [...prev, result.assets[0].uri]);
     }
   };
@@ -286,12 +327,36 @@ export default function EditProduct() {
       Alert.alert(ui.missingMedia, ui.missingMediaMsg);
       return;
     }
+    if (!isNonNegativeNumber(price)) {
+      Alert.alert(
+        (ui as any).invalidPrice || "Invalid price",
+        (ui as any).invalidPriceMsg || "Enter a valid price of 0 or more.",
+      );
+      return;
+    }
+    if (!isNonNegativeNumber(stockQuantity)) {
+      Alert.alert(
+        (ui as any).invalidStockQuantity || "Invalid stock quantity",
+        (ui as any).invalidStockQuantityMsg ||
+          "Enter a stock quantity of 0 or more.",
+      );
+      return;
+    }
+    if (!isNonNegativeNumber(minimumQuantity)) {
+      Alert.alert(
+        (ui as any).invalidMinimumQuantity || "Invalid minimum quantity",
+        (ui as any).invalidMinimumQuantityMsg ||
+          "Enter a minimum quantity of 0 or more before saving.",
+      );
+      return;
+    }
 
     const formData = new FormData();
     formData.append("name", name.trim());
     formData.append("description", description.trim());
     formData.append("price", String(price).trim());
     formData.append("stockQuantity", String(stockQuantity).trim());
+    formData.append("minimulAuantity", String(minimumQuantity).trim());
     formData.append("isAvailable", String(isActive));
     formData.append("categoryId", selectedCategoryId);
 
@@ -365,7 +430,7 @@ export default function EditProduct() {
       console.error("Error saving product:", error);
       Alert.alert(
         t("error", "Error"),
-        error?.data?.message || ui.failedSaveProduct,
+        formatApiErrorMessage(error, ui.failedSaveProduct),
       );
     }
   };
@@ -467,6 +532,16 @@ export default function EditProduct() {
             value={stockQuantity}
             onChangeText={setStockQuantity}
           />
+          <Text style={styles.inputLabel}>
+            {t("minimum_quantity", "Minimum Quantity")}
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={minimumQuantity}
+            onChangeText={setMinimumQuantity}
+          />
         </View>
 
         <View style={styles.card}>
@@ -477,7 +552,7 @@ export default function EditProduct() {
             placeholder={t("price_placeholder", "0.00")}
             keyboardType="numeric"
             value={price}
-            onChangeText={(text) => setPrice(text.replace("$", ""))}
+            onChangeText={(text) => setPrice(toCleanNumberString(text))}
           />
         </View>
 
