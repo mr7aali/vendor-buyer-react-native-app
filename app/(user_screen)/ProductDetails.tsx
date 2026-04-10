@@ -1,5 +1,4 @@
 import { useAddToCartMutation } from "@/store/api/cartApiSlice";
-import { useCreateOrderMutation } from "@/store/api/orderApiSlice";
 import { useGetProductByIdQuery } from "@/store/api/product_api_slice";
 import { useCreateReviewMutation, useGetProductReviewsQuery } from "@/store/api/reviewApiSlice";
 import { useTranslation } from "@/hooks/use-translation";
@@ -59,7 +58,6 @@ const ProductDetails = () => {
     { productId: reviewProductId },
     { skip: !reviewProductId }
   );
-  const [createOrder, { isLoading: isCreating }] = useCreateOrderMutation();
   const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
   const [createReview, { isLoading: isSubmittingReview }] = useCreateReviewMutation();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -76,9 +74,11 @@ const ProductDetails = () => {
 
   const reviews = reviewsData?.data?.reviews || [];
   const totalReviews = reviewsData?.data?.meta?.total || 0;
-  const avgRating = totalReviews > 0
-    ? (reviews.reduce((acc: number, curr: any) => acc + curr.rating, 0) / reviews.length).toFixed(1)
-    : (product?.rating?.toFixed(1) || "0.0");
+  const averageRatingValue = reviews.length > 0
+    ? reviews.reduce((acc: number, curr: any) => acc + Number(curr.rating || 0), 0) / reviews.length
+    : Number(product?.rating || 0);
+  const avgRating = averageRatingValue.toFixed(1);
+  const filledStars = Math.round(averageRatingValue);
 
   const handleReviewSubmit = async () => {
     if (!user) {
@@ -116,7 +116,7 @@ const ProductDetails = () => {
   const handleBuyNow = async () => {
     if (!product) return;
     if (!user) {
-      Alert.alert(t("error", "Error"), t("product_details_login_order", "Please login to place an order"));
+      Alert.alert(t("error", "Error"), t("product_details_login_add_cart", "Please login to add items to cart"));
       return;
     }
     if (!Number.isInteger(quantity) || quantity < MIN_ORDER_QTY) {
@@ -128,25 +128,16 @@ const ProductDetails = () => {
     }
 
     try {
-      const orderData = {
-        vendorId: product.vendorId || product.vendor?._id || product.vendor,
-        orderItems: [
-          {
-            product: product._id || product.id,
-            quantity: quantity,
-            price: product.price
-          }
-        ],
-        shippingAddress: t("product_details_default_shipping", "Default Shipping Address"), // User should provide this in a real app
-        totalPrice: product.price * quantity,
-      };
-
-      const result = await createOrder(orderData).unwrap();
-      Alert.alert(t("success", "Success"), t("product_details_order_success", "Order placed successfully!"), [
-        { text: t("ok", "OK"), onPress: () => router.push("/(users)/cart") }
-      ]);
+      await addToCart({
+        productId: product._id || product.id,
+        quantity,
+      }).unwrap();
+      router.push("/(users)/cart");
     } catch (err: any) {
-      Alert.alert(t("error", "Error"), err?.data?.message || t("product_details_order_failed", "Failed to place order"));
+      Alert.alert(
+        t("error", "Error"),
+        err?.data?.message || t("product_details_failed_add_cart", "Failed to add to cart"),
+      );
     }
   };
 
@@ -240,7 +231,7 @@ const ProductDetails = () => {
         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
           <View style={{ flexDirection: "row", marginRight: 8 }}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <Ionicons key={i} name="star" size={14} color={i <= (product.rating || 0) ? "#FFD700" : "#E0E0E0"} />
+              <Ionicons key={i} name="star" size={14} color={i <= filledStars ? "#FFD700" : "#E0E0E0"} />
             ))}
           </View>
         <Text style={{ fontSize: 12, fontWeight: "bold", color: "#333" }}>
@@ -366,11 +357,11 @@ const ProductDetails = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.buyBtn, isCreating && { opacity: 0.7 }]}
+          style={[styles.buyBtn, isAdding && { opacity: 0.7 }]}
           onPress={handleBuyNow}
-          disabled={isCreating}
+          disabled={isAdding}
         >
-          {isCreating ? <ActivityIndicator color="white" /> : <Text style={styles.buyBtnText}>{t("product_details_buy", "Buy")} ${product.price}</Text>}
+          {isAdding ? <ActivityIndicator color="white" /> : <Text style={styles.buyBtnText}>{t("product_details_buy", "Buy")} ${product.price}</Text>}
         </TouchableOpacity>
 
         {/* Reviews */}

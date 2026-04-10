@@ -275,9 +275,12 @@ const ElectronicsScreen = () => {
                 {/* Rating Section */}
                 <View style={styles.ratingRow}>
                   <Ionicons name="star" size={16} color="#FFB800" />
-                  <Text style={styles.ratingText}>{item.rating || "0.0"}</Text>
+                  <Text style={styles.ratingText}>
+                    {Number(item.averageRating || item.rating || 0).toFixed(1)}
+                  </Text>
                   <Text style={styles.reviews}>
-                    ({item.reviews || 0} {t("electronics_reviews", "reviews")})
+                    ({item.totalReviews || item.reviews || 0}{" "}
+                    {t("electronics_reviews", "reviews")})
                   </Text>
                 </View>
               </TouchableOpacity>

@@ -5,11 +5,13 @@ import { useTranslation } from "@/hooks/use-translation";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Image, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 
 export default function TabLayout() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const user = useSelector((state: RootState) => state.auth.user as any);
   const profileImageUri =
     user?.vendor?.logoUrl ||
@@ -29,7 +31,8 @@ export default function TabLayout() {
           paddingLeft: 20,
           paddingRight: 20,
           paddingTop: 10,
-          height: 85,
+          paddingBottom: Math.max(insets.bottom, 10),
+          height: 75 + Math.max(insets.bottom, 10),
           direction: "ltr",
           borderTopWidth: 0,
           elevation: 10,
@@ -112,12 +115,6 @@ export default function TabLayout() {
           title: t("tab_electronics", "Electronics"),
           tabBarButton: () => null,
           tabBarItemStyle: { display: "none" },
-          tabBarStyle: {
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
-            display: "flex",
-          },
         }}
       />
     </Tabs>

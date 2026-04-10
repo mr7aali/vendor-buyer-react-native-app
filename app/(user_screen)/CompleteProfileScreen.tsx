@@ -339,6 +339,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
@@ -453,6 +454,7 @@ const CompleteProfileScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7FAF9" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -517,16 +519,6 @@ const CompleteProfileScreen = () => {
                 onPress={() => setIsCountryPickerVisible(true)}
               >
                 <View style={styles.dropdownLeft}>
-                  <CountryPicker
-                    countryCode={countryCode}
-                    withFilter
-                    withFlag
-                    withCountryNameButton={false}
-                    withAlphaFilter
-                    onSelect={onSelectCountry}
-                    visible={isCountryPickerVisible}
-                    onClose={() => setIsCountryPickerVisible(false)}
-                  />
                   <Text style={[styles.dropdownText, { color: "#181725", marginLeft: 5 }]}>
                     {country}
                   </Text>
@@ -572,6 +564,20 @@ const CompleteProfileScreen = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {isCountryPickerVisible ? (
+        <CountryPicker
+          countryCode={countryCode}
+          withFilter
+          withFlag
+          withCountryNameButton
+          withAlphaFilter
+          withCloseButton
+          visible
+          onSelect={onSelectCountry}
+          onClose={() => setIsCountryPickerVisible(false)}
+        />
+      ) : null}
 
       {/* Gender Selection Modal (Your existing modal remains the same) */}
       <Modal

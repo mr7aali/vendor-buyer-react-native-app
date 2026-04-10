@@ -1,6 +1,7 @@
 import { supportTickets } from "@/constants/common";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
+import { formatRoleLabel, resolveConversationRole, resolveCurrentRole } from "@/services/chatRole";
 import {
   useGetConversationsQuery,
   useMarkAsReadMutation,
@@ -124,6 +125,7 @@ export default function ChatTabs() {
   const { t } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = resolveChatUserId(user);
+  const currentRole = resolveCurrentRole(user);
 
   const [activeTab, setActiveTab] = useState<"chat" | "support">("chat");
   const [searchQuery, setSearchQuery] = useState("");
@@ -239,6 +241,9 @@ export default function ChatTabs() {
                   conversation?.lastMessage?.messageText ||
                   t("chat_no_messages_yet", "No messages yet");
                 const unreadCount = Number(conversation?.unreadCount || 0);
+                const conversationRole =
+                  resolveConversationRole(conversation, user) || "vendor";
+                const isRoleMismatch = conversationRole !== currentRole;
                 const messageId =
                   conversation?.lastMessage?.id ||
                   conversation?.lastMessage?._id;
@@ -262,7 +267,7 @@ export default function ChatTabs() {
                       router.push({
                         pathname: "/(screens)/chat_box",
                         params: {
-                          role: "vendor",
+                          role: conversationRole,
                           partnerId,
                           conversationId: normalizeId(
                             conversation?.id || conversation?._id || partnerId,
@@ -274,22 +279,23 @@ export default function ChatTabs() {
                   >
                     <Image source={{ uri: avatar }} style={styles.avatar} />
                     <View style={styles.middle}>
-                      {/* 1px solid red */}
-                      <Text
-                        style={styles.name}
-                        onPress={() => {
-                          console.log(
-                            displayName,
-                            avatar,
-                            partner,
-                            conversation,
-                          );
-                        }}
-                      >
-                        {displayName}
-                      </Text>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.name}>{displayName}</Text>
+                        <View
+                          style={[
+                            styles.roleBadge,
+                            isRoleMismatch && styles.roleBadgeMuted,
+                          ]}
+                        >
+                          <Text style={styles.roleBadgeText}>
+                            {formatRoleLabel(conversationRole)} Chat
+                          </Text>
+                        </View>
+                      </View>
                       <Text style={styles.preview} numberOfLines={1}>
-                        {lastText}
+                        {isRoleMismatch
+                          ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                          : lastText}
                       </Text>
                     </View>
                     <View style={styles.right}>
@@ -392,6 +398,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#CCEFDB",
   },
   middle: { flex: 1, marginLeft: 12, marginRight: 8, direction: "ltr" },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   name: {
     fontSize: 31 / 2,
     fontWeight: "600",
@@ -403,6 +414,20 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     marginTop: 2,
     textAlign: "left",
+  },
+  roleBadge: {
+    backgroundColor: "#DDF2F0",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  roleBadgeMuted: {
+    backgroundColor: "#FDECEC",
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#206C69",
   },
   right: { alignItems: "flex-start", minWidth: 64, direction: "ltr" },
   time: { fontSize: 14, color: "#4B5563", textAlign: "left" },

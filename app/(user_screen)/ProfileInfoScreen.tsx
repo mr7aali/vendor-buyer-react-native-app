@@ -1,5 +1,5 @@
-import { useGetProfileQuery } from "@/store/api/authApiSlice";
 import { useTranslation } from "@/hooks/use-translation";
+import { useGetProfileQuery } from "@/store/api/authApiSlice";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -43,11 +43,17 @@ const ProfileInfoScreen = () => {
     : ImagePicker.MediaTypeOptions.Images;
 
   // Helper to safely get user properties with fallbacks for weird backend keys
-  const getName = () => userData?.buyer?.fullName || userData?.name || userData?.fulllName || "User";
+  const getName = () =>
+    userData?.buyer?.fullName ||
+    userData?.name ||
+    userData?.fulllName ||
+    "User";
   const getDob = () => userData?.buyer?.dob || "N/A";
-  const getPhone = () => userData?.buyer?.phone || userData?.phoneNumber || "N/A";
+  const getPhone = () =>
+    userData?.buyer?.phone || userData?.phoneNumber || "N/A";
   const getIdType = () => userData?.buyer?.idType || "National ID";
-  const getIdNumber = () => userData?.buyer?.nidNumber || userData?.idNumber || "N/A";
+  const getIdNumber = () =>
+    userData?.buyer?.nidNumber || userData?.idNumber || "N/A";
   const ui = useMemo(() => {
     if (language === "he") {
       return {
@@ -97,7 +103,7 @@ const ProfileInfoScreen = () => {
       userData?.image ||
       userData?.logo ||
       "https://xsgames.co/randomusers/assets/avatars/male/74.jpg",
-    [userData]
+    [userData],
   );
 
   const pickImage = async () => {
@@ -106,7 +112,10 @@ const ProfileInfoScreen = () => {
     if (status !== "granted") {
       Alert.alert(
         t("permission_required", "Permission Required"),
-        t("need_photos_permission", "Sorry, we need camera roll permissions to make this work!")
+        t(
+          "need_photos_permission",
+          "Sorry, we need camera roll permissions to make this work!",
+        ),
       );
       return;
     }
@@ -152,7 +161,10 @@ const ProfileInfoScreen = () => {
       >
         <View style={styles.profileSection}>
           <View style={styles.imageWrapper}>
-            <Image source={{ uri: profileImage || serverAvatarUri }} style={styles.avatar} />
+            <Image
+              source={{ uri: profileImage || serverAvatarUri }}
+              style={styles.avatar}
+            />
 
             <TouchableOpacity style={styles.cameraBadge} onPress={pickImage}>
               <MaterialCommunityIcons
@@ -171,12 +183,6 @@ const ProfileInfoScreen = () => {
             icon="account-outline"
             label={ui.fullName}
             value={getName()}
-          />
-          <InfoItem
-            icon="calendar-month-outline"
-            label={ui.dateOfBirth}
-            value={getDob()}
-            isLast
           />
         </View>
 
@@ -220,7 +226,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7FBF9",
   },
   header: {
-    direction: 'ltr',
+    direction: "ltr",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",

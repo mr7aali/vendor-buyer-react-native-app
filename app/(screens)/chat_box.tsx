@@ -1,6 +1,7 @@
 import { useTranslation } from "@/hooks/use-translation";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useSocket } from "@/context/SocketContext";
+import { formatRoleLabel, resolveConversationRole, resolveCurrentRole } from "@/services/chatRole";
 import socketService from "@/services/socket";
 import { useGetCategoriesByVendorQuery } from "@/store/api/categoryApiSlice";
 import {
@@ -40,6 +41,7 @@ import {
 } from "react-native";
 import {
   SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -94,6 +96,8 @@ const normalizeId = (value: any): string => {
     return String(value);
   return "";
 };
+
+const INPUT_PLACEHOLDER_COLOR = "#98A2B3";
 
 const resolveEntityId = (entity: any): string => {
   if (entity === undefined || entity === null) return "";
@@ -475,9 +479,10 @@ const OrderHistorySkeleton = () => (
 
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const closedComposerInset = 30;
-  const openComposerInset = 30;
+  const closedComposerInset = Math.max(insets.bottom, 12);
+  const openComposerInset = Math.max(insets.bottom, 12);
   const composerBottomInset = isKeyboardVisible ? openComposerInset : closedComposerInset;
   const { socket } = useSocket();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -684,6 +689,28 @@ const ChatBox: React.FC = () => {
     activePartnerId,
     explicitPartnerId,
   ]);
+  const matchedConversation = useMemo(
+    () =>
+      Array.isArray(conversationsData)
+        ? conversationsData.find((conversation: any) => {
+            const conversationKey = normalizeId(conversation?._id || conversation?.id);
+            const candidateIds = [
+              resolveChatUserId(conversation?.partner),
+              resolveChatUserId(conversation?.participant),
+              ...(Array.isArray(conversation?.participants)
+                ? conversation.participants.map((p: any) => resolveChatUserId(p))
+                : []),
+            ].filter(Boolean);
+
+            return (
+              (!!activePartnerId && candidateIds.includes(activePartnerId)) ||
+              (!!explicitPartnerId && candidateIds.includes(explicitPartnerId)) ||
+              (!!conversationKey && conversationKey === paramConversationId)
+            );
+          }) || null
+        : null,
+    [activePartnerId, conversationsData, explicitPartnerId, paramConversationId],
+  );
 
   const displayName = partnerData.name || t("chat_partner_fallback", "Partner");
   const partnerAvatar = partnerData.avatar;
@@ -762,18 +789,21 @@ const ChatBox: React.FC = () => {
 
   // 1. Detect role from global state & storage (strictly vendor/buyer only)
   const normalizedRoleParam = String(roleParam || "").toLowerCase();
-  const normalizedUserType = String(user?.userType || "").toLowerCase();
-  const normalizedStoredRole = String(storedRole || "").toLowerCase();
-  // Priority: current authenticated user role > stored fallback role
-  const role: "vendor" | "buyer" =
+  const currentRole = resolveCurrentRole(user, storedRole);
+  const detectedConversationRole = useMemo(
+    () =>
+      resolveConversationRole(
+        matchedConversation || { partner: partnerData },
+        user,
+      ),
+    [matchedConversation, partnerData, user],
+  );
+  const conversationRole: "vendor" | "buyer" =
     normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
       ? (normalizedRoleParam as "vendor" | "buyer")
-      : normalizedUserType === "vendor" || normalizedUserType === "buyer"
-        ? (normalizedUserType as "vendor" | "buyer")
-        : normalizedStoredRole === "vendor"
-          ? "vendor"
-          : "buyer";
-  const isVendorSide = role === "vendor";
+      : detectedConversationRole || currentRole;
+  const isRoleMismatch = conversationRole !== currentRole;
+  const isVendorSide = currentRole === "vendor";
   const couponPrefix = t("chat_coupon_message_prefix", "Sent a coupon");
   const legacyCouponPrefix = "Sent a coupon";
 
@@ -1016,6 +1046,9 @@ const ChatBox: React.FC = () => {
     type: string = "text",
     coupon?: CouponData,
   ) => {
+    if (isRoleMismatch) {
+      return;
+    }
     if (!text.trim() && type === "text") return;
     const targetPartnerId = canonicalPartnerId || activePartnerId;
     if (!targetPartnerId) return;
@@ -1678,7 +1711,7 @@ const ChatBox: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
               styles.chatList,
-              { paddingBottom: composerHeight + 15 },
+              { paddingBottom: composerHeight + insets.bottom + 15 },
             ]}
             renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
@@ -1709,11 +1742,23 @@ const ChatBox: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       {renderHeader()}
       {renderTabs()}
 
       <View style={styles.contentShell}>
+        {activeTab === "chat" && isRoleMismatch ? (
+          <View style={styles.roleNotice}>
+            <View style={styles.roleNoticeBadge}>
+              <Text style={styles.roleNoticeBadgeText}>
+                {formatRoleLabel(conversationRole)} Chat
+              </Text>
+            </View>
+            <Text style={styles.roleNoticeText}>
+              {`This conversation was created using your ${formatRoleLabel(conversationRole)} role. Please switch back to ${formatRoleLabel(conversationRole)} to continue chatting.`}
+            </Text>
+          </View>
+        ) : null}
         {activeTab === "chat" ? renderPinnedBanner() : null}
         {renderContent()}
 
@@ -1752,6 +1797,7 @@ const ChatBox: React.FC = () => {
             <View
               style={[
                 styles.inputArea,
+                isRoleMismatch && styles.inputAreaDisabled,
                 isKeyboardVisible
                   ? styles.inputAreaKeyboardOpen
                   : styles.inputAreaKeyboardClosed,
@@ -1759,19 +1805,26 @@ const ChatBox: React.FC = () => {
               ]}
             >
               <TouchableOpacity
-                onPress={() => setShowOptions(!showOptions)}
+                onPress={() => !isRoleMismatch && setShowOptions(!showOptions)}
                 style={styles.plusBtn}
+                disabled={isRoleMismatch}
               >
                 <Feather
                   name={showOptions ? "x" : "plus"}
                   size={28}
-                  color="#2A8383"
+                  color={isRoleMismatch ? "#B0B8C2" : "#2A8383"}
                 />
               </TouchableOpacity>
               <TextInput
-                placeholder={t("chat_type_message", "Type a message...")}
+                placeholder={
+                  isRoleMismatch
+                    ? `Switch to ${formatRoleLabel(conversationRole)} to reply`
+                    : t("chat_type_message", "Type a message...")
+                }
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 style={[
                   styles.textInput,
+                  isRoleMismatch && styles.textInputDisabled,
                   isKeyboardVisible
                     ? styles.textInputKeyboardOpen
                     : styles.textInputKeyboardClosed,
@@ -1780,9 +1833,11 @@ const ChatBox: React.FC = () => {
                 onChangeText={setMessageText}
                 multiline
                 blurOnSubmit={false}
+                editable={!isRoleMismatch}
               />
               <TouchableOpacity
-                onPress={() => handleSendMessage(messageText)}
+                onPress={() => !isRoleMismatch && handleSendMessage(messageText)}
+                disabled={isRoleMismatch}
               >
                 <View
                   style={[
@@ -1790,7 +1845,9 @@ const ChatBox: React.FC = () => {
                     isKeyboardVisible
                       ? styles.sendBtnKeyboardOpen
                       : styles.sendBtnKeyboardClosed,
-                    !messageText.trim() && { backgroundColor: "#DDD" },
+                    (isRoleMismatch || !messageText.trim()) && {
+                      backgroundColor: "#DDD",
+                    },
                   ]}
                 >
                   <Ionicons name="send" size={18} color="white" />
@@ -1910,6 +1967,34 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0FDFA",
     borderWidth: 1,
     borderColor: "#99F6E4",
+  },
+  roleNotice: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 2,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: "#FFF4E5",
+    borderWidth: 1,
+    borderColor: "#F4C98A",
+  },
+  roleNoticeBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#B45309",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  roleNoticeBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  roleNoticeText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: "#8A4B08",
   },
   pinnedBannerInner: {
     flexDirection: "row",
@@ -2124,6 +2209,9 @@ const styles = StyleSheet.create({
     borderTopColor: "#F0F0F0",
     backgroundColor: "#fff",
   },
+  inputAreaDisabled: {
+    backgroundColor: "#F8FAFC",
+  },
   inputAreaKeyboardClosed: {
     paddingTop: 7,
 
@@ -2153,6 +2241,10 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     marginHorizontal: 8,
     color: "#1F2937",
+  },
+  textInputDisabled: {
+    color: "#94A3B8",
+    backgroundColor: "#EEF2F6",
   },
   textInputKeyboardClosed: {
     minHeight: 40,
