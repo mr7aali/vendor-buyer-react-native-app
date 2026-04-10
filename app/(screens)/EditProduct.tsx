@@ -35,10 +35,20 @@ const getEntityId = (entity: any) => entity?.id || entity?._id;
 const getProductIdFromResponse = (response: any) =>
   response?.id ||
   response?._id ||
+  response?.product?.id ||
+  response?.product?._id ||
   response?.data?.id ||
   response?.data?._id ||
+  response?.data?.product?.id ||
+  response?.data?.product?._id ||
   response?.data?.data?.id ||
   response?.data?.data?._id ||
+  response?.data?.data?.product?.id ||
+  response?.data?.data?.product?._id ||
+  response?.result?.id ||
+  response?.result?._id ||
+  response?.result?.product?.id ||
+  response?.result?.product?._id ||
   "";
 
 const toCleanNumberString = (value: string) => value.replace(/[^0-9.]/g, "");
@@ -400,6 +410,7 @@ export default function EditProduct() {
         savedProductId = productId || getProductIdFromResponse(updated);
       } else {
         const created = await createProduct(formData).unwrap();
+        console.log("EditProduct createProduct response:", created);
         savedProductId = getProductIdFromResponse(created);
       }
 
