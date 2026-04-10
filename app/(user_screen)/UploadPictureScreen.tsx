@@ -10,6 +10,7 @@ import {
   Image,
   Platform,
   StyleSheet,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -220,6 +221,7 @@ const UploadPictureScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7FAF9" />
       <View style={styles.content}>
         <Text style={styles.label}>{ui.uploadPicture}</Text>
 
