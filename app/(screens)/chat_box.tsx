@@ -40,6 +40,7 @@ import {
 } from "react-native";
 import {
   SafeAreaView,
+  useSafeAreaInsets,
 } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 
@@ -475,9 +476,10 @@ const OrderHistorySkeleton = () => (
 
 const ChatBox: React.FC = () => {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const closedComposerInset = 30;
-  const openComposerInset = 30;
+  const closedComposerInset = Math.max(insets.bottom, 12);
+  const openComposerInset = Math.max(insets.bottom, 12);
   const composerBottomInset = isKeyboardVisible ? openComposerInset : closedComposerInset;
   const { socket } = useSocket();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -1678,7 +1680,7 @@ const ChatBox: React.FC = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
               styles.chatList,
-              { paddingBottom: composerHeight + 15 },
+              { paddingBottom: composerHeight + insets.bottom + 15 },
             ]}
             renderItem={renderMessage}
             onScrollToIndexFailed={(info) => {
@@ -1709,7 +1711,7 @@ const ChatBox: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       {renderHeader()}
       {renderTabs()}
 
