@@ -9,11 +9,13 @@ import {
 import { useTranslation } from "@/hooks/use-translation";
 import React from "react";
 import { Image, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 
 export default function UsersLayout() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const user = useSelector((state: RootState) => state.auth.user as any);
   const profileImageUri =
     user?.buyer?.profilePhotoUrl ||
@@ -33,7 +35,8 @@ export default function UsersLayout() {
           paddingLeft: 20,
           paddingRight: 20,
           paddingTop: 10,
-          height: 85,
+          paddingBottom: Math.max(insets.bottom, 10),
+          height: 75 + Math.max(insets.bottom, 10),
           direction: "ltr",
           borderTopWidth: 0,
           elevation: 10,
