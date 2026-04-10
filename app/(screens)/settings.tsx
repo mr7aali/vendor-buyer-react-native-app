@@ -68,7 +68,8 @@ const SettingsScreen = () => {
                 <View style={{ flex: 1 }} />
 
                 {/* Delete Account Button */}
-                <TouchableOpacity
+                
+                {/* <TouchableOpacity
                     style={{
                         backgroundColor: '#2D8A8A',
                         flexDirection: 'row',
@@ -83,7 +84,7 @@ const SettingsScreen = () => {
                     <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
                         {t("delete_account", "Delete Account")}
                     </Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
             </ScrollView>
         </SafeAreaView>
     );
