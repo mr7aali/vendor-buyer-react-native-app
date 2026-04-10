@@ -519,16 +519,6 @@ const CompleteProfileScreen = () => {
                 onPress={() => setIsCountryPickerVisible(true)}
               >
                 <View style={styles.dropdownLeft}>
-                  <CountryPicker
-                    countryCode={countryCode}
-                    withFilter
-                    withFlag
-                    withCountryNameButton={false}
-                    withAlphaFilter
-                    onSelect={onSelectCountry}
-                    visible={isCountryPickerVisible}
-                    onClose={() => setIsCountryPickerVisible(false)}
-                  />
                   <Text style={[styles.dropdownText, { color: "#181725", marginLeft: 5 }]}>
                     {country}
                   </Text>
@@ -574,6 +564,20 @@ const CompleteProfileScreen = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {isCountryPickerVisible ? (
+        <CountryPicker
+          countryCode={countryCode}
+          withFilter
+          withFlag
+          withCountryNameButton
+          withAlphaFilter
+          withCloseButton
+          visible
+          onSelect={onSelectCountry}
+          onClose={() => setIsCountryPickerVisible(false)}
+        />
+      ) : null}
 
       {/* Gender Selection Modal (Your existing modal remains the same) */}
       <Modal

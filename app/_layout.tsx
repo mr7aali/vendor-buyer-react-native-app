@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { View } from "react-native";
 import "react-native-reanimated";
+import { CountryModalProvider } from "react-native-country-picker-modal";
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -225,7 +226,9 @@ export default function RootLayout() {
         >
           <AuthSync />
           <SocketProvider>
-            <AppNavigator />
+            <CountryModalProvider>
+              <AppNavigator />
+            </CountryModalProvider>
           </SocketProvider>
         </StripeProvider>
       </SafeAreaProvider>

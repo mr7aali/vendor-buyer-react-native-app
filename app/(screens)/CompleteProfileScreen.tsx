@@ -552,17 +552,7 @@ const CompleteProfileScreen: React.FC = () => {
                 activeOpacity={0.8}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <CountryPicker
-                    countryCode={formData.countryCode}
-                    withFilter
-                    withFlag
-                    withCountryNameButton
-                    withAlphaFilter
-                    onSelect={onSelectCountry}
-                    visible={showCountryPicker}
-                    onClose={() => setShowCountryPicker(false)}
-                    containerButtonStyle={{ marginRight: 5 }}
-                  />
+                  <Text style={styles.dropdownText}>{formData.country}</Text>
                 </View>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
@@ -597,6 +587,20 @@ const CompleteProfileScreen: React.FC = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {showCountryPicker ? (
+        <CountryPicker
+          countryCode={formData.countryCode}
+          withFilter
+          withFlag
+          withCountryNameButton
+          withAlphaFilter
+          withCloseButton
+          visible
+          onSelect={onSelectCountry}
+          onClose={() => setShowCountryPicker(false)}
+        />
+      ) : null}
 
       <Modal
         visible={isGenderModalVisible}

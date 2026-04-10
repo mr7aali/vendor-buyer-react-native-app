@@ -171,23 +171,12 @@ export default function InformationScreen() {
               style={styles.countrySelector}
               onPress={() => setIsCountryPickerVisible(true)}
             >
-              <Text style={styles.inputText}>{countryName}</Text>
+              <View style={styles.countryValueWrap}>
+                <Text style={styles.inputText}>{countryName}</Text>
+              </View>
               <Ionicons name="chevron-down" size={20} color="#666" />
             </TouchableOpacity>
 
-            <CountryPicker
-              {...{
-                countryCode,
-                withFilter: true, 
-                withFlag: true,
-                withCountryNameButton: false,
-                withAlphaFilter: true,
-                onSelect: onSelectCountry,
-                modalProps: { visible: isCountryPickerVisible }
-              }}
-              visible={isCountryPickerVisible}
-              onClose={() => setIsCountryPickerVisible(false)}
-            />
           </View>
 
           {/* Full Name */}
@@ -299,6 +288,19 @@ export default function InformationScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      {isCountryPickerVisible ? (
+        <CountryPicker
+          countryCode={countryCode}
+          withFilter
+          withFlag
+          withCountryNameButton
+          withAlphaFilter
+          withCloseButton
+          visible
+          onSelect={onSelectCountry}
+          onClose={() => setIsCountryPickerVisible(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -356,6 +358,11 @@ const styles = StyleSheet.create({
     height: 50,
     borderWidth: 1,
     borderColor: "#EAEAEA",
+  },
+  countryValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   inputText: { fontSize: 14, color: "#333" },
   row: { flexDirection: "row" },
