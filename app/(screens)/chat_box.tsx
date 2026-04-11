@@ -139,6 +139,19 @@ const getCouponDisabledState = (coupon: any) => {
   return { isDisabled: false, statusText: undefined };
 };
 
+const imageMediaTypes = (ImagePicker as any).MediaType?.Images
+  ? [(ImagePicker as any).MediaType.Images]
+  : ["images"];
+
+const getImageMimeType = (uri: string) => {
+  const lower = String(uri || "").toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+};
+
 const mapCouponToChatCouponData = (coupon: any): CouponData => {
   const discount = formatCouponDiscountValue(coupon);
   const type = coupon?.discountType === "percentage" ? "DISCOUNT" : "CASHBACK";
@@ -1277,7 +1290,7 @@ const ChatBox: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
+        mediaTypes: imageMediaTypes,
         allowsEditing: true,
         quality: 0.35,
       });
@@ -1286,14 +1299,14 @@ const ChatBox: React.FC = () => {
       const asset = result.assets[0];
       if (!asset.uri) return;
 
-      const mimeType = asset.mimeType || "image/jpeg";
+      const mimeType = asset.mimeType || getImageMimeType(asset.uri);
       const fileName =
         asset.fileName ||
         `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
 
       const formData = new FormData();
       formData.append("image", {
-        uri: asset.uri,
+        uri: Platform.OS === "ios" ? asset.uri.replace("file://", "file://") : asset.uri,
         name: fileName,
         type: mimeType,
       } as any);
