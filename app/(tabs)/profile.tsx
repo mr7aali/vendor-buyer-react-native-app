@@ -1,15 +1,21 @@
-
-import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
-import { apiSlice } from "@/store/api/apiSlice";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { persistAuthState } from "@/services/authStorage";
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
+import { apiSlice } from "@/store/api/apiSlice";
+import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
 import {
   useCreateAccountLinkMutation,
   useCreateVendorAccountMutation,
   useGetVendorAccountStatusQuery,
 } from "@/store/api/paymentApiSlice";
-import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectAvailableProfiles, selectCurrentAccessToken, selectCurrentUser, setCredentials } from "@/store/slices/authSlice";
+import {
+  logOut,
+  selectAvailableProfiles,
+  selectCurrentAccessToken,
+  selectCurrentUser,
+  setCredentials,
+} from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -34,6 +40,42 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../hooks/use-translation";
 
+const cardStyle = {
+  backgroundColor: "#fff",
+  borderRadius: 16,
+  padding: 20,
+  marginBottom: 16,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 1,
+} as const;
+
+const sectionTitleStyle = {
+  fontSize: 18,
+  fontWeight: "700" as const,
+  color: "#1F2937",
+  marginBottom: 20,
+};
+
+const ProfileActionRowSkeleton = () => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 14,
+    }}
+  >
+    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+      <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+      <SkeletonBlock style={{ width: "44%", height: 16, borderRadius: 8, marginLeft: 14 }} />
+    </View>
+    <SkeletonBlock style={{ width: 16, height: 16, borderRadius: 8 }} />
+  </View>
+);
+
 const ProfileScreen = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -43,42 +85,39 @@ const ProfileScreen = () => {
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
-  const { data: profileData } = useGetProfileQuery({});
+  const {
+    data: profileData,
+    isLoading: isProfileLoading,
+    isFetching: isProfileFetching,
+  } = useGetProfileQuery({});
 
-  // Stripe hooks
   const {
     data: stripeStatus,
     isLoading: isStripeLoading,
-    refetch: refetchStripeStatus
+    refetch: refetchStripeStatus,
   } = useGetVendorAccountStatusQuery(undefined, { skip: !user });
 
   const [createVendorAccount, { isLoading: isCreatingAccount }] = useCreateVendorAccountMutation();
   const [createAccountLink, { isLoading: isCreatingLink }] = useCreateAccountLinkMutation();
 
-  // Use profileData if available, otherwise fallback to Redux user
   const displayUser = profileData?.data || user;
+  const shouldShowProfileSkeleton = !displayUser && (isProfileLoading || isProfileFetching);
 
-  // Refresh stripe status when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       if (user) {
         refetchStripeStatus();
       }
-    }, [user, refetchStripeStatus])
+    }, [user, refetchStripeStatus]),
   );
 
   const handleConnectStripe = async () => {
     try {
-      console.log("Stripe Status:", stripeStatus);
-      // 1. Check if account exists, if not create one
       if (!stripeStatus?.stripeAccountId) {
         await createVendorAccount({}).unwrap();
       }
 
-
-      // 2. Create account link
       const linkResponse = await createAccountLink({}).unwrap();
-      console.log("Link Response:", linkResponse);
       const onboardingUrl =
         linkResponse?.url ||
         linkResponse?.accountLink ||
@@ -109,22 +148,17 @@ const ProfileScreen = () => {
     try {
       await unregisterPushTokenFromBackend(accessToken);
 
-      // Clear AsyncStorage
-      await AsyncStorage.removeItem('accessToken');
-      await AsyncStorage.removeItem('refreshToken');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userRole');
-      await AsyncStorage.removeItem('userType');
-      await AsyncStorage.removeItem('availableProfiles');
+      await AsyncStorage.removeItem("accessToken");
+      await AsyncStorage.removeItem("refreshToken");
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("userRole");
+      await AsyncStorage.removeItem("userType");
+      await AsyncStorage.removeItem("availableProfiles");
 
-      // Clear Redux state (this now triggers a global reset)
       dispatch(logOut());
-
-      // Navigate to login
       router.replace("/(auth)/login");
     } catch (error) {
       console.error("Logout error:", error);
-      // Fallback navigation
       router.replace("/(auth)/login");
     }
   };
@@ -154,7 +188,7 @@ const ProfileScreen = () => {
           accessToken: payload.accessToken,
           refreshToken: payload.refreshToken || null,
           availableProfiles: nextAvailableProfiles,
-        })
+        }),
       );
 
       await persistAuthState({
@@ -177,7 +211,7 @@ const ProfileScreen = () => {
               text: t("ok", "OK"),
               onPress: () => router.replace("/(user_screen)/CompleteProfileScreen"),
             },
-          ]
+          ],
         );
         return;
       }
@@ -195,12 +229,7 @@ const ProfileScreen = () => {
     confirmText,
     confirmColor,
   }: any) => (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
+    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
@@ -218,19 +247,8 @@ const ProfileScreen = () => {
             alignItems: "center",
           }}
         >
-          <Text
-            style={{ fontSize: 20, fontWeight: "bold", marginVertical: 10 }}
-          >
-            {title}
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              color: "#666",
-              textAlign: "center",
-              marginBottom: 25,
-            }}
-          >
+          <Text style={{ fontSize: 20, fontWeight: "bold", marginVertical: 10 }}>{title}</Text>
+          <Text style={{ fontSize: 14, color: "#666", textAlign: "center", marginBottom: 25 }}>
             {subtitle}
           </Text>
           <View style={{ flexDirection: "row", width: "100%" }}>
@@ -258,15 +276,14 @@ const ProfileScreen = () => {
               }}
               onPress={onConfirm}
             >
-              <Text style={{ color: "#FFF", fontWeight: "bold" }}>
-                {confirmText}
-              </Text>
+              <Text style={{ color: "#FFF", fontWeight: "bold" }}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
     </Modal>
   );
+
   const userData = {
     name:
       displayUser?.vendor?.fullName ||
@@ -285,441 +302,276 @@ const ProfileScreen = () => {
 
   const isStripeConnected = Boolean(stripeStatus?.chargesEnabled && stripeStatus?.payoutsEnabled);
   const stripeStatusLabel = String(stripeStatus?.status || "").toLowerCase();
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/*Account Information Card*/}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-        >
-          {/* Profile Header */}
-          <View style={{ alignItems: "center", marginBottom: 24 }}>
-            <Image
-              source={{ uri: userData.avatar }}
-              style={{
-                width: 100,
-                height: 100,
-                borderRadius: 50,
-                marginBottom: 12,
-              }}
-            />
-            <Text style={{ fontSize: 22, fontWeight: "600", color: "#111" }}>
-              {userData.name}
-            </Text>
-          </View>
-
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: "#1F2937",
-              marginBottom: 20,
-            }}
-          >
-            {t("account_information", "Account Information")}
-          </Text>
-
-          {/* Personal Info Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/personal_info")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="person-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("personal_info", "Personal info")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-
-          {/* Business Info Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/business_info")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="business-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("business_info", "Business info")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/transaction_history")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <AntDesign name="transaction" size={24} color="black" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("transaction_history", "Transaction History")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          {/* Make a coupon Section */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/MakeCoupon")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 4,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <MaterialCommunityIcons
-                name="ticket-percent-outline"
-                size={26}
-                color="#4B5563"
-              />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("make_coupon", "Make a coupon")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Payout Settings (Stripe Connect) */}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: "#1F2937",
-              marginBottom: 20,
-            }}
-          >
-            {t("payout_settings", "Payout Settings")}
-          </Text>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialCommunityIcons name="bank-transfer" size={26} color="#4B5563" />
-              <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
-                {t("stripe_connect", "Stripe Connect")}
-              </Text>
-            </View>
-
-            {isStripeLoading ? (
-              <ActivityIndicator size="small" color="#2D8C8C" />
-            ) : isStripeConnected ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 }}>
-                <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
-                <Text style={{ color: '#4CAF50', fontWeight: 'bold', marginLeft: 5, fontSize: 12 }}>
-                  {stripeStatusLabel === "verified" ? "Verified" : t("connected", "Connected")}
-                </Text>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }} showsVerticalScrollIndicator={false}>
+        {shouldShowProfileSkeleton ? (
+          <>
+            <View style={cardStyle}>
+              <View style={{ alignItems: "center", marginBottom: 24 }}>
+                <SkeletonBlock style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
+                <SkeletonBlock style={{ width: 160, height: 22, borderRadius: 11 }} />
               </View>
-            ) : (
+              <SkeletonBlock style={{ width: 170, height: 22, borderRadius: 10, marginBottom: 20 }} />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+            </View>
+
+            <View style={cardStyle}>
+              <SkeletonBlock style={{ width: 145, height: 22, borderRadius: 10, marginBottom: 20 }} />
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+                  <SkeletonBlock style={{ width: 132, height: 16, borderRadius: 8, marginLeft: 14 }} />
+                </View>
+                <SkeletonBlock style={{ width: 84, height: 32, borderRadius: 8 }} />
+              </View>
+              <SkeletonBlock style={{ width: "74%", height: 12, borderRadius: 6, marginTop: 14 }} />
+              <SkeletonBlock style={{ width: 108, height: 12, borderRadius: 6, marginTop: 8 }} />
+            </View>
+
+            <View style={cardStyle}>
+              <SkeletonBlock style={{ width: 92, height: 22, borderRadius: 10, marginBottom: 20 }} />
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingVertical: 14,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                  <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+                  <SkeletonBlock style={{ width: 120, height: 16, borderRadius: 8, marginLeft: 14 }} />
+                </View>
+                <SkeletonBlock style={{ width: 50, height: 30, borderRadius: 999 }} />
+              </View>
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+            </View>
+
+            <View style={{ ...cardStyle, flexDirection: "row", alignItems: "center", marginBottom: 0 }}>
+              <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+              <SkeletonBlock style={{ width: 90, height: 16, borderRadius: 8, marginLeft: 14 }} />
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={cardStyle}>
+              <View style={{ alignItems: "center", marginBottom: 24 }}>
+                <Image
+                  source={{ uri: userData.avatar }}
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    marginBottom: 12,
+                  }}
+                />
+                <Text style={{ fontSize: 22, fontWeight: "600", color: "#111" }}>{userData.name}</Text>
+              </View>
+
+              <Text style={sectionTitleStyle}>{t("account_information", "Account Information")}</Text>
+
               <TouchableOpacity
-                onPress={handleConnectStripe}
-                disabled={isCreatingAccount || isCreatingLink}
-                style={{
-                  backgroundColor: '#635BFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center'
-                }}
+                onPress={() => router.push("/(screens)/personal_info")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
               >
-                {(isCreatingAccount || isCreatingLink) ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <>
-                    <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 12 }}>{t("connect", "Connect")}</Text>
-                    <MaterialIcons name="arrow-back" size={12} color="#FFF" style={{ marginLeft: 4 }} />
-                  </>
-                )}
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="person-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("personal_info", "Personal info")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
               </TouchableOpacity>
-            )}
-          </View>
-          {!isStripeConnected && !isStripeLoading && (
-            <Text style={{ fontSize: 12, color: '#666', marginTop: 10, fontStyle: 'italic' }}>
-              {t("stripe_connect_hint", "Connect your Stripe account to receive payouts.")}
-            </Text>
-          )}
-          {stripeStatus?.stripeAccountId ? (
-            <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 8 }}>
-              Stripe ID: {stripeStatus.stripeAccountId}
-            </Text>
-          ) : null}
-        </View>
 
-        {/* Setting Card */}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: "#1F2937",
-              marginBottom: 20,
-            }}
-          >
-            {t("setting", "Setting")}
-          </Text>
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/business_info")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="business-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("business_info", "Business info")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
 
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingVertical: 14,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Ionicons name="people-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/transaction_history")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
               >
-                {t("switch_profile", "Switch profile")}
-              </Text>
-            </View>
-            <Switch
-              trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-              thumbColor="#278687"
-              ios_backgroundColor="#3e3e3e"
-              onValueChange={toggleSwitch}
-              value={true}
-              disabled={isSwitchingProfile}
-            />
-          </View>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <AntDesign name="transaction" size={24} color="black" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("transaction_history", "Transaction History")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
 
-          {/* Permission Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/permission")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Feather name="check-circle" size={24} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/MakeCoupon")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}
               >
-                {t("permission", "Permission")}
-              </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <MaterialCommunityIcons name="ticket-percent-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("make_coupon", "Make a coupon")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
             </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          {/* Settings Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/settings")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="settings-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("settings", "Settings")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/language")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="language-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("language", "Language")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-        </View>
 
-        {/* Logout Card */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            flexDirection: "row",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-          onPress={() => setShowLogoutModal(true)}
-        >
-          <MaterialIcons name="logout" size={26} color="#4B5563" />
-          <Text
-            style={{
-              fontSize: 16,
-              color: "#4B5563",
-              marginLeft: 14,
-              fontWeight: "600",
-            }}
-          >
-            {t("logout", "Log Out")}
-          </Text>
-        </TouchableOpacity>
+            <View style={cardStyle}>
+              <Text style={sectionTitleStyle}>{t("payout_settings", "Payout Settings")}</Text>
+
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <MaterialCommunityIcons name="bank-transfer" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("stripe_connect", "Stripe Connect")}
+                  </Text>
+                </View>
+
+                {isStripeLoading ? (
+                  <ActivityIndicator size="small" color="#2D8C8C" />
+                ) : isStripeConnected ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: "#E8F5E9",
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <MaterialIcons name="check-circle" size={16} color="#4CAF50" />
+                    <Text style={{ color: "#4CAF50", fontWeight: "bold", marginLeft: 5, fontSize: 12 }}>
+                      {stripeStatusLabel === "verified" ? "Verified" : t("connected", "Connected")}
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleConnectStripe}
+                    disabled={isCreatingAccount || isCreatingLink}
+                    style={{
+                      backgroundColor: "#635BFF",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    {isCreatingAccount || isCreatingLink ? (
+                      <ActivityIndicator size="small" color="#FFF" />
+                    ) : (
+                      <>
+                        <Text style={{ color: "#FFF", fontWeight: "600", fontSize: 12 }}>
+                          {t("connect", "Connect")}
+                        </Text>
+                        <MaterialIcons name="arrow-back" size={12} color="#FFF" style={{ marginLeft: 4 }} />
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {!isStripeConnected && !isStripeLoading && (
+                <Text style={{ fontSize: 12, color: "#666", marginTop: 10, fontStyle: "italic" }}>
+                  {t("stripe_connect_hint", "Connect your Stripe account to receive payouts.")}
+                </Text>
+              )}
+
+              {stripeStatus?.stripeAccountId ? (
+                <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 8 }}>
+                  Stripe ID: {stripeStatus.stripeAccountId}
+                </Text>
+              ) : null}
+            </View>
+
+            <View style={cardStyle}>
+              <Text style={sectionTitleStyle}>{t("setting", "Setting")}</Text>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Ionicons name="people-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("switch_profile", "Switch profile")}
+                  </Text>
+                </View>
+                <Switch
+                  trackColor={{ false: "#78788029", true: "#E3E6F0" }}
+                  thumbColor="#278687"
+                  ios_backgroundColor="#3e3e3e"
+                  onValueChange={toggleSwitch}
+                  value={true}
+                  disabled={isSwitchingProfile}
+                />
+              </View>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/permission")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Feather name="check-circle" size={24} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("permission", "Permission")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/settings")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="settings-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("settings", "Settings")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/language")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="language-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("language", "Language")}
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={{ ...cardStyle, flexDirection: "row", alignItems: "center", marginBottom: 0 }}
+              onPress={() => setShowLogoutModal(true)}
+            >
+              <MaterialIcons name="logout" size={26} color="#4B5563" />
+              <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "600" }}>
+                {t("logout", "Log Out")}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         visible={showSwitchModal}
         onClose={() => setShowSwitchModal(false)}
@@ -730,7 +582,6 @@ const ProfileScreen = () => {
         confirmColor="#2D8C8C"
       />
 
-      {/* Logout Confirmation Modal */}
       <ConfirmationModal
         visible={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
@@ -745,4 +596,3 @@ const ProfileScreen = () => {
 };
 
 export default ProfileScreen;
-
