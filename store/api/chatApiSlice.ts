@@ -1,5 +1,6 @@
 import socketService from '../../services/socket';
 import { apiSlice } from './apiSlice';
+import { buildApiCandidateUrls } from '@/services/apiConfig';
 
 const normalizeId = (value: any): string | undefined => {
     if (value === undefined || value === null) return undefined;
@@ -113,6 +114,17 @@ const normalizeMessage = (msg: any) => ({
     orderId: normalizeId(msg?.orderId) || null,
     metadata: msg?.metadata ?? null,
 });
+
+const parseJsonResponse = async (response: Response) => {
+    const text = await response.text();
+    if (!text.trim()) return null;
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { message: text };
+    }
+};
 
 const normalizeConversation = (conv: any, currentUserId?: string) => {
     const participantCandidates = [
@@ -290,6 +302,64 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             },
             providesTags: (result, error, conversationId) => [{ type: 'Chat', id: `pinned-${conversationId}` }],
         }),
+        uploadChatImage: builder.mutation<{ url: string; publicId?: string }, FormData>({
+            async queryFn(formData, api) {
+                const candidateUrls = buildApiCandidateUrls('/messages/upload-image');
+                const accessToken = (api.getState() as any)?.auth?.accessToken;
+                let lastError: any = null;
+
+                for (const url of candidateUrls) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                Accept: 'application/json',
+                                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                            },
+                            body: formData,
+                        });
+
+                        const payload = await parseJsonResponse(response);
+
+                        if (response.ok) {
+                            const data = (payload?.data ?? payload) as { url?: string; publicId?: string } | null;
+                            if (data?.url) {
+                                return { data: data as { url: string; publicId?: string } };
+                            }
+
+                            lastError = {
+                                status: 'PARSING_ERROR',
+                                data: payload,
+                                error: `Image upload succeeded but no url was returned from ${url}`,
+                            };
+                            continue;
+                        }
+
+                        lastError = {
+                            status: response.status,
+                            data: payload || { message: response.statusText || 'Request failed' },
+                        };
+
+                        if (response.status !== 404) {
+                            return { error: lastError };
+                        }
+                    } catch (error: any) {
+                        lastError = {
+                            status: 'FETCH_ERROR',
+                            error: error?.message || 'Network request failed',
+                            data: { url },
+                        };
+                    }
+                }
+
+                return {
+                    error: lastError ?? {
+                        status: 'FETCH_ERROR',
+                        error: 'Unable to reach any chat image upload endpoint',
+                    },
+                };
+            },
+        }),
         sendMessage: builder.mutation<any, { receiverId: string; messageText: string }>({
             async queryFn(body, _api, _extraOptions, baseQuery) {
                 console.log('Sending message body:', body);
@@ -366,6 +436,7 @@ export const {
     useGetConversationsQuery,
     useGetMessagesQuery,
     useGetPinnedMessageQuery,
+    useUploadChatImageMutation,
     useSendMessageMutation,
     useMarkAsReadMutation,
 } = chatApiSlice;

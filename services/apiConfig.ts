@@ -5,6 +5,12 @@ const DEFAULT_API_PORT = "3000";
 const LOOPBACK_HOSTS = new Set(["10.0.2.2", "127.0.0.1", "localhost"]);
 
 const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, "");
+const normalizePath = (value: string) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+};
 
 const rawConfiguredApiUrl = normalizeBaseUrl(
   process.env.EXPO_PUBLIC_API_URL ?? "",
@@ -68,11 +74,48 @@ const getResolvedApiBaseUrl = () => {
 export const apiBaseUrl = normalizeBaseUrl(getResolvedApiBaseUrl());
 
 export const buildApiUrl = (path: string) => {
-  const normalizedPath = String(path || "").trim();
+  const normalizedPath = normalizePath(path);
   if (!normalizedPath) return apiBaseUrl;
   if (/^https?:\/\//i.test(normalizedPath)) return normalizedPath;
   if (!apiBaseUrl) return normalizedPath;
-  return `${apiBaseUrl}${normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`}`;
+  return `${apiBaseUrl}${normalizedPath}`;
+};
+
+export const buildApiCandidateUrls = (path: string) => {
+  const normalizedPath = normalizePath(path);
+  if (!normalizedPath) {
+    return apiBaseUrl ? [apiBaseUrl] : [];
+  }
+
+  if (/^https?:\/\//i.test(normalizedPath)) {
+    return [normalizedPath];
+  }
+
+  const prefixedPaths =
+    normalizedPath === "/api" || normalizedPath.startsWith("/api/")
+      ? [normalizedPath, normalizedPath.replace(/^\/api(?=\/|$)/, "") || "/"]
+      : [normalizedPath, `/api${normalizedPath}`];
+
+  const localFallbackProtocol = "http";
+  const fallbackPort = getPort(rawConfiguredApiUrl);
+  const expoDevHost = getExpoDevHost();
+  const candidateBases = [
+    apiBaseUrl,
+    __DEV__ && expoDevHost
+      ? `${localFallbackProtocol}://${expoDevHost}:${fallbackPort}`
+      : "",
+    __DEV__ ? `${localFallbackProtocol}://10.0.2.2:${fallbackPort}` : "",
+    __DEV__ ? `${localFallbackProtocol}://127.0.0.1:${fallbackPort}` : "",
+    __DEV__ ? `${localFallbackProtocol}://localhost:${fallbackPort}` : "",
+  ].filter(Boolean);
+
+  return Array.from(
+    new Set(
+      candidateBases.flatMap((baseUrl) =>
+        prefixedPaths.map((candidatePath) => `${normalizeBaseUrl(baseUrl)}${candidatePath}`),
+      ),
+    ),
+  );
 };
 
 export const resolveAbsoluteUrl = (value: unknown) => {

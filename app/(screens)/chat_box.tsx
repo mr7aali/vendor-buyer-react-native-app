@@ -10,26 +10,32 @@ import {
   useGetPinnedMessageQuery,
   useMarkAsReadMutation,
   useSendMessageMutation,
+  useUploadChatImageMutation,
 } from "@/store/api/chatApiSlice";
 import {
   useAssignCouponMutation,
   useGetCouponsByVendorQuery,
+  useGetMyCouponsQuery,
 } from "@/store/api/couponApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { RootState } from "@/store/store";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Alert,
   Easing,
   FlatList,
   Image,
   Keyboard,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -52,6 +58,8 @@ interface CouponData {
   discount: string;
   color: string;
   desc: string;
+  isDisabled?: boolean;
+  statusText?: string;
 }
 
 interface CustomChatMessage {
@@ -72,6 +80,98 @@ interface CustomChatMessage {
   orderId?: string | null;
   metadata?: any;
 }
+
+const normalizeCouponCode = (value: any): string =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const isImageMessageText = (value: any): boolean => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  return (
+    /^data:image\//i.test(text) ||
+    /^file:\/\//i.test(text) ||
+    /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i.test(text) ||
+    /res\.cloudinary\.com\/.+\/image\/upload\//i.test(text)
+  );
+};
+
+const formatCouponDiscountValue = (coupon: any): string => {
+  const rawDiscountValue = Number(coupon?.discountValue ?? 0);
+  const normalizedDiscountValue = Number.isInteger(rawDiscountValue)
+    ? rawDiscountValue.toString()
+    : rawDiscountValue.toFixed(2).replace(/\.?0+$/, "");
+
+  return coupon?.discountType === "percentage"
+    ? `${normalizedDiscountValue}%`
+    : `$${normalizedDiscountValue}`;
+};
+
+const getCouponDisabledState = (coupon: any) => {
+  const now = new Date();
+  const validFrom = coupon?.validFrom ? new Date(coupon.validFrom) : null;
+  const validUntil = coupon?.validUntil ? new Date(coupon.validUntil) : null;
+  const usageLimit = Number(coupon?.usageLimit ?? 0);
+  const usedCount = Number(coupon?.usedCount ?? 0);
+
+  if (coupon?.isUsed) {
+    return { isDisabled: true, statusText: "Used" };
+  }
+
+  if (usageLimit > 0 && usedCount >= usageLimit) {
+    return { isDisabled: true, statusText: "Used Up" };
+  }
+
+  if (coupon?.isActive === false) {
+    return { isDisabled: true, statusText: "Unavailable" };
+  }
+
+  if (validUntil && !Number.isNaN(validUntil.getTime()) && validUntil < now) {
+    return { isDisabled: true, statusText: "Expired" };
+  }
+
+  if (validFrom && !Number.isNaN(validFrom.getTime()) && validFrom > now) {
+    return { isDisabled: true, statusText: "Not Active Yet" };
+  }
+
+  return { isDisabled: false, statusText: undefined };
+};
+
+const imageMediaTypes = (ImagePicker as any).MediaType?.Images
+  ? [(ImagePicker as any).MediaType.Images]
+  : ["images"];
+
+const getImageMimeType = (uri: string) => {
+  const lower = String(uri || "").toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
+};
+
+const mapCouponToChatCouponData = (coupon: any): CouponData => {
+  const discount = formatCouponDiscountValue(coupon);
+  const type = coupon?.discountType === "percentage" ? "DISCOUNT" : "CASHBACK";
+  const minPurchaseAmount = Number(coupon?.minPurchaseAmount ?? 0);
+  const normalizedMinPurchase = Number.isInteger(minPurchaseAmount)
+    ? minPurchaseAmount.toString()
+    : minPurchaseAmount.toFixed(2).replace(/\.?0+$/, "");
+  const { isDisabled, statusText } = getCouponDisabledState(coupon);
+
+  return {
+    id: String(coupon?.id || ""),
+    code: String(coupon?.code || ""),
+    type,
+    discount,
+    color: coupon?.discountType === "percentage" ? "#FF9100" : "#FF4D67",
+    desc: `${type} ${discount} on Orders Over $${normalizedMinPurchase}`,
+    isDisabled,
+    statusText,
+  };
+};
 
 interface OrderItemSummary {
   productName?: string;
@@ -286,14 +386,16 @@ const ChatCouponCard = ({
     offer: string;
     defaultDiscount: string;
   };
-  onCopyCode: (code?: string) => void;
+  onCopyCode: (coupon?: CouponData) => void;
 }) => {
   if (!coupon) return null;
+  const isDisabled = !!coupon.isDisabled;
   return (
     <View
       style={[
         styles.chatCouponContainer,
         isOwn ? styles.chatCouponOwn : styles.chatCouponOther,
+        isDisabled ? styles.chatCouponDisabled : null,
       ]}
     >
       <View
@@ -325,19 +427,40 @@ const ChatCouponCard = ({
               {labels.code}:{coupon.code}
             </Text>
             <TouchableOpacity
-              onPress={() => onCopyCode(coupon?.code)}
+              onPress={() => onCopyCode(coupon)}
+              disabled={isDisabled}
               style={{ padding: 2 }}
             >
-              <MaterialIcons name="content-copy" size={18} color="#374151" />
+              <MaterialIcons
+                name="content-copy"
+                size={18}
+                color={isDisabled ? "#9CA3AF" : "#374151"}
+              />
             </TouchableOpacity>
           </View>
-          <Text style={styles.chatCouponDiscount}>
+          <Text
+            style={[
+              styles.chatCouponDiscount,
+              isDisabled ? styles.chatCouponDiscountDisabled : null,
+            ]}
+          >
             {coupon.discount || labels.defaultDiscount}
           </Text>
         </View>
-        <Text style={styles.chatCouponDesc} numberOfLines={2}>
+        <Text
+          style={[
+            styles.chatCouponDesc,
+            isDisabled ? styles.chatCouponDescDisabled : null,
+          ]}
+          numberOfLines={2}
+        >
           {coupon.desc || coupon.description}
         </Text>
+        {isDisabled && coupon.statusText ? (
+          <View style={styles.chatCouponStatusBadge}>
+            <Text style={styles.chatCouponStatusText}>{coupon.statusText}</Text>
+          </View>
+        ) : null}
         <View style={styles.chatCouponFooter}>
           <View style={styles.chatCouponInfo}>
             <Ionicons name="time-outline" size={12} color="#666" />
@@ -722,12 +845,15 @@ const ChatBox: React.FC = () => {
   const [messageText, setMessageText] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [activeTab, setActiveTab] = useState<
     "chat" | "categories" | "order_history"
   >("chat");
   const [storedRole, setStoredRole] = useState<string | null>(null);
   const [assignCoupon] = useAssignCouponMutation();
   const [markAsRead] = useMarkAsReadMutation();
+  const [uploadChatImage, { isLoading: isUploadingImage }] =
+    useUploadChatImageMutation();
   const flatListRef = useRef<FlatList>(null);
   const autoPinnedMessageKeyRef = useRef("");
   const [highlightedMessageId, setHighlightedMessageId] = useState("");
@@ -888,6 +1014,11 @@ const ChatBox: React.FC = () => {
       skip: !isVendorSide || !currentVendorId,
     },
   );
+  const { data: buyerCouponsData } = useGetMyCouponsQuery({
+    includeHistory: true,
+  }, {
+    skip: isVendorSide,
+  });
 
   // Map API coupons to component format
   const availableCoupons = React.useMemo(() => {
@@ -899,16 +1030,29 @@ const ChatBox: React.FC = () => {
       return [];
     }
     return vendorCouponsData
-      .filter((coupon) => coupon.isActive)
-      .map((coupon) => ({
-        id: coupon.id,
-        code: coupon.code,
-        type: coupon.discountType === "percentage" ? "DISCOUNT" : "CASHBACK",
-        discount: `${coupon.discountValue}${coupon.discountType === "percentage" ? "%" : "$"}`,
-        color: coupon.discountType === "percentage" ? "#FF9100" : "#FF4D67",
-        desc: `${coupon.discountType === "percentage" ? "DISCOUNT" : "CASHBACK"} on Orders Over $${coupon.minPurchaseAmount || 0}`,
-      }));
+      .filter((coupon) => !getCouponDisabledState(coupon).isDisabled)
+      .map(mapCouponToChatCouponData);
   }, [vendorCouponsData]);
+
+  const knownCouponsByCode = React.useMemo(() => {
+    const sourceCoupons =
+      isVendorSide && Array.isArray(vendorCouponsData)
+        ? vendorCouponsData
+        : Array.isArray(buyerCouponsData)
+          ? buyerCouponsData
+          : [];
+
+    return sourceCoupons.reduce(
+      (acc, coupon) => {
+        const normalizedCode = normalizeCouponCode(coupon?.code);
+        if (normalizedCode) {
+          acc[normalizedCode] = mapCouponToChatCouponData(coupon);
+        }
+        return acc;
+      },
+      {} as Record<string, CouponData>,
+    );
+  }, [buyerCouponsData, isVendorSide, vendorCouponsData]);
 
   const chatMessages = useMemo<CustomChatMessage[]>(() => {
     if (!Array.isArray(messagesData)) {
@@ -938,8 +1082,7 @@ const ChatBox: React.FC = () => {
       type: (() => {
         const normalizedType = normalizeMessageType(msg.type);
         if (normalizedType === "TEXT") {
-          return String(msg.messageText || msg.text || "").startsWith("data:image/") ||
-            String(msg.messageText || msg.text || "").startsWith("file://")
+          return isImageMessageText(msg.messageText || msg.text || "")
             ? "image"
             : "TEXT";
         }
@@ -1105,28 +1248,22 @@ const ChatBox: React.FC = () => {
             assignErr?.data?.message ||
             assignErr?.error ||
             "Coupon assignment failed";
-          const alreadyAssigned =
-            typeof assignMessage === "string" &&
-            assignMessage.toLowerCase().includes("already assigned");
-
-          if (!alreadyAssigned) {
-            Alert.alert(
-              t("error", "Error"),
-              typeof assignMessage === "string"
-                ? assignMessage
-                : t(
-                    "chat_coupon_assign_error",
-                    "Error: Cannot assign coupon. Buyer ID not resolved.",
-                  ),
-            );
-            return;
-          }
+          Alert.alert(
+            t("error", "Error"),
+            typeof assignMessage === "string"
+              ? assignMessage
+              : t(
+                  "chat_coupon_assign_error",
+                  "Error: Cannot assign coupon. Buyer ID not resolved.",
+                ),
+          );
+          return;
         }
       }
 
       const msgText =
         type === "coupon"
-          ? `${couponPrefix}: ${coupon?.code} - ${coupon?.desc}`
+          ? `${couponPrefix}: ${coupon?.code} | ${coupon?.discount} | ${coupon?.desc}`
           : text;
 
       await sendMessage({
@@ -1153,21 +1290,33 @@ const ChatBox: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: imageMediaTypes,
         allowsEditing: true,
         quality: 0.35,
-        base64: true,
       });
 
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      const mimeType = asset.mimeType || "image/jpeg";
-      const imagePayload = asset.base64
-        ? `data:${mimeType};base64,${asset.base64}`
-        : asset.uri || "";
+      if (!asset.uri) return;
 
-      if (!imagePayload) return;
-      await handleSendMessage(imagePayload, "image");
+      const mimeType = asset.mimeType || getImageMimeType(asset.uri);
+      const fileName =
+        asset.fileName ||
+        `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: Platform.OS === "ios" ? asset.uri.replace("file://", "file://") : asset.uri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+
+      const uploadResult = await uploadChatImage(formData).unwrap();
+      if (!uploadResult?.url) {
+        throw new Error("Image upload failed");
+      }
+
+      await handleSendMessage(uploadResult.url, "image");
     } catch (error) {
       console.error("Photo pick/send failed", error);
       Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
@@ -1183,10 +1332,14 @@ const ChatBox: React.FC = () => {
     });
   };
 
-  const handleCopyCouponCode = async (code?: string) => {
-    if (!code) return;
+  const handleCopyCouponCode = async (coupon?: CouponData) => {
+    if (!coupon?.code) return;
+    if (coupon.isDisabled) {
+      Alert.alert("Coupon unavailable", "This coupon is no longer valid.");
+      return;
+    }
     try {
-      await Clipboard.setStringAsync(String(code));
+      await Clipboard.setStringAsync(String(coupon.code));
       Alert.alert("Copied", "Coupon code copied");
     } catch {
       Alert.alert("Copy failed", "Could not copy coupon code");
@@ -1474,7 +1627,9 @@ const ChatBox: React.FC = () => {
           ) : isOrderMessageType(msg.type) ? (
             renderOrderCard(msg)
           ) : msg.type === "image" ? (
-            <View
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePreviewImage(msg.text)}
               style={[
                 styles.bubble,
                 msg.isOwn ? styles.myBubble : styles.otherBubble,
@@ -1486,7 +1641,10 @@ const ChatBox: React.FC = () => {
                 style={styles.chatImage}
                 resizeMode="cover"
               />
-            </View>
+              <View style={styles.imagePreviewBadge}>
+                <Text style={styles.imagePreviewBadgeText}>Preview</Text>
+              </View>
+            </TouchableOpacity>
           ) : (
             <View
               style={[
@@ -1514,16 +1672,48 @@ const ChatBox: React.FC = () => {
   const parseCouponFromText = (text: string) => {
     const activePrefix = `${couponPrefix}:`;
     const legacyPrefixWithColon = `${legacyCouponPrefix}:`;
+    const couponsLookupReady = isVendorSide
+      ? Array.isArray(vendorCouponsData)
+      : Array.isArray(buyerCouponsData);
     if (
       !text ||
       (!text.includes(activePrefix) && !text.includes(legacyPrefixWithColon))
     )
       return null;
     try {
-      // Format: "<prefix>: CODE - DESC"
       const normalized = text.startsWith(legacyPrefixWithColon)
         ? text.replace(legacyPrefixWithColon, activePrefix)
         : text;
+      const payload = normalized.slice(activePrefix.length).trim();
+      const [pipeCode, pipeDiscount, ...pipeDescParts] = payload.split("|");
+      const fallbackCode = payload.split("-")[0]?.trim();
+      const resolvedCode = pipeCode?.trim() || fallbackCode;
+      const matchedCoupon = resolvedCode
+        ? knownCouponsByCode[normalizeCouponCode(resolvedCode)]
+        : undefined;
+
+      if (matchedCoupon) {
+        return matchedCoupon;
+      }
+
+      if (pipeCode && pipeDiscount && pipeDescParts.length > 0) {
+        const normalizedDiscount = pipeDiscount.trim();
+        const desc = pipeDescParts.join("|").trim();
+        const isCashback = desc.includes("CASHBACK");
+        return {
+          code: pipeCode.trim() || t("chat_coupon_fallback_code", "COUPON"),
+          desc: desc || t("chat_coupon_fallback_desc", "Special Offer"),
+          type: isCashback
+            ? t("chat_coupon_cashback", "CASHBACK")
+            : t("chat_coupon_discount", "DISCOUNT"),
+          color: isCashback ? "#FF4D67" : "#FF9100",
+          discount:
+            normalizedDiscount || t("chat_coupon_default_discount", "10%"),
+          isDisabled: true,
+          statusText: couponsLookupReady ? "Unavailable" : "Checking...",
+        };
+      }
+
       const parts = normalized.split(":");
       if (parts.length < 2) return null;
       const details = parts[1].split("-");
@@ -1538,9 +1728,42 @@ const ChatBox: React.FC = () => {
         discount:
           details[1]?.match(/\d+[%$]/)?.[0] ||
           t("chat_coupon_default_discount", "10%"),
+        isDisabled: true,
+        statusText: couponsLookupReady ? "Unavailable" : "Checking...",
       };
     } catch {
       return null;
+    }
+  };
+
+  const handlePreviewImage = (imageUrl?: string) => {
+    if (!imageUrl) return;
+    setPreviewImageUrl(imageUrl);
+  };
+
+  const handleCloseImagePreview = () => {
+    setPreviewImageUrl("");
+  };
+
+  const handleDownloadImage = async (imageUrl?: string) => {
+    if (!imageUrl) return;
+    try {
+      const fileExtensionMatch = imageUrl.match(/\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i);
+      const fileExtension = fileExtensionMatch?.[1] || "jpg";
+      const targetUri = `${FileSystem.cacheDirectory}chat-image-${Date.now()}.${fileExtension}`;
+      const downloadResult = await FileSystem.downloadAsync(imageUrl, targetUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+          dialogTitle: "Download image",
+        });
+      } else {
+        await Linking.openURL(downloadResult.uri);
+      }
+    } catch (error) {
+      console.error("Image download failed", error);
+      Alert.alert("Download failed", "Could not download image.");
     }
   };
 
@@ -1791,6 +2014,14 @@ const ChatBox: React.FC = () => {
                     />
                   )}
                 </View>
+                {isUploadingImage ? (
+                  <View style={styles.imageUploadStatus}>
+                    <ActivityIndicator size="small" color="#2A8383" />
+                    <Text style={styles.imageUploadStatusText}>
+                      Uploading image...
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             )}
 
@@ -1873,6 +2104,33 @@ const ChatBox: React.FC = () => {
           ),
         }}
       />
+      <Modal
+        visible={!!previewImageUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseImagePreview}
+      >
+        <View style={styles.imagePreviewOverlay}>
+          <TouchableOpacity
+            style={styles.imagePreviewCloseBtn}
+            onPress={handleCloseImagePreview}
+          >
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: previewImageUrl }}
+            style={styles.imagePreviewFull}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            style={styles.imagePreviewDownloadBtn}
+            onPress={() => handleDownloadImage(previewImageUrl)}
+          >
+            <Feather name="download" size={18} color="#111827" />
+            <Text style={styles.imagePreviewDownloadText}>Download</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -2069,6 +2327,61 @@ const styles = StyleSheet.create({
   otherBubble: { backgroundColor: "#fff", borderBottomLeftRadius: 2 },
   imageBubble: { padding: 4, overflow: "hidden" },
   chatImage: { width: 180, height: 180, borderRadius: 12, backgroundColor: "#E5E7EB" },
+  imagePreviewBadge: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    backgroundColor: "rgba(17,24,39,0.75)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  imagePreviewBadgeText: {
+    color: "#FFF",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  imagePreviewOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+  },
+  imagePreviewFull: {
+    width: "100%",
+    height: "78%",
+    borderRadius: 16,
+    backgroundColor: "#111827",
+  },
+  imagePreviewCloseBtn: {
+    position: "absolute",
+    top: 52,
+    right: 20,
+    zIndex: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePreviewDownloadBtn: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFF",
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  imagePreviewDownloadText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "700",
+  },
   msgText: { fontSize: 14, lineHeight: 20 },
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
@@ -2277,6 +2590,18 @@ const styles = StyleSheet.create({
     borderTopColor: "#F3F4F6",
   },
   attachmentRow: { flexDirection: "row", justifyContent: "space-around" },
+  imageUploadStatus: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  imageUploadStatusText: {
+    fontSize: 13,
+    color: "#4B5563",
+    fontWeight: "500",
+  },
   attachBtn: { alignItems: "center" },
   attachIconCircle: {
     width: 56,
@@ -2446,6 +2771,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
+  chatCouponDisabled: {
+    opacity: 0.6,
+  },
   chatCouponOwn: { borderBottomRightRadius: 2 },
   chatCouponOther: { borderBottomLeftRadius: 2 },
   chatCouponSide: {
@@ -2493,10 +2821,29 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
   },
+  chatCouponDiscountDisabled: {
+    color: "#6B7280",
+  },
   chatCouponDesc: {
     fontSize: 11,
     color: "#4B5563",
     marginTop: 4,
+  },
+  chatCouponDescDisabled: {
+    color: "#6B7280",
+  },
+  chatCouponStatusBadge: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#FEE2E2",
+  },
+  chatCouponStatusText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B91C1C",
   },
   chatCouponFooter: {
     flexDirection: "row",
