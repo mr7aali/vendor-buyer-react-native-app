@@ -2,6 +2,7 @@ import { useTranslation } from "@/hooks/use-translation";
 import { getLayoutDirection } from "@/constants/rtl";
 import { Entypo, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -11,6 +12,7 @@ const LanguageScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <View
         style={{
           flexDirection: isRTL ? "row-reverse" : "row",

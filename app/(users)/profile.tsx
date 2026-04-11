@@ -13,6 +13,7 @@ import {
 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
 import { Alert, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -61,7 +62,8 @@ const ProfileActionRowSkeleton = ({ switchRow = false }: { switchRow?: boolean }
 );
 
 const ProfileScreen = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const profileArrowIcon = language === "he" ? "arrow-back-ios-new" : "arrow-forward-ios";
   const dispatch = useAppDispatch();
   const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
@@ -198,6 +200,7 @@ const ProfileScreen = () => {
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }} showsVerticalScrollIndicator={false}>
         {shouldShowProfileSkeleton ? (
           <>
@@ -260,7 +263,7 @@ const ProfileScreen = () => {
                     {t("personal_info", "Personal info")}
                   </Text>
                 </View>
-                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -273,7 +276,7 @@ const ProfileScreen = () => {
                     {t("transaction_history", "Transaction History")}
                   </Text>
                 </View>
-                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
             </View>
 
@@ -294,6 +297,7 @@ const ProfileScreen = () => {
                   onValueChange={toggleSwitch}
                   value={false}
                   disabled={isSwitchingProfile}
+                  style={{ transform: [{ scaleX: 1.3 }, { scaleY: 1.3 }] }}
                 />
               </View>
 
@@ -307,7 +311,7 @@ const ProfileScreen = () => {
                     {t("permission", "Permission")}
                   </Text>
                 </View>
-                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -320,7 +324,7 @@ const ProfileScreen = () => {
                     {t("settings", "Settings")}
                   </Text>
                 </View>
-                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -333,7 +337,7 @@ const ProfileScreen = () => {
                     {t("language", "Language")}
                   </Text>
                 </View>
-                <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
             </View>
 

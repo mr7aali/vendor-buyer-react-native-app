@@ -1,4 +1,3 @@
-import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import { useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
@@ -11,6 +10,7 @@ import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
 import {
+  ActivityIndicator,
   BackHandler,
   Image,
   ScrollView,
@@ -21,23 +21,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { quickActions } from "../../constants/common";
 
-const cardStyle = {
-  backgroundColor: "white",
-  borderRadius: 16,
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.05,
-  shadowRadius: 8,
-  elevation: 2,
-} as const;
-
 const toNumber = (value: any, fallback = 0) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
-const normalizeStatus = (value: any) => String(value || "pending").toLowerCase();
+const normalizeStatus = (value: any) =>
+  String(value || "pending").toLowerCase();
 
 const getStatusTheme = (status: string) => {
   const map: Record<string, { bg: string; text: string }> = {
@@ -51,95 +42,8 @@ const getStatusTheme = (status: string) => {
   return map[status] || { bg: "#EEF2F4", text: "#56636B" };
 };
 
-const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
-
-const HomeHeaderSkeleton = () => (
-  <View
-    style={{
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingTop: 12,
-      paddingBottom: 12,
-      paddingLeft: 20,
-      paddingRight: 20,
-    }}
-  >
-    <View>
-      <SkeletonBlock style={{ width: 88, height: 18, borderRadius: 9 }} />
-      <SkeletonBlock style={{ width: 144, height: 16, borderRadius: 8, marginTop: 8 }} />
-      <SkeletonBlock style={{ width: 92, height: 13, borderRadius: 7, marginTop: 8 }} />
-    </View>
-    <SkeletonBlock style={{ width: 48, height: 48, borderRadius: 24 }} />
-  </View>
-);
-
-const StatCardSkeleton = () => (
-  <View
-    style={{
-      ...cardStyle,
-      padding: 16,
-      width: "48%",
-      gap: 8,
-    }}
-  >
-    <SkeletonBlock style={{ width: "56%", height: 14, borderRadius: 7 }} />
-    <SkeletonBlock style={{ width: "42%", height: 22, borderRadius: 10 }} />
-    <SkeletonBlock style={{ width: 52, height: 14, borderRadius: 7 }} />
-  </View>
-);
-
-const QuickActionSkeleton = () => (
-  <View style={{ alignItems: "center" }}>
-    <SkeletonBlock style={{ width: 44, height: 44, borderRadius: 22 }} />
-    <SkeletonBlock style={{ width: 54, height: 10, borderRadius: 5, marginTop: 8 }} />
-  </View>
-);
-
-const RecentOrderSkeleton = () => (
-  <View
-    style={{
-      ...cardStyle,
-      borderRadius: 12,
-      padding: 12,
-    }}
-  >
-    <View style={{ flexDirection: "row", marginBottom: 8 }}>
-      <SkeletonBlock style={{ width: 80, height: 80, borderRadius: 8, marginRight: 12 }} />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-          <SkeletonBlock style={{ width: "46%", height: 16, borderRadius: 8 }} />
-          <SkeletonBlock style={{ width: 72, height: 22, borderRadius: 11 }} />
-        </View>
-        <SkeletonBlock style={{ width: "88%", height: 12, borderRadius: 6, marginBottom: 8 }} />
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <SkeletonBlock style={{ width: 12, height: 12, borderRadius: 6 }} />
-          <SkeletonBlock style={{ width: "38%", height: 12, borderRadius: 6, marginLeft: 6 }} />
-        </View>
-      </View>
-    </View>
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        backgroundColor: "#eaf2f2",
-        paddingLeft: 12,
-        paddingRight: 12,
-        paddingBottom: 10,
-        paddingTop: 10,
-        borderRadius: 6,
-        marginTop: 8,
-      }}
-    >
-      <View>
-        <SkeletonBlock style={{ width: 86, height: 12, borderRadius: 6 }} />
-        <SkeletonBlock style={{ width: 72, height: 12, borderRadius: 6, marginTop: 6 }} />
-      </View>
-      <SkeletonBlock style={{ width: 68, height: 18, borderRadius: 9 }} />
-    </View>
-  </View>
-);
+const toTitle = (value: string) =>
+  value.charAt(0).toUpperCase() + value.slice(1);
 
 export default function HomeScreen() {
   const { language, t } = useTranslation();
@@ -150,11 +54,9 @@ export default function HomeScreen() {
     (user as any)?._id ||
     (user as any)?.buyer?.userId ||
     (user as any)?.vendor?.userId;
-
   const {
     data: statsData,
     isLoading: isStatsLoading,
-    isFetching: isStatsFetching,
     isError: isStatsError,
   } = useGetUserVendorStatisticsQuery(currentUserId, {
     skip: !currentUserId,
@@ -162,48 +64,44 @@ export default function HomeScreen() {
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
-
-  const {
-    data: ordersData = [],
-    isLoading: isOrdersLoading,
-    isFetching: isOrdersFetching,
-  } = useGetOrdersQuery(undefined, {
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
-  });
+  const { data: ordersData = [], isLoading: isOrdersLoading } =
+    useGetOrdersQuery(undefined, {
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    });
 
   const localizedText = React.useMemo(() => {
     if (language === "he") {
       return {
-        thisMonth: "×”×—×•×“×©",
-        quickActions: "×¤×¢×•×œ×•×ª ×ž×”×™×¨×•×ª",
-        recentOrders: "×”×–×ž× ×•×ª ××—×¨×•× ×•×ª",
-        viewAll: "×”×¦×’ ×”×›×œ",
-        products: "×ž×•×¦×¨×™×",
-        newClients: "×œ×§×•×—×•×ª ×—×“×©×™×",
-        noItems: "××™×Ÿ ×¤×¨×™×˜×™×",
-        statsFallback: "×œ× × ×™×ª×Ÿ ×œ×¨×¢× ×Ÿ × ×ª×•× ×™×. ×ž×•×¦×’×™× ×¢×¨×›×™ ×‘×¨×™×¨×ª ×ž×—×“×œ.",
-        addProduct: "×”×•×¡×£ ×ž×•×¦×¨",
-        orders: "×”×–×ž× ×•×ª",
-        payments: "×ª×©×œ×•×ž×™×",
-        myQrCode: "×§×•×“ ×”-QR ×©×œ×™",
+        thisMonth: "החודש",
+        quickActions: "פעולות מהירות",
+        recentOrders: "הזמנות אחרונות",
+        viewAll: "הצג הכל",
+        products: "מוצרים",
+        newClients: "לקוחות חדשים",
+        noItems: "אין פריטים",
+        statsFallback: "לא ניתן לרענן נתונים. מוצגים ערכי ברירת מחדל.",
+        addProduct: "הוסף מוצר",
+        orders: "הזמנות",
+        payments: "תשלומים",
+        myQrCode: "קוד ה-QR שלי",
       };
     }
     if (language === "hi") {
       return {
-        thisMonth: "à¤‡à¤¸ à¤®à¤¹à¥€à¤¨à¥‡",
-        quickActions: "à¤¤à¥à¤µà¤°à¤¿à¤¤ à¤•à¤¾à¤°à¥à¤¯",
-        recentOrders: "à¤¹à¤¾à¤² à¤•à¥‡ à¤‘à¤°à¥à¤¡à¤°",
-        viewAll: "à¤¸à¤­à¥€ à¤¦à¥‡à¤–à¥‡à¤‚",
-        products: "à¤ªà¥à¤°à¥‹à¤¡à¤•à¥à¤Ÿà¥à¤¸",
-        newClients: "à¤¨à¤ à¤—à¥à¤°à¤¾à¤¹à¤•",
-        noItems: "à¤•à¥‹à¤ˆ à¤†à¤‡à¤Ÿà¤® à¤¨à¤¹à¥€à¤‚",
+        thisMonth: "इस महीने",
+        quickActions: "त्वरित कार्य",
+        recentOrders: "हाल के ऑर्डर",
+        viewAll: "सभी देखें",
+        products: "प्रोडक्ट्स",
+        newClients: "नए ग्राहक",
+        noItems: "कोई आइटम नहीं",
         statsFallback:
-          "à¤†à¤‚à¤•à¤¡à¤¼à¥‡ à¤°à¥€à¤«à¥à¤°à¥‡à¤¶ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¥‡à¥¤ à¤¡à¤¿à¤«à¤¼à¥‰à¤²à¥à¤Ÿ à¤®à¤¾à¤¨ à¤¦à¤¿à¤–à¤¾à¤ à¤œà¤¾ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚à¥¤",
-        addProduct: "à¤ªà¥à¤°à¥‹à¤¡à¤•à¥à¤Ÿ à¤œà¥‹à¤¡à¤¼à¥‡à¤‚",
-        orders: "à¤‘à¤°à¥à¤¡à¤°",
-        payments: "à¤ªà¥‡à¤®à¥‡à¤‚à¤Ÿà¥à¤¸",
-        myQrCode: "à¤®à¥‡à¤°à¤¾ QR à¤•à¥‹à¤¡",
+          "आंकड़े रीफ्रेश नहीं हो सके। डिफ़ॉल्ट मान दिखाए जा रहे हैं।",
+        addProduct: "प्रोडक्ट जोड़ें",
+        orders: "ऑर्डर",
+        payments: "पेमेंट्स",
+        myQrCode: "मेरा QR कोड",
       };
     }
     return {
@@ -227,7 +125,8 @@ export default function HomeScreen() {
       const key = metric.toLowerCase();
       if (key === "sales") return t("total_sales", "Sales");
       if (key === "active orders") return t("active_orders", "Active Orders");
-      if (key === "completed orders") return t("completed_order", "Completed Orders");
+      if (key === "completed orders")
+        return t("completed_order", "Completed Orders");
       if (key === "products") return localizedText.products;
       if (key === "new clients") return localizedText.newClients;
       return metric;
@@ -273,10 +172,12 @@ export default function HomeScreen() {
       (user as any)?.storename ||
       (user as any)?.businessName;
 
-    if (displayName && String(displayName).trim()) return String(displayName).trim();
+    if (displayName && String(displayName).trim())
+      return String(displayName).trim();
 
     const email = (user as any)?.email;
-    if (email && String(email).includes("@")) return String(email).split("@")[0];
+    if (email && String(email).includes("@"))
+      return String(email).split("@")[0];
 
     return t("chat_user_fallback", "User");
   }, [t, user]);
@@ -332,16 +233,13 @@ export default function HomeScreen() {
     return sorted.slice(0, 3);
   }, [ordersData]);
 
-  const locale = language === "he" ? "he-IL" : language === "hi" ? "hi-IN" : "en-US";
+  const locale =
+    language === "he" ? "he-IL" : language === "hi" ? "hi-IN" : "en-US";
   const today = new Date().toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-
-  const showHeaderSkeleton = !user && (isStatsLoading || isStatsFetching);
-  const showStatsSkeleton = isStatsLoading || (isStatsFetching && !statsData);
-  const showOrdersSkeleton = isOrdersLoading || (isOrdersFetching && !ordersData.length);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -350,124 +248,204 @@ export default function HomeScreen() {
         return true;
       };
 
-      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
       return () => subscription.remove();
     }, []),
   );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar
+        style="dark"
+        backgroundColor="#FFFFFF"
+        translucent={false}
+      />
       <View>
-        {showHeaderSkeleton ? (
-          <HomeHeaderSkeleton />
-        ) : (
+        {/* THIS IS FOR HOME HEADER */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingTop: 12,
+            paddingBottom: 12,
+            paddingLeft: 20,
+            paddingRight: 20,
+          }}
+        >
+          <View>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "600",
+              }}
+            >
+              {t("welcome", "Welcome")}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "500",
+                color: "#1A1A1A",
+                marginTop: 2,
+              }}
+            >
+              {userName}
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: "#5f6470",
+              }}
+            >
+              {today}
+            </Text>
+          </View>
           <View
             style={{
               flexDirection: "row",
-              justifyContent: "space-between",
               alignItems: "center",
-              paddingTop: 12,
-              paddingBottom: 12,
-              paddingLeft: 20,
-              paddingRight: 20,
+              gap: 12,
             }}
           >
+            <TouchableOpacity
+              onPress={() => router.push("/notifications")}
+              style={{
+                backgroundColor: "white",
+                padding: 12,
+                borderRadius: "100%",
+                borderWidth: 0.5,
+                borderColor: "#E3E6F0",
+              }}
+            >
+              <Ionicons name="notifications-outline" size={24} color="black" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        {/* THIS IS FOR THIS MONTHS INFO PART */}
+        <ScrollView>
+          <View
+            style={{
+              paddingLeft: 20,
+              paddingRight: 20,
+              paddingBottom: 140,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                marginBottom: 16,
+              }}
+            >
+              {localizedText.thisMonth}
+            </Text>
+
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              {statCards.map((item, index) => {
+                const growth =
+                  typeof item.growth === "number" ? item.growth : null;
+                const isUp = growth === null ? true : growth >= 0;
+                return (
+                  <TouchableOpacity
+                    key={`${item.metric}-${index}`}
+                    style={{
+                      backgroundColor: "white",
+                      borderRadius: 16,
+                      padding: 16,
+                      width: "48%",
+                      gap: 6,
+                      shadowColor: "#000",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 8,
+                      elevation: 2,
+                    }}
+                    activeOpacity={0.9}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        marginBottom: 4,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {metricLabel(item.metric)}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontWeight: "500",
+                      }}
+                    >
+                      {item.value}
+                    </Text>
+                    {growth !== null ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 12,
+                        }}
+                      >
+                        <Feather
+                          name={isUp ? "trending-up" : "trending-down"}
+                          size={12}
+                          color={isUp ? "#088738" : "#E83808"}
+                          style={{ marginRight: 2 }}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            color: isUp ? "#088738" : "#E83808",
+                            fontWeight: "500",
+                          }}
+                        >
+                          {`${isUp ? "+" : "-"}${Math.abs(growth)}%`}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ height: 16 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+              {isStatsLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#278687"
+                  style={{ marginTop: 8, marginLeft: 4 }}
+                />
+              ) : null}
+              {isStatsError ? (
+                <Text style={{ fontSize: 12, color: "#B45309", marginTop: 4 }}>
+                  {localizedText.statsFallback}
+                </Text>
+              ) : null}
+            </View>
+            {/* THIS IS FOR Quick Actions */}
             <View>
-              <Text style={{ fontSize: 18, fontWeight: "600" }}>{t("welcome", "Welcome")}</Text>
               <Text
                 style={{
                   fontSize: 16,
                   fontWeight: "500",
-                  color: "#1A1A1A",
-                  marginTop: 2,
                 }}
               >
-                {userName}
+                {localizedText.quickActions}
               </Text>
-              <Text style={{ fontSize: 13, color: "#5f6470" }}>{today}</Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <TouchableOpacity
-                onPress={() => router.push("/notifications")}
-                style={{
-                  backgroundColor: "white",
-                  padding: 12,
-                  borderRadius: "100%",
-                  borderWidth: 0.5,
-                  borderColor: "#E3E6F0",
-                }}
-              >
-                <Ionicons name="notifications-outline" size={24} color="black" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        <ScrollView>
-          <View style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: 140 }}>
-            <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 16 }}>{localizedText.thisMonth}</Text>
-
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
-              {showStatsSkeleton
-                ? Array.from({ length: 4 }).map((_, index) => <StatCardSkeleton key={`stat-skeleton-${index}`} />)
-                : statCards.map((item, index) => {
-                    const growth = typeof item.growth === "number" ? item.growth : null;
-                    const isUp = growth === null ? true : growth >= 0;
-                    return (
-                      <TouchableOpacity
-                        key={`${item.metric}-${index}`}
-                        style={{
-                          ...cardStyle,
-                          padding: 16,
-                          width: "48%",
-                          gap: 6,
-                        }}
-                        activeOpacity={0.9}
-                      >
-                        <Text style={{ fontSize: 14, marginBottom: 4, fontWeight: "500" }}>
-                          {metricLabel(item.metric)}
-                        </Text>
-                        <Text style={{ fontSize: 18, fontWeight: "500" }}>{item.value}</Text>
-                        {growth !== null ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              paddingHorizontal: 6,
-                              paddingVertical: 2,
-                              borderRadius: 12,
-                            }}
-                          >
-                            <Feather
-                              name={isUp ? "trending-up" : "trending-down"}
-                              size={12}
-                              color={isUp ? "#088738" : "#E83808"}
-                              style={{ marginRight: 2 }}
-                            />
-                            <Text
-                              style={{
-                                fontSize: 10,
-                                color: isUp ? "#088738" : "#E83808",
-                                fontWeight: "500",
-                              }}
-                            >
-                              {`${isUp ? "+" : "-"}${Math.abs(growth)}%`}
-                            </Text>
-                          </View>
-                        ) : (
-                          <View style={{ height: 16 }} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-              {isStatsError ? (
-                <Text style={{ fontSize: 12, color: "#B45309", marginTop: 4 }}>{localizedText.statsFallback}</Text>
-              ) : null}
-            </View>
-
-            <View>
-              <Text style={{ fontSize: 16, fontWeight: "500" }}>{localizedText.quickActions}</Text>
               <View
                 style={{
                   flexDirection: "row",
@@ -476,33 +454,48 @@ export default function HomeScreen() {
                   justifyContent: "space-between",
                 }}
               >
-                {quickActions.map((action: any) =>
-                  showStatsSkeleton ? (
-                    <QuickActionSkeleton key={`quick-skeleton-${action.id}`} />
-                  ) : (
-                    <View key={action.id} style={{ alignItems: "center" }}>
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: "white",
-                          padding: 10,
-                          borderRadius: "100%",
-                          justifyContent: "center",
-                          alignItems: "center",
-                        }}
-                        onPress={action.onPress}
-                      >
-                        <Image source={action.icon} style={{ width: 24, height: 24 }} />
-                      </TouchableOpacity>
-                      <Text style={{ fontSize: 10, textAlign: "center", marginTop: 6 }}>
-                        {getQuickActionLabel(action.id, action.name)}
-                      </Text>
-                    </View>
-                  ),
-                )}
+                {quickActions.map((action: any) => (
+                  <View
+                    key={action.id}
+                    style={{
+                      alignItems: "center",
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: "white",
+                        padding: 10,
+                        borderRadius: "100%",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                      onPress={action.onPress}
+                    >
+                      <Image
+                        source={action.icon}
+                        style={{ width: 24, height: 24 }}
+                      />
+                    </TouchableOpacity>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        textAlign: "center",
+                        marginTop: 6,
+                      }}
+                    >
+                      {getQuickActionLabel(action.id, action.name)}
+                    </Text>
+                  </View>
+                ))}
               </View>
             </View>
-
-            <View style={{ marginTop: 10, marginBottom: 10 }}>
+            {/* THIS IS FOR Recent Orders */}
+            <View
+              style={{
+                marginTop: 10,
+                marginBottom: 10,
+              }}
+            >
               <View
                 style={{
                   flexDirection: "row",
@@ -510,24 +503,41 @@ export default function HomeScreen() {
                   alignItems: "center",
                 }}
               >
-                <Text style={{ fontSize: 16, fontWeight: "500" }}>{localizedText.recentOrders}</Text>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "500",
+                  }}
+                >
+                  {localizedText.recentOrders}
+                </Text>
                 <TouchableOpacity onPress={() => router.push("/(tabs)/order")}>
-                  <Text style={{ fontSize: 12, color: "#278687", fontWeight: "500" }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#278687",
+                      fontWeight: "500",
+                    }}
+                  >
                     {localizedText.viewAll}
                   </Text>
                 </TouchableOpacity>
               </View>
               <View style={{ marginTop: 12, gap: 12 }}>
-                {showOrdersSkeleton ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <RecentOrderSkeleton key={`order-skeleton-${index}`} />
-                  ))
+                {isOrdersLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#278687"
+                    style={{ marginTop: 8 }}
+                  />
                 ) : recentOrders.length ? (
                   recentOrders.map((order: any) => {
                     const orderId = order?.id || order?._id;
                     const status = normalizeStatus(order?.status);
                     const statusTheme = getStatusTheme(status);
-                    const firstItem = Array.isArray(order?.orderItems) ? order.orderItems[0] : null;
+                    const firstItem = Array.isArray(order?.orderItems)
+                      ? order.orderItems[0]
+                      : null;
                     const coverImage =
                       firstItem?.product?.images?.[0] ||
                       firstItem?.product?.imageUrl ||
@@ -537,9 +547,11 @@ export default function HomeScreen() {
                       order?.vendor?.fullName ||
                       order?.vendor?.storename ||
                       t("customer", "Customer");
-                    const customerId = order?.buyer?.id || order?.vendor?.id || "N/A";
+                    const customerId =
+                      order?.buyer?.id || order?.vendor?.id || "N/A";
                     const itemSummary =
-                      Array.isArray(order?.orderItems) && order.orderItems.length
+                      Array.isArray(order?.orderItems) &&
+                      order.orderItems.length
                         ? `${order.orderItems.length} ${t("orders_items_label", "items")}`
                         : localizedText.noItems;
 
@@ -553,9 +565,14 @@ export default function HomeScreen() {
                         }
                         key={orderId}
                         style={{
-                          ...cardStyle,
+                          backgroundColor: "white",
                           borderRadius: 12,
                           padding: 12,
+                          shadowColor: "#000",
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: 0.1,
+                          shadowRadius: 3,
+                          elevation: 2,
                         }}
                       >
                         <View style={{ flexDirection: "row", marginBottom: 8 }}>
@@ -609,10 +626,22 @@ export default function HomeScreen() {
                                 </Text>
                               </View>
                             </View>
-                            <Text style={{ fontSize: 12, color: "#4D4D4D", marginBottom: 8 }}>
-                              {order?.shippingAddress || t("address_unavailable", "Address unavailable")}
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: "#4D4D4D",
+                                marginBottom: 8,
+                              }}
+                            >
+                              {order?.shippingAddress ||
+                                t("address_unavailable", "Address unavailable")}
                             </Text>
-                            <View style={{ flexDirection: "row", alignItems: "center" }}>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                              }}
+                            >
                               <Ionicons name="star" size={12} color="#FFC107" />
                               <Text
                                 style={{ fontSize: 12, marginLeft: 4, flex: 1, flexShrink: 1 }}
@@ -640,13 +669,29 @@ export default function HomeScreen() {
                           }}
                         >
                           <View>
-                            <Text style={{ fontSize: 12, fontWeight: "500", color: "#278687" }}>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: "500",
+                                color: "#278687",
+                              }}
+                            >
                               {customerName}
                             </Text>
-                            <Text style={{ fontSize: 12, color: "#278687" }}>{itemSummary}</Text>
+                            <Text style={{ fontSize: 12, color: "#278687" }}>
+                              {itemSummary}
+                            </Text>
                           </View>
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: "#278687" }}>
-                            {formatMoney(order?.totalAmount || order?.totalPrice)}
+                          <Text
+                            style={{
+                              fontSize: 14,
+                              fontWeight: "600",
+                              color: "#278687",
+                            }}
+                          >
+                            {formatMoney(
+                              order?.totalAmount || order?.totalPrice,
+                            )}
                           </Text>
                         </View>
                       </TouchableOpacity>

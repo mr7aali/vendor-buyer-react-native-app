@@ -9,6 +9,7 @@ import {
 import { RootState } from "@/store/store";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
 import {
   Image,
@@ -163,6 +164,7 @@ export default function ChatTabs() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#1F2937" />
