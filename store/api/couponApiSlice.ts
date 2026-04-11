@@ -69,7 +69,6 @@ export interface Coupon {
 
 export interface CreateCouponRequest {
     name: string;
-    code: string;
     discountType: 'percentage' | 'fixed';
     discountValue: number;
     validFrom: string;
@@ -82,11 +81,22 @@ export interface AssignCouponRequest {
     buyerId: string;
 }
 
+export interface GetMyCouponsParams {
+    includeHistory?: boolean;
+    vendorId?: string;
+}
+
 export const couponApiSlice = apiSlice.injectEndpoints({
     overrideExisting: true,
     endpoints: (builder) => ({
         getMyCoupons: builder.query({
-            query: () => '/coupons',
+            query: (params?: GetMyCouponsParams) => {
+                const searchParams = new URLSearchParams();
+                if (params?.vendorId) searchParams.set('vendorId', params.vendorId);
+                if (params?.includeHistory) searchParams.set('includeHistory', 'true');
+                const queryString = searchParams.toString();
+                return queryString ? `/coupons?${queryString}` : '/coupons';
+            },
             transformResponse: (response: any) => {
                 try {
                     console.log('Coupon API - getMyCoupons transformResponse called');
