@@ -290,6 +290,14 @@ export const chatApiSlice = apiSlice.injectEndpoints({
             },
             providesTags: (result, error, conversationId) => [{ type: 'Chat', id: `pinned-${conversationId}` }],
         }),
+        uploadChatImage: builder.mutation<{ url: string; publicId?: string }, FormData>({
+            query: (formData) => ({
+                url: '/messages/upload-image',
+                method: 'POST',
+                body: formData,
+            }),
+            transformResponse: (response: any) => response?.data ?? response,
+        }),
         sendMessage: builder.mutation<any, { receiverId: string; messageText: string }>({
             async queryFn(body, _api, _extraOptions, baseQuery) {
                 console.log('Sending message body:', body);
@@ -366,6 +374,7 @@ export const {
     useGetConversationsQuery,
     useGetMessagesQuery,
     useGetPinnedMessageQuery,
+    useUploadChatImageMutation,
     useSendMessageMutation,
     useMarkAsReadMutation,
 } = chatApiSlice;

@@ -10,6 +10,7 @@ import {
   useGetPinnedMessageQuery,
   useMarkAsReadMutation,
   useSendMessageMutation,
+  useUploadChatImageMutation,
 } from "@/store/api/chatApiSlice";
 import {
   useAssignCouponMutation,
@@ -21,16 +22,20 @@ import { RootState } from "@/store/store";
 import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Alert,
   Easing,
   FlatList,
   Image,
   Keyboard,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -81,6 +86,18 @@ const normalizeCouponCode = (value: any): string =>
     .trim()
     .toUpperCase();
 
+const isImageMessageText = (value: any): boolean => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  return (
+    /^data:image\//i.test(text) ||
+    /^file:\/\//i.test(text) ||
+    /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i.test(text) ||
+    /res\.cloudinary\.com\/.+\/image\/upload\//i.test(text)
+  );
+};
+
 const formatCouponDiscountValue = (coupon: any): string => {
   const rawDiscountValue = Number(coupon?.discountValue ?? 0);
   const normalizedDiscountValue = Number.isInteger(rawDiscountValue)
@@ -96,9 +113,15 @@ const getCouponDisabledState = (coupon: any) => {
   const now = new Date();
   const validFrom = coupon?.validFrom ? new Date(coupon.validFrom) : null;
   const validUntil = coupon?.validUntil ? new Date(coupon.validUntil) : null;
+  const usageLimit = Number(coupon?.usageLimit ?? 0);
+  const usedCount = Number(coupon?.usedCount ?? 0);
 
   if (coupon?.isUsed) {
     return { isDisabled: true, statusText: "Used" };
+  }
+
+  if (usageLimit > 0 && usedCount >= usageLimit) {
+    return { isDisabled: true, statusText: "Used Up" };
   }
 
   if (coupon?.isActive === false) {
@@ -809,12 +832,15 @@ const ChatBox: React.FC = () => {
   const [messageText, setMessageText] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState("");
   const [activeTab, setActiveTab] = useState<
     "chat" | "categories" | "order_history"
   >("chat");
   const [storedRole, setStoredRole] = useState<string | null>(null);
   const [assignCoupon] = useAssignCouponMutation();
   const [markAsRead] = useMarkAsReadMutation();
+  const [uploadChatImage, { isLoading: isUploadingImage }] =
+    useUploadChatImageMutation();
   const flatListRef = useRef<FlatList>(null);
   const autoPinnedMessageKeyRef = useRef("");
   const [highlightedMessageId, setHighlightedMessageId] = useState("");
@@ -975,7 +1001,9 @@ const ChatBox: React.FC = () => {
       skip: !isVendorSide || !currentVendorId,
     },
   );
-  const { data: buyerCouponsData } = useGetMyCouponsQuery(undefined, {
+  const { data: buyerCouponsData } = useGetMyCouponsQuery({
+    includeHistory: true,
+  }, {
     skip: isVendorSide,
   });
 
@@ -1041,8 +1069,7 @@ const ChatBox: React.FC = () => {
       type: (() => {
         const normalizedType = normalizeMessageType(msg.type);
         if (normalizedType === "TEXT") {
-          return String(msg.messageText || msg.text || "").startsWith("data:image/") ||
-            String(msg.messageText || msg.text || "").startsWith("file://")
+          return isImageMessageText(msg.messageText || msg.text || "")
             ? "image"
             : "TEXT";
         }
@@ -1250,21 +1277,33 @@ const ChatBox: React.FC = () => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.35,
-        base64: true,
       });
 
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      const mimeType = asset.mimeType || "image/jpeg";
-      const imagePayload = asset.base64
-        ? `data:${mimeType};base64,${asset.base64}`
-        : asset.uri || "";
+      if (!asset.uri) return;
 
-      if (!imagePayload) return;
-      await handleSendMessage(imagePayload, "image");
+      const mimeType = asset.mimeType || "image/jpeg";
+      const fileName =
+        asset.fileName ||
+        `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: asset.uri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+
+      const uploadResult = await uploadChatImage(formData).unwrap();
+      if (!uploadResult?.url) {
+        throw new Error("Image upload failed");
+      }
+
+      await handleSendMessage(uploadResult.url, "image");
     } catch (error) {
       console.error("Photo pick/send failed", error);
       Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
@@ -1575,7 +1614,9 @@ const ChatBox: React.FC = () => {
           ) : isOrderMessageType(msg.type) ? (
             renderOrderCard(msg)
           ) : msg.type === "image" ? (
-            <View
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handlePreviewImage(msg.text)}
               style={[
                 styles.bubble,
                 msg.isOwn ? styles.myBubble : styles.otherBubble,
@@ -1587,7 +1628,10 @@ const ChatBox: React.FC = () => {
                 style={styles.chatImage}
                 resizeMode="cover"
               />
-            </View>
+              <View style={styles.imagePreviewBadge}>
+                <Text style={styles.imagePreviewBadgeText}>Preview</Text>
+              </View>
+            </TouchableOpacity>
           ) : (
             <View
               style={[
@@ -1676,6 +1720,37 @@ const ChatBox: React.FC = () => {
       };
     } catch {
       return null;
+    }
+  };
+
+  const handlePreviewImage = (imageUrl?: string) => {
+    if (!imageUrl) return;
+    setPreviewImageUrl(imageUrl);
+  };
+
+  const handleCloseImagePreview = () => {
+    setPreviewImageUrl("");
+  };
+
+  const handleDownloadImage = async (imageUrl?: string) => {
+    if (!imageUrl) return;
+    try {
+      const fileExtensionMatch = imageUrl.match(/\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i);
+      const fileExtension = fileExtensionMatch?.[1] || "jpg";
+      const targetUri = `${FileSystem.cacheDirectory}chat-image-${Date.now()}.${fileExtension}`;
+      const downloadResult = await FileSystem.downloadAsync(imageUrl, targetUri);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+          dialogTitle: "Download image",
+        });
+      } else {
+        await Linking.openURL(downloadResult.uri);
+      }
+    } catch (error) {
+      console.error("Image download failed", error);
+      Alert.alert("Download failed", "Could not download image.");
     }
   };
 
@@ -1926,6 +2001,14 @@ const ChatBox: React.FC = () => {
                     />
                   )}
                 </View>
+                {isUploadingImage ? (
+                  <View style={styles.imageUploadStatus}>
+                    <ActivityIndicator size="small" color="#2A8383" />
+                    <Text style={styles.imageUploadStatusText}>
+                      Uploading image...
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             )}
 
@@ -2008,6 +2091,33 @@ const ChatBox: React.FC = () => {
           ),
         }}
       />
+      <Modal
+        visible={!!previewImageUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseImagePreview}
+      >
+        <View style={styles.imagePreviewOverlay}>
+          <TouchableOpacity
+            style={styles.imagePreviewCloseBtn}
+            onPress={handleCloseImagePreview}
+          >
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          <Image
+            source={{ uri: previewImageUrl }}
+            style={styles.imagePreviewFull}
+            resizeMode="contain"
+          />
+          <TouchableOpacity
+            style={styles.imagePreviewDownloadBtn}
+            onPress={() => handleDownloadImage(previewImageUrl)}
+          >
+            <Feather name="download" size={18} color="#111827" />
+            <Text style={styles.imagePreviewDownloadText}>Download</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -2204,6 +2314,61 @@ const styles = StyleSheet.create({
   otherBubble: { backgroundColor: "#fff", borderBottomLeftRadius: 2 },
   imageBubble: { padding: 4, overflow: "hidden" },
   chatImage: { width: 180, height: 180, borderRadius: 12, backgroundColor: "#E5E7EB" },
+  imagePreviewBadge: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    backgroundColor: "rgba(17,24,39,0.75)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  imagePreviewBadgeText: {
+    color: "#FFF",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  imagePreviewOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.92)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 28,
+  },
+  imagePreviewFull: {
+    width: "100%",
+    height: "78%",
+    borderRadius: 16,
+    backgroundColor: "#111827",
+  },
+  imagePreviewCloseBtn: {
+    position: "absolute",
+    top: 52,
+    right: 20,
+    zIndex: 2,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePreviewDownloadBtn: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFF",
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  imagePreviewDownloadText: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "700",
+  },
   msgText: { fontSize: 14, lineHeight: 20 },
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
@@ -2412,6 +2577,18 @@ const styles = StyleSheet.create({
     borderTopColor: "#F3F4F6",
   },
   attachmentRow: { flexDirection: "row", justifyContent: "space-around" },
+  imageUploadStatus: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  imageUploadStatusText: {
+    fontSize: 13,
+    color: "#4B5563",
+    fontWeight: "500",
+  },
   attachBtn: { alignItems: "center" },
   attachIconCircle: {
     width: 56,
