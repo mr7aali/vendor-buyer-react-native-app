@@ -14,6 +14,7 @@ import {
 import {
   useAssignCouponMutation,
   useGetCouponsByVendorQuery,
+  useGetMyCouponsQuery,
 } from "@/store/api/couponApiSlice";
 import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
 import { RootState } from "@/store/store";
@@ -52,6 +53,8 @@ interface CouponData {
   discount: string;
   color: string;
   desc: string;
+  isDisabled?: boolean;
+  statusText?: string;
 }
 
 interface CustomChatMessage {
@@ -72,6 +75,67 @@ interface CustomChatMessage {
   orderId?: string | null;
   metadata?: any;
 }
+
+const normalizeCouponCode = (value: any): string =>
+  String(value || "")
+    .trim()
+    .toUpperCase();
+
+const formatCouponDiscountValue = (coupon: any): string => {
+  const rawDiscountValue = Number(coupon?.discountValue ?? 0);
+  const normalizedDiscountValue = Number.isInteger(rawDiscountValue)
+    ? rawDiscountValue.toString()
+    : rawDiscountValue.toFixed(2).replace(/\.?0+$/, "");
+
+  return coupon?.discountType === "percentage"
+    ? `${normalizedDiscountValue}%`
+    : `$${normalizedDiscountValue}`;
+};
+
+const getCouponDisabledState = (coupon: any) => {
+  const now = new Date();
+  const validFrom = coupon?.validFrom ? new Date(coupon.validFrom) : null;
+  const validUntil = coupon?.validUntil ? new Date(coupon.validUntil) : null;
+
+  if (coupon?.isUsed) {
+    return { isDisabled: true, statusText: "Used" };
+  }
+
+  if (coupon?.isActive === false) {
+    return { isDisabled: true, statusText: "Unavailable" };
+  }
+
+  if (validUntil && !Number.isNaN(validUntil.getTime()) && validUntil < now) {
+    return { isDisabled: true, statusText: "Expired" };
+  }
+
+  if (validFrom && !Number.isNaN(validFrom.getTime()) && validFrom > now) {
+    return { isDisabled: true, statusText: "Not Active Yet" };
+  }
+
+  return { isDisabled: false, statusText: undefined };
+};
+
+const mapCouponToChatCouponData = (coupon: any): CouponData => {
+  const discount = formatCouponDiscountValue(coupon);
+  const type = coupon?.discountType === "percentage" ? "DISCOUNT" : "CASHBACK";
+  const minPurchaseAmount = Number(coupon?.minPurchaseAmount ?? 0);
+  const normalizedMinPurchase = Number.isInteger(minPurchaseAmount)
+    ? minPurchaseAmount.toString()
+    : minPurchaseAmount.toFixed(2).replace(/\.?0+$/, "");
+  const { isDisabled, statusText } = getCouponDisabledState(coupon);
+
+  return {
+    id: String(coupon?.id || ""),
+    code: String(coupon?.code || ""),
+    type,
+    discount,
+    color: coupon?.discountType === "percentage" ? "#FF9100" : "#FF4D67",
+    desc: `${type} ${discount} on Orders Over $${normalizedMinPurchase}`,
+    isDisabled,
+    statusText,
+  };
+};
 
 interface OrderItemSummary {
   productName?: string;
@@ -286,14 +350,16 @@ const ChatCouponCard = ({
     offer: string;
     defaultDiscount: string;
   };
-  onCopyCode: (code?: string) => void;
+  onCopyCode: (coupon?: CouponData) => void;
 }) => {
   if (!coupon) return null;
+  const isDisabled = !!coupon.isDisabled;
   return (
     <View
       style={[
         styles.chatCouponContainer,
         isOwn ? styles.chatCouponOwn : styles.chatCouponOther,
+        isDisabled ? styles.chatCouponDisabled : null,
       ]}
     >
       <View
@@ -325,19 +391,40 @@ const ChatCouponCard = ({
               {labels.code}:{coupon.code}
             </Text>
             <TouchableOpacity
-              onPress={() => onCopyCode(coupon?.code)}
+              onPress={() => onCopyCode(coupon)}
+              disabled={isDisabled}
               style={{ padding: 2 }}
             >
-              <MaterialIcons name="content-copy" size={18} color="#374151" />
+              <MaterialIcons
+                name="content-copy"
+                size={18}
+                color={isDisabled ? "#9CA3AF" : "#374151"}
+              />
             </TouchableOpacity>
           </View>
-          <Text style={styles.chatCouponDiscount}>
+          <Text
+            style={[
+              styles.chatCouponDiscount,
+              isDisabled ? styles.chatCouponDiscountDisabled : null,
+            ]}
+          >
             {coupon.discount || labels.defaultDiscount}
           </Text>
         </View>
-        <Text style={styles.chatCouponDesc} numberOfLines={2}>
+        <Text
+          style={[
+            styles.chatCouponDesc,
+            isDisabled ? styles.chatCouponDescDisabled : null,
+          ]}
+          numberOfLines={2}
+        >
           {coupon.desc || coupon.description}
         </Text>
+        {isDisabled && coupon.statusText ? (
+          <View style={styles.chatCouponStatusBadge}>
+            <Text style={styles.chatCouponStatusText}>{coupon.statusText}</Text>
+          </View>
+        ) : null}
         <View style={styles.chatCouponFooter}>
           <View style={styles.chatCouponInfo}>
             <Ionicons name="time-outline" size={12} color="#666" />
@@ -888,6 +975,9 @@ const ChatBox: React.FC = () => {
       skip: !isVendorSide || !currentVendorId,
     },
   );
+  const { data: buyerCouponsData } = useGetMyCouponsQuery(undefined, {
+    skip: isVendorSide,
+  });
 
   // Map API coupons to component format
   const availableCoupons = React.useMemo(() => {
@@ -899,16 +989,29 @@ const ChatBox: React.FC = () => {
       return [];
     }
     return vendorCouponsData
-      .filter((coupon) => coupon.isActive)
-      .map((coupon) => ({
-        id: coupon.id,
-        code: coupon.code,
-        type: coupon.discountType === "percentage" ? "DISCOUNT" : "CASHBACK",
-        discount: `${coupon.discountValue}${coupon.discountType === "percentage" ? "%" : "$"}`,
-        color: coupon.discountType === "percentage" ? "#FF9100" : "#FF4D67",
-        desc: `${coupon.discountType === "percentage" ? "DISCOUNT" : "CASHBACK"} on Orders Over $${coupon.minPurchaseAmount || 0}`,
-      }));
+      .filter((coupon) => !getCouponDisabledState(coupon).isDisabled)
+      .map(mapCouponToChatCouponData);
   }, [vendorCouponsData]);
+
+  const knownCouponsByCode = React.useMemo(() => {
+    const sourceCoupons =
+      isVendorSide && Array.isArray(vendorCouponsData)
+        ? vendorCouponsData
+        : Array.isArray(buyerCouponsData)
+          ? buyerCouponsData
+          : [];
+
+    return sourceCoupons.reduce(
+      (acc, coupon) => {
+        const normalizedCode = normalizeCouponCode(coupon?.code);
+        if (normalizedCode) {
+          acc[normalizedCode] = mapCouponToChatCouponData(coupon);
+        }
+        return acc;
+      },
+      {} as Record<string, CouponData>,
+    );
+  }, [buyerCouponsData, isVendorSide, vendorCouponsData]);
 
   const chatMessages = useMemo<CustomChatMessage[]>(() => {
     if (!Array.isArray(messagesData)) {
@@ -1105,28 +1208,22 @@ const ChatBox: React.FC = () => {
             assignErr?.data?.message ||
             assignErr?.error ||
             "Coupon assignment failed";
-          const alreadyAssigned =
-            typeof assignMessage === "string" &&
-            assignMessage.toLowerCase().includes("already assigned");
-
-          if (!alreadyAssigned) {
-            Alert.alert(
-              t("error", "Error"),
-              typeof assignMessage === "string"
-                ? assignMessage
-                : t(
-                    "chat_coupon_assign_error",
-                    "Error: Cannot assign coupon. Buyer ID not resolved.",
-                  ),
-            );
-            return;
-          }
+          Alert.alert(
+            t("error", "Error"),
+            typeof assignMessage === "string"
+              ? assignMessage
+              : t(
+                  "chat_coupon_assign_error",
+                  "Error: Cannot assign coupon. Buyer ID not resolved.",
+                ),
+          );
+          return;
         }
       }
 
       const msgText =
         type === "coupon"
-          ? `${couponPrefix}: ${coupon?.code} - ${coupon?.desc}`
+          ? `${couponPrefix}: ${coupon?.code} | ${coupon?.discount} | ${coupon?.desc}`
           : text;
 
       await sendMessage({
@@ -1183,10 +1280,14 @@ const ChatBox: React.FC = () => {
     });
   };
 
-  const handleCopyCouponCode = async (code?: string) => {
-    if (!code) return;
+  const handleCopyCouponCode = async (coupon?: CouponData) => {
+    if (!coupon?.code) return;
+    if (coupon.isDisabled) {
+      Alert.alert("Coupon unavailable", "This coupon is no longer valid.");
+      return;
+    }
     try {
-      await Clipboard.setStringAsync(String(code));
+      await Clipboard.setStringAsync(String(coupon.code));
       Alert.alert("Copied", "Coupon code copied");
     } catch {
       Alert.alert("Copy failed", "Could not copy coupon code");
@@ -1514,16 +1615,48 @@ const ChatBox: React.FC = () => {
   const parseCouponFromText = (text: string) => {
     const activePrefix = `${couponPrefix}:`;
     const legacyPrefixWithColon = `${legacyCouponPrefix}:`;
+    const couponsLookupReady = isVendorSide
+      ? Array.isArray(vendorCouponsData)
+      : Array.isArray(buyerCouponsData);
     if (
       !text ||
       (!text.includes(activePrefix) && !text.includes(legacyPrefixWithColon))
     )
       return null;
     try {
-      // Format: "<prefix>: CODE - DESC"
       const normalized = text.startsWith(legacyPrefixWithColon)
         ? text.replace(legacyPrefixWithColon, activePrefix)
         : text;
+      const payload = normalized.slice(activePrefix.length).trim();
+      const [pipeCode, pipeDiscount, ...pipeDescParts] = payload.split("|");
+      const fallbackCode = payload.split("-")[0]?.trim();
+      const resolvedCode = pipeCode?.trim() || fallbackCode;
+      const matchedCoupon = resolvedCode
+        ? knownCouponsByCode[normalizeCouponCode(resolvedCode)]
+        : undefined;
+
+      if (matchedCoupon) {
+        return matchedCoupon;
+      }
+
+      if (pipeCode && pipeDiscount && pipeDescParts.length > 0) {
+        const normalizedDiscount = pipeDiscount.trim();
+        const desc = pipeDescParts.join("|").trim();
+        const isCashback = desc.includes("CASHBACK");
+        return {
+          code: pipeCode.trim() || t("chat_coupon_fallback_code", "COUPON"),
+          desc: desc || t("chat_coupon_fallback_desc", "Special Offer"),
+          type: isCashback
+            ? t("chat_coupon_cashback", "CASHBACK")
+            : t("chat_coupon_discount", "DISCOUNT"),
+          color: isCashback ? "#FF4D67" : "#FF9100",
+          discount:
+            normalizedDiscount || t("chat_coupon_default_discount", "10%"),
+          isDisabled: true,
+          statusText: couponsLookupReady ? "Unavailable" : "Checking...",
+        };
+      }
+
       const parts = normalized.split(":");
       if (parts.length < 2) return null;
       const details = parts[1].split("-");
@@ -1538,6 +1671,8 @@ const ChatBox: React.FC = () => {
         discount:
           details[1]?.match(/\d+[%$]/)?.[0] ||
           t("chat_coupon_default_discount", "10%"),
+        isDisabled: true,
+        statusText: couponsLookupReady ? "Unavailable" : "Checking...",
       };
     } catch {
       return null;
@@ -2446,6 +2581,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
+  chatCouponDisabled: {
+    opacity: 0.6,
+  },
   chatCouponOwn: { borderBottomRightRadius: 2 },
   chatCouponOther: { borderBottomLeftRadius: 2 },
   chatCouponSide: {
@@ -2493,10 +2631,29 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#111827",
   },
+  chatCouponDiscountDisabled: {
+    color: "#6B7280",
+  },
   chatCouponDesc: {
     fontSize: 11,
     color: "#4B5563",
     marginTop: 4,
+  },
+  chatCouponDescDisabled: {
+    color: "#6B7280",
+  },
+  chatCouponStatusBadge: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: "#FEE2E2",
+  },
+  chatCouponStatusText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#B91C1C",
   },
   chatCouponFooter: {
     flexDirection: "row",

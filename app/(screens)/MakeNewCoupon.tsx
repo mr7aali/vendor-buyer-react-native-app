@@ -21,11 +21,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MakeNewCoupon: React.FC = () => {
   const { language, t } = useTranslation();
   const router = useRouter();
-  const [createCoupon] = useCreateCouponMutation();
+  const [createCoupon, { isLoading: isCreating }] = useCreateCouponMutation();
 
   // State for form fields
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState("");
   const [minTransaction, setMinTransaction] = useState("");
@@ -120,30 +119,35 @@ const MakeNewCoupon: React.FC = () => {
   };
 
   const handleCreateCoupon = async () => {
+    const normalizedValidFrom = new Date(validFrom);
+    normalizedValidFrom.setHours(0, 0, 0, 0);
+
+    const normalizedValidUntil = new Date(validUntil);
+    normalizedValidUntil.setHours(23, 59, 59, 999);
+
     // Validation
     if (!name.trim()) {
       Alert.alert(t("error", "Error"), ui.pleaseEnterName);
-      return;
-    }
-    if (!code.trim()) {
-      Alert.alert(t("error", "Error"), ui.pleaseEnterCode);
       return;
     }
     if (!discountValue || parseFloat(discountValue) <= 0) {
       Alert.alert(t("error", "Error"), ui.pleaseEnterValidDiscount);
       return;
     }
+    if (normalizedValidUntil < normalizedValidFrom) {
+      Alert.alert(t("error", "Error"), "Valid until date must be after the valid from date");
+      return;
+    }
 
     try {
       await createCoupon({
         name: name.trim(),
-        code: code.trim(),
         discountType,
         discountValue: parseFloat(discountValue),
-        validFrom: validFrom.toISOString(),
-        validUntil: validUntil.toISOString(),
+        validFrom: normalizedValidFrom.toISOString(),
+        validUntil: normalizedValidUntil.toISOString(),
         minPurchaseAmount: minTransaction ? parseFloat(minTransaction) : undefined,
-        usageLimit: usageLimit ? parseInt(usageLimit) : undefined,
+        usageLimit: usageLimit ? parseInt(usageLimit, 10) : undefined,
       }).unwrap();
 
       Alert.alert(t("success", "Success"), ui.couponCreated);
@@ -183,17 +187,6 @@ const MakeNewCoupon: React.FC = () => {
               value={name}
               onChangeText={setName}
               placeholderTextColor="#99ABB3"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder={ui.couponCode}
-              value={code}
-              onChangeText={setCode}
-              placeholderTextColor="#99ABB3"
-              autoCapitalize="characters"
             />
           </View>
 
@@ -292,7 +285,7 @@ const MakeNewCoupon: React.FC = () => {
               mode="date"
               display="default"
               onChange={onDateChange}
-              minimumDate={new Date()}
+              minimumDate={showDatePicker === "until" ? validFrom : new Date()}
             />
           )}
         </ScrollView>
@@ -300,10 +293,13 @@ const MakeNewCoupon: React.FC = () => {
         {/* Bottom Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={styles.createBtn}
+            style={[styles.createBtn, isCreating && styles.createBtnDisabled]}
             onPress={handleCreateCoupon}
+            disabled={isCreating}
           >
-            <Text style={styles.createBtnText}>{ui.createCoupon}</Text>
+            <Text style={styles.createBtnText}>
+              {isCreating ? t("loading", "Loading...") : ui.createCoupon}
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -381,6 +377,9 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     justifyContent: "center",
     alignItems: "center",
+  },
+  createBtnDisabled: {
+    opacity: 0.7,
   },
   createBtnText: {
     color: "#FFF",

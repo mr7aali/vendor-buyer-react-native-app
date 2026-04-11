@@ -69,7 +69,6 @@ export interface Coupon {
 
 export interface CreateCouponRequest {
     name: string;
-    code: string;
     discountType: 'percentage' | 'fixed';
     discountValue: number;
     validFrom: string;
