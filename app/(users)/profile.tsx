@@ -4,7 +4,12 @@ import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectAvailableProfiles, setCredentials } from "@/store/slices/authSlice";
+import {
+  logOut,
+  selectAvailableProfiles,
+  selectCurrentUser,
+  setCredentials,
+} from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
@@ -65,6 +70,7 @@ const ProfileScreen = () => {
   const { t, language } = useTranslation();
   const profileArrowIcon = language === "he" ? "arrow-back-ios-new" : "arrow-forward-ios";
   const dispatch = useAppDispatch();
+  const user = useAppSelector(selectCurrentUser);
   const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -74,7 +80,7 @@ const ProfileScreen = () => {
     isLoading: isProfileLoading,
     isFetching: isProfileFetching,
   } = useGetProfileQuery({});
-  const displayUser = profileData?.data;
+  const displayUser = profileData?.data || user;
   const shouldShowProfileSkeleton = !displayUser && (isProfileLoading || isProfileFetching);
 
   const onLogout = async () => {
