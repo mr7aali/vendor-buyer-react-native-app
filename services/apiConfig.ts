@@ -16,6 +16,9 @@ const rawConfiguredApiUrl = normalizeBaseUrl(
   process.env.EXPO_PUBLIC_API_URL ?? "",
 );
 
+const shouldUseLocalDevFallbacks = () =>
+  __DEV__ && (!rawConfiguredApiUrl || isLoopbackUrl(rawConfiguredApiUrl));
+
 const getScheme = (value: string) =>
   /^https:\/\//i.test(value) ? "https" : "http";
 
@@ -99,14 +102,15 @@ export const buildApiCandidateUrls = (path: string) => {
   const localFallbackProtocol = "http";
   const fallbackPort = getPort(rawConfiguredApiUrl);
   const expoDevHost = getExpoDevHost();
+  const includeLocalFallbacks = shouldUseLocalDevFallbacks();
   const candidateBases = [
     apiBaseUrl,
-    __DEV__ && expoDevHost
+    includeLocalFallbacks && expoDevHost
       ? `${localFallbackProtocol}://${expoDevHost}:${fallbackPort}`
       : "",
-    __DEV__ ? `${localFallbackProtocol}://10.0.2.2:${fallbackPort}` : "",
-    __DEV__ ? `${localFallbackProtocol}://127.0.0.1:${fallbackPort}` : "",
-    __DEV__ ? `${localFallbackProtocol}://localhost:${fallbackPort}` : "",
+    includeLocalFallbacks ? `${localFallbackProtocol}://10.0.2.2:${fallbackPort}` : "",
+    includeLocalFallbacks ? `${localFallbackProtocol}://127.0.0.1:${fallbackPort}` : "",
+    includeLocalFallbacks ? `${localFallbackProtocol}://localhost:${fallbackPort}` : "",
   ].filter(Boolean);
 
   return Array.from(
