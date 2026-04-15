@@ -15,6 +15,7 @@ import React, { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   ListRenderItem,
   RefreshControl,
@@ -79,6 +80,24 @@ export default function NotificationsScreen() {
     () => notifications.filter((item) => !item.isRead).length,
     [notifications]
   );
+
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(users)");
+    }
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackPress,
+    );
+
+    return () => subscription.remove();
+  }, [handleBackPress]);
 
   const onPressItem = async (item: UserNotification) => {
     if (!item.isRead) {
@@ -152,7 +171,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" backgroundColor="#F8FBF9" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.replace("/(users)")}>
+        <TouchableOpacity onPress={handleBackPress}>
           <Ionicons name="chevron-back" size={28} color="black" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t("notif_notifications", "Notifications")} ({unreadCount})</Text>

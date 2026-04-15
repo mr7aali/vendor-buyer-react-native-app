@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  BackHandler,
   Modal,
   Pressable,
   RefreshControl,
@@ -83,6 +84,15 @@ const Notifications = () => {
     [t]
   );
 
+  const handleBackPress = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+    return true;
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
     const onNotification = () => {
@@ -93,6 +103,15 @@ const Notifications = () => {
       socket.off("notification", onNotification);
     };
   }, [socket, refetch]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackPress,
+    );
+
+    return () => subscription.remove();
+  }, [handleBackPress]);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
 
@@ -142,7 +161,7 @@ const Notifications = () => {
             marginBottom: 10,
           }}
         >
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={handleBackPress}>
             <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
           </TouchableOpacity>
           <Text style={{ fontSize: 18, fontWeight: "600" }}>{`${t("notif_notifications", "Notifications")} (${unreadCount})`}</Text>
