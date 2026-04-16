@@ -33,7 +33,6 @@ import {
   Image,
   Modal,
   ScrollView,
-  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -104,6 +103,10 @@ const ProfileScreen = () => {
 
   const displayUser = profileData?.data || user;
   const shouldShowProfileSkeleton = !displayUser && (isProfileLoading || isProfileFetching);
+  const currentModeLabel = t("vendor_mode", "Vendor");
+  const targetModeLabel = t("customer_mode", "Customer");
+  const switchButtonLabel = t("switch_to_customer", "Switch to Customer");
+
 
   useFocusEffect(
     useCallback(() => {
@@ -505,22 +508,97 @@ const ProfileScreen = () => {
             <View style={cardStyle}>
               <Text style={sectionTitleStyle}>{t("setting", "Setting")}</Text>
 
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Ionicons name="people-outline" size={26} color="#4B5563" />
-                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
-                    {t("switch_profile", "Switch profile")}
-                  </Text>
+              <View
+                style={{
+                  paddingVertical: 8,
+                  borderRadius: 18,
+                  backgroundColor: "#F5FBFA",
+                  borderWidth: 1,
+                  borderColor: "#D9EEEC",
+                  padding: 16,
+                  marginBottom: 8,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: "#DDF3F1",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="swap-horizontal" size={22} color="#278687" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>
+                      {t("switch_profile", "Switch profile")}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 4, lineHeight: 18 }}>
+                      {t("current_mode_vendor", "You are currently using the Vendor profile.")}
+                    </Text>
+                  </View>
                 </View>
-                <Switch
-                  trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-                  thumbColor="#278687"
-                  ios_backgroundColor="#3e3e3e"
-                  onValueChange={toggleSwitch}
-                  value={true}
+
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                  <View
+                    style={{
+                      backgroundColor: "#278687",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>{currentModeLabel}</Text>
+                  </View>
+                  <Ionicons
+                    name={language === "he" ? "arrow-back" : "arrow-forward"}
+                    size={16}
+                    color="#94A3B8"
+                    style={{ marginHorizontal: 10 }}
+                  />
+                  <View
+                    style={{
+                      backgroundColor: "#E7F0EF",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#355E5E", fontSize: 12, fontWeight: "700" }}>{targetModeLabel}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={toggleSwitch}
                   disabled={isSwitchingProfile}
-                  style={{ transform: [{ scaleX: 1.3 }, { scaleY: 1.3 }] }}
-                />
+                  style={{
+                    minHeight: 56,
+                    borderRadius: 16,
+                    backgroundColor: isSwitchingProfile ? "#97C9C5" : "#278687",
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "700" }}>{switchButtonLabel}</Text>
+
+                  </View>
+                  {isSwitchingProfile ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Ionicons
+                      name={language === "he" ? "arrow-back" : "arrow-forward"}
+                      size={18}
+                      color="#FFF"
+                    />
+                  )}
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -581,7 +659,10 @@ const ProfileScreen = () => {
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
         title={t("switch_profile_q", "Switch Profile?")}
-        subtitle={t("switch_profile_desc_personal", "Are you sure you want to switch to Personal profile?")}
+        subtitle={t(
+          "switch_profile_desc_customer",
+          "Are you sure you want to switch to the Customer profile?",
+        )}
         confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />
