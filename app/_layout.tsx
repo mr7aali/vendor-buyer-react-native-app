@@ -1,7 +1,7 @@
 import { useAppSelector } from "@/store/hooks";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { Stack, router } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -15,7 +15,7 @@ import {
 import { Provider, useSelector } from "react-redux";
 import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
 import { SocketProvider } from "../context/SocketContext";
-import { loadPersistedAuthState, persistAuthState } from "../services/authStorage";
+import { persistAuthState } from "../services/authStorage";
 import {
   registerForPushNotificationsAsync,
   syncPushTokenToBackend,
@@ -134,7 +134,8 @@ const AppNavigator = () => {
         backgroundColor={APP_BACKGROUND_COLOR}
         translucent={false}
       />
-      <Stack key={isRTL ? "rtl" : "ltr"} initialRouteName="(onboarding)">
+      <Stack key={isRTL ? "rtl" : "ltr"} initialRouteName="index">
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
         <Stack.Screen name="(users)" options={{ headerShown: false }} />
         <Stack.Screen name="(user_screen)" options={{ headerShown: false }} />
@@ -151,12 +152,8 @@ export default function RootLayout() {
     process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
   ).trim();
 
-  // Startup auth routing logic
   React.useEffect(() => {
-    const checkLogin = async () => {
-      let shouldRedirect = false;
-      let targetPath = "/(onboarding)";
-
+    const syncSavedLanguage = async () => {
       try {
         const savedLanguage = await AsyncStorage.getItem("app_language");
         if (
@@ -167,43 +164,12 @@ export default function RootLayout() {
           syncRTLForLanguage(savedLanguage);
           store.dispatch(setLanguage(savedLanguage));
         }
-
-        const persistedAuth = await loadPersistedAuthState();
-
-        if (persistedAuth) {
-          store.dispatch(
-            setCredentials({
-              user: null,
-              accessToken: persistedAuth.accessToken,
-              refreshToken: persistedAuth.refreshToken || "",
-              availableProfiles: persistedAuth.availableProfiles,
-            }),
-          );
-
-          const detectedRole = String(persistedAuth.userRole || "").toLowerCase();
-
-          targetPath =
-            detectedRole === "vendor"
-              ? "/(tabs)"
-              : detectedRole === "buyer"
-                ? "/(users)"
-                : "/(onboarding)";
-        } else {
-          // Not logged in -> onboarding/auth flow
-          targetPath = "/(onboarding)";
-        }
-
-        shouldRedirect = true;
-      } catch (e) {
-        console.error("Auto-login failed:", e);
-      } finally {
-        if (shouldRedirect && targetPath !== "/(onboarding)") {
-          router.replace(targetPath as any);
-        }
+      } catch (error) {
+        console.warn("Failed to restore saved language.", error);
       }
     };
 
-    checkLogin();
+    syncSavedLanguage();
   }, []);
 
   React.useEffect(() => {
