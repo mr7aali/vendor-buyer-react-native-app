@@ -415,6 +415,7 @@ const MyCart: React.FC = () => {
     0,
     subtotal + tax + SHIPPING_FEE - appliedDiscount,
   );
+  const hasCartItems = cartItems.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -596,15 +597,21 @@ const MyCart: React.FC = () => {
             </View>
 
             <TouchableOpacity
-              style={styles.checkoutBtn}
-              onPress={() =>
+              style={[
+                styles.checkoutBtn,
+                !hasCartItems && styles.checkoutBtnDisabled,
+              ]}
+              disabled={!hasCartItems}
+              onPress={() => {
+                if (!hasCartItems) return;
+
                 router.push({
                   pathname: "/(users)/Information" as any,
                   params: appliedPromoCode
                     ? { promoCode: appliedPromoCode }
                     : undefined,
-                })
-              }
+                });
+              }}
             >
               <Text style={styles.checkoutBtnText}>
                 {t("cart_checkout", "Checkout")} (${total.toFixed(2)})
@@ -792,6 +799,9 @@ const styles = StyleSheet.create({
     height: 55,
     justifyContent: "center",
     alignItems: "center",
+  },
+  checkoutBtnDisabled: {
+    backgroundColor: "#B8D8D3",
   },
   checkoutBtnText: { color: "#FFF", fontSize: 18, fontWeight: "bold" },
 });

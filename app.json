@@ -14,7 +14,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.soriful420.yozietranceapp"
+      "bundleIdentifier": "com.soriful420.yozietranceapp",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow LinkooTo to take product and chat photos with your camera.",
+        "NSPhotoLibraryUsageDescription": "Allow LinkooTo to choose product and chat photos from your library."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,6 +37,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow LinkooTo to access your photos so you can upload product and chat images.",
+          "cameraPermission": "Allow LinkooTo to use your camera so you can capture product and chat images."
+        }
+      ],
       [
         "expo-notifications",
         {

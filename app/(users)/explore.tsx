@@ -177,14 +177,6 @@ export default function ExploreScreen() {
     const name = getVendorDisplayName(vendor);
     const subtitle = getVendorSubtitle(vendor);
     const imageUri = resolveAbsoluteUrl(vendor?.logoUrl);
-    const rating = Number(vendor?.averageRating || 0).toFixed(1);
-    const totalReviews = Number(
-      vendor?.totalReviews ||
-        vendor?.reviewsCount ||
-        vendor?.reviewCount ||
-        vendor?.counts?.reviews ||
-        0,
-    );
     const productsCount = Number(vendor?.counts?.products || 0);
     const categoriesCount = Number(vendor?.counts?.categories || 0);
     const isThisVendorConnecting = connectingVendorId === cardKey;
@@ -210,12 +202,6 @@ export default function ExploreScreen() {
         </Text>
 
         <View style={styles.metaRow}>
-          <View style={styles.metaBadge}>
-            <Ionicons name="star" size={13} color="#E4A11B" />
-            <Text style={styles.metaBadgeText}>
-              {rating} ({totalReviews})
-            </Text>
-          </View>
           <View style={styles.metaBadge}>
             <Ionicons name="cube-outline" size={13} color="#2B6E6F" />
             <Text style={styles.metaBadgeText}>{productsCount}</Text>

@@ -1311,12 +1311,33 @@ const ChatBox: React.FC = () => {
         type: mimeType,
       } as any);
 
-      const uploadResult = await uploadChatImage(formData).unwrap();
-      if (!uploadResult?.url) {
+      let imageMessageUrl = "";
+
+      try {
+        const uploadResult = await uploadChatImage(formData).unwrap();
+        imageMessageUrl = String(uploadResult?.url || "");
+      } catch (uploadError: any) {
+        const isMissingUploadRoute =
+          uploadError?.status === 404 &&
+          String(uploadError?.data?.path || "").includes("/messages/upload-image");
+
+        if (!isMissingUploadRoute) {
+          throw uploadError;
+        }
+
+        // Fallback for deployments that support chat messages but do not expose
+        // a dedicated image-upload endpoint yet.
+        const base64Image = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        imageMessageUrl = `data:${mimeType};base64,${base64Image}`;
+      }
+
+      if (!imageMessageUrl) {
         throw new Error("Image upload failed");
       }
 
-      await handleSendMessage(uploadResult.url, "image");
+      await handleSendMessage(imageMessageUrl, "image");
     } catch (error) {
       console.error("Photo pick/send failed", error);
       Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
@@ -1748,18 +1769,32 @@ const ChatBox: React.FC = () => {
   const handleDownloadImage = async (imageUrl?: string) => {
     if (!imageUrl) return;
     try {
-      const fileExtensionMatch = imageUrl.match(/\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i);
-      const fileExtension = fileExtensionMatch?.[1] || "jpg";
+      const dataUrlMatch = imageUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+      const remoteExtensionMatch = imageUrl.match(/\.(jpg|jpeg|png|webp|gif|bmp)(\?.*)?$/i);
+      const mimeType = dataUrlMatch?.[1] || `image/${remoteExtensionMatch?.[1] === "jpg" ? "jpeg" : remoteExtensionMatch?.[1] || "jpeg"}`;
+      const fileExtension =
+        mimeType.split("/")[1]?.replace("jpeg", "jpg") ||
+        remoteExtensionMatch?.[1] ||
+        "jpg";
       const targetUri = `${FileSystem.cacheDirectory}chat-image-${Date.now()}.${fileExtension}`;
-      const downloadResult = await FileSystem.downloadAsync(imageUrl, targetUri);
+      let localUri = targetUri;
+
+      if (dataUrlMatch) {
+        await FileSystem.writeAsStringAsync(targetUri, dataUrlMatch[2], {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else {
+        const downloadResult = await FileSystem.downloadAsync(imageUrl, targetUri);
+        localUri = downloadResult.uri;
+      }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadResult.uri, {
-          mimeType: `image/${fileExtension === "jpg" ? "jpeg" : fileExtension}`,
+        await Sharing.shareAsync(localUri, {
+          mimeType,
           dialogTitle: "Download image",
         });
       } else {
-        await Linking.openURL(downloadResult.uri);
+        await Linking.openURL(localUri);
       }
     } catch (error) {
       console.error("Image download failed", error);

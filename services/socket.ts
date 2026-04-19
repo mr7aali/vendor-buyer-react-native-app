@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { apiBaseUrl } from '@/services/apiConfig';
 
-const SOCKET_URL = apiBaseUrl || 'http://localhost:3000';
+const SOCKET_URL = apiBaseUrl || (__DEV__ ? 'http://localhost:3000' : '');
 
 class SocketService {
     private static instance: SocketService;
@@ -18,7 +18,7 @@ class SocketService {
 
     public init(token?: string): Socket {
         if (!this.socket) {
-            this.socket = io(SOCKET_URL, {
+            this.socket = io(SOCKET_URL || undefined, {
                 auth: token ? { token } : {},
                 transports: ['websocket', 'polling'],
                 autoConnect: false,

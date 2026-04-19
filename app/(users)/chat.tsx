@@ -11,6 +11,7 @@ import { useGetMyConnectionsQuery } from "@/store/api/connectionApiSlice";
 import { RootState } from "@/store/store";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
 import {
   Image,
@@ -228,6 +229,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t("chat_title", "Chat")}</Text>
       </View>

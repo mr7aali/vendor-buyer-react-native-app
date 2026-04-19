@@ -1,17 +1,43 @@
 import {
+  paymentApiSlice,
   useCreateAccountLinkMutation,
   useCreateVendorAccountMutation,
   useGetVendorTransactionHistoryQuery,
   useGetVendorAccountStatusQuery,
 } from '@/store/api/paymentApiSlice';
+import { useAppDispatch } from '@/store/hooks';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowDownLeft, ChevronLeft, ChevronRight, Plus } from 'lucide-react-native';
-import React, { useCallback, useMemo } from 'react';
+import * as Sharing from 'expo-sharing';
+import { ArrowDownLeft, ChevronLeft, ChevronRight, Download, Plus } from 'lucide-react-native';
+import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as XLSX from 'xlsx';
+
+const EXPORT_PAGE_SIZE = 100;
+
+const getTransactionItems = (payload: any) => {
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.payments)) return payload.payments;
+  if (Array.isArray(payload?.data?.items)) return payload.data.items;
+  if (Array.isArray(payload?.data?.payments)) return payload.data.payments;
+  return [];
+};
+
+const toMoney = (value: any) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : '0.00';
+};
+
+const normalizeStatus = (value: any) =>
+  String(value || 'pending')
+    .replace(/_/g, ' ')
+    .trim();
 
 export default function TransactionHistory() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const queryParams = useMemo(
     () => ({
       page: 1,
@@ -31,6 +57,7 @@ export default function TransactionHistory() {
   } = useGetVendorAccountStatusQuery(undefined);
   const [createVendorAccount, { isLoading: isCreatingStripeAccount }] = useCreateVendorAccountMutation();
   const [createAccountLink, { isLoading: isCreatingStripeLink }] = useCreateAccountLinkMutation();
+  const [isExporting, setIsExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -88,6 +115,120 @@ export default function TransactionHistory() {
     }
   };
 
+  const fetchAllTransactions = useCallback(async () => {
+    const collected: any[] = [];
+    let page = 1;
+
+    while (true) {
+      const request = dispatch(
+        paymentApiSlice.endpoints.getVendorTransactionHistory.initiate(
+          {
+            page,
+            limit: EXPORT_PAGE_SIZE,
+            sortBy: 'createdAt',
+            sortOrder: 'desc',
+          },
+          { forceRefetch: true },
+        ),
+      );
+
+      try {
+        const result = await request;
+        const payload = 'data' in result ? result.data : null;
+        const pageItems = getTransactionItems(payload);
+        if (!pageItems.length) {
+          break;
+        }
+
+        collected.push(...pageItems);
+
+        if (pageItems.length < EXPORT_PAGE_SIZE) {
+          break;
+        }
+
+        page += 1;
+      } finally {
+        request.unsubscribe();
+      }
+    }
+
+    return collected;
+  }, [dispatch]);
+
+  const handleExportExcel = async () => {
+    if (isExporting) return;
+
+    try {
+      setIsExporting(true);
+
+      const allTransactions = await fetchAllTransactions();
+      const rowsSource = allTransactions.length ? allTransactions : transactions;
+
+      if (!rowsSource.length) {
+        Alert.alert('No data', 'No transaction history found to export.');
+        return;
+      }
+
+      const rows = rowsSource.map((item: any, index: number) => ({
+        'Transaction #': index + 1,
+        'Order Number': item.order?.orderNumber || item.orderNumber || 'N/A',
+        'Transaction ID': item.id || item._id || item.paymentIntentId || item.chargeId || 'N/A',
+        Status: normalizeStatus(item.status),
+        Currency: String(item.currency || 'USD').toUpperCase(),
+        'Gross Amount': Number(toMoney(item.amount)),
+        'Vendor Payout': Number(toMoney(item.vendorPayoutAmount ?? item.amount)),
+        'Customer Name': item.order?.buyer?.fullName || item.buyer?.fullName || item.customerName || 'N/A',
+        'Customer ID': item.order?.buyer?.userId || item.buyer?.userId || item.buyerId || 'N/A',
+        'Created At': item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A',
+        'Updated At': item.updatedAt ? new Date(item.updatedAt).toLocaleString() : 'N/A',
+      }));
+
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 26 },
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 24 },
+        { wch: 38 },
+        { wch: 24 },
+        { wch: 24 },
+      ];
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Transactions');
+
+      const base64 = XLSX.write(workbook, {
+        type: 'base64',
+        bookType: 'xlsx',
+      });
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const fileUri = `${FileSystem.cacheDirectory}vendor-transaction-history-${timestamp}.xlsx`;
+
+      await FileSystem.writeAsStringAsync(fileUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Export complete', `Excel file saved to ${fileUri}`);
+        return;
+      }
+
+      await Sharing.shareAsync(fileUri, {
+        UTI: 'org.openxmlformats.spreadsheetml.sheet',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+    } catch (error: any) {
+      console.error('Failed to export transaction history:', error);
+      Alert.alert('Export failed', error?.message || 'Could not export transaction history.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.historyCard}>
       <View style={styles.iconContainer}>
@@ -120,6 +261,21 @@ export default function TransactionHistory() {
       </View>
 
       <View style={styles.contentContainer}>
+        <TouchableOpacity
+          style={[styles.exportButton, isExporting ? styles.exportButtonDisabled : null]}
+          onPress={handleExportExcel}
+          disabled={isExporting}
+        >
+          {isExporting ? (
+            <ActivityIndicator size="small" color="#FFF" />
+          ) : (
+            <Download color="#FFF" size={18} />
+          )}
+          <Text style={styles.exportButtonText}>
+            {isExporting ? 'Exporting...' : 'Export (Excel)'}
+          </Text>
+        </TouchableOpacity>
+
         {/* Payment Method Section */}
         <View>
           <Text style={styles.sectionTitle}>Payment method</Text>
@@ -192,6 +348,25 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  exportButton: {
+    marginTop: 14,
+    marginBottom: 2,
+    backgroundColor: '#1E7B73',
+    borderRadius: 12,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  exportButtonDisabled: {
+    opacity: 0.7,
+  },
+  exportButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFF',
   },
   sectionTitle: {
     fontSize: 16,

@@ -17,6 +17,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -218,6 +219,14 @@ export default function EditProduct() {
       maxImagesMsg: "You can upload up to 5 images.",
       permissionRequired: "Permission Required",
       photoPermissionRequired: "Photo library permission is required.",
+      cameraPermissionRequired: "Camera permission is required.",
+      cameraOption: "Take Photo",
+      galleryOption: "Choose from Gallery",
+      imageSourceTitle: "Add Product Image",
+      imageSourceMessage: "Choose how you want to add an image.",
+      cameraUnavailable: "Camera unavailable",
+      cameraUnavailableMsg:
+        "This device cannot open the camera right now. Please try the gallery instead.",
       specMissingFields: "Missing fields",
       specMissingFieldsMsg: "Please enter both specification key and value.",
       successUpdated: "Product updated successfully.",
@@ -284,24 +293,97 @@ export default function EditProduct() {
     [categories],
   );
 
-  const pickImage = async () => {
-    if (selectedImages.length >= 5) {
-      Alert.alert(ui.limitReached, ui.maxImagesMsg);
-      return;
+  const handleImagePickerResult = (result: ImagePicker.ImagePickerResult) => {
+    if (!result.canceled && result.assets?.length) {
+      setSelectedImages((prev) => [...prev, result.assets[0].uri]);
     }
+  };
+
+  const openGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert(ui.permissionRequired, ui.photoPermissionRequired);
       return;
     }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: imagePickerMediaTypes,
       allowsEditing: true,
       quality: 0.8,
     });
-    if (!result.canceled && result.assets?.length) {
-      setSelectedImages((prev) => [...prev, result.assets[0].uri]);
+
+    handleImagePickerResult(result);
+  };
+
+  const openCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        ui.permissionRequired,
+        (ui as any).cameraPermissionRequired || "Camera permission is required.",
+      );
+      return;
     }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: imagePickerMediaTypes,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      handleImagePickerResult(result);
+    } catch (error) {
+      console.error("Failed to launch camera:", error);
+      Alert.alert(
+        (ui as any).cameraUnavailable || "Camera unavailable",
+        (ui as any).cameraUnavailableMsg ||
+          "This device cannot open the camera right now. Please try the gallery instead.",
+      );
+    }
+  };
+
+  const pickImage = async () => {
+    if (selectedImages.length >= 5) {
+      Alert.alert(ui.limitReached, ui.maxImagesMsg);
+      return;
+    }
+
+    if (Platform.OS === "ios") {
+      Alert.alert(
+        (ui as any).imageSourceTitle || "Add Product Image",
+        (ui as any).imageSourceMessage ||
+          "Choose how you want to add an image.",
+        [
+          {
+            text: (ui as any).cameraOption || "Take Photo",
+            onPress: openCamera,
+          },
+          {
+            text: (ui as any).galleryOption || "Choose from Gallery",
+            onPress: openGallery,
+          },
+          { text: t("cancel", "Cancel"), style: "cancel" },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      (ui as any).imageSourceTitle || "Add Product Image",
+      (ui as any).imageSourceMessage || "Choose how you want to add an image.",
+      [
+        {
+          text: (ui as any).cameraOption || "Take Photo",
+          onPress: openCamera,
+        },
+        {
+          text: (ui as any).galleryOption || "Choose from Gallery",
+          onPress: openGallery,
+        },
+        { text: t("cancel", "Cancel"), style: "cancel" },
+      ],
+    );
   };
 
   const removeImage = (index: number) => {

@@ -1,31 +1,91 @@
-import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
+import { SkeletonBlock } from "@/components/ui/skeleton";
 import { persistAuthState } from "@/services/authStorage";
+import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { logOut, selectAvailableProfiles, setCredentials } from "@/store/slices/authSlice";
+import {
+  logOut,
+  selectAvailableProfiles,
+  selectCurrentUser,
+  setCredentials,
+} from "@/store/slices/authSlice";
 import {
   AntDesign,
   Feather,
   Ionicons,
-  MaterialIcons
+  MaterialIcons,
 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useState } from "react";
-import { Alert, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../hooks/use-translation";
 
+const cardStyle = {
+  backgroundColor: "#fff",
+  borderRadius: 16,
+  padding: 20,
+  marginBottom: 16,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.05,
+  shadowRadius: 8,
+  elevation: 1,
+} as const;
+
+const headerTitleStyle = {
+  fontSize: 18,
+  fontWeight: "700" as const,
+  color: "#1F2937",
+  marginBottom: 20,
+};
+
+const ProfileActionRowSkeleton = ({ switchRow = false }: { switchRow?: boolean }) => (
+  <View
+    style={{
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 14,
+    }}
+  >
+    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+      <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+      <SkeletonBlock style={{ width: "44%", height: 16, borderRadius: 8, marginLeft: 14 }} />
+    </View>
+    <SkeletonBlock
+      style={{
+        width: switchRow ? 50 : 16,
+        height: switchRow ? 30 : 16,
+        borderRadius: switchRow ? 999 : 8,
+      }}
+    />
+  </View>
+);
+
 const ProfileScreen = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const profileArrowIcon = language === "he" ? "arrow-back-ios-new" : "arrow-forward-ios";
   const dispatch = useAppDispatch();
+  const user = useAppSelector(selectCurrentUser);
   const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
-  const { data: profileData } = useGetProfileQuery({});
-  const displayUser = profileData?.data;
+  const {
+    data: profileData,
+    isLoading: isProfileLoading,
+    isFetching: isProfileFetching,
+  } = useGetProfileQuery({});
+  const displayUser = profileData?.data || user;
+  const shouldShowProfileSkeleton = !displayUser && (isProfileLoading || isProfileFetching);
+  const currentModeLabel = t("customer_mode", "Customer");
+  const targetModeLabel = t("vendor_mode", "Vendor");
+  const switchButtonLabel = t("switch_to_vendor", "Switch to Vendor");
+ 
 
   const onLogout = async () => {
     setShowLogoutModal(false);
@@ -33,18 +93,14 @@ const ProfileScreen = () => {
       const accessToken = await AsyncStorage.getItem("accessToken");
       await unregisterPushTokenFromBackend(accessToken);
 
-      // Clear AsyncStorage
-      await AsyncStorage.removeItem('accessToken');
-      await AsyncStorage.removeItem('refreshToken');
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('userRole');
-      await AsyncStorage.removeItem('userType');
-      await AsyncStorage.removeItem('availableProfiles');
+      await AsyncStorage.removeItem("accessToken");
+      await AsyncStorage.removeItem("refreshToken");
+      await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("userRole");
+      await AsyncStorage.removeItem("userType");
+      await AsyncStorage.removeItem("availableProfiles");
 
-      // Clear Redux state
       dispatch(logOut());
-
-      // Navigate to onboarding
       router.replace("/(onboarding)/GetStarted");
     } catch (error) {
       console.error("Logout error:", error);
@@ -77,7 +133,7 @@ const ProfileScreen = () => {
           accessToken: payload.accessToken,
           refreshToken: payload.refreshToken || null,
           availableProfiles: nextAvailableProfiles,
-        })
+        }),
       );
 
       await persistAuthState({
@@ -100,7 +156,7 @@ const ProfileScreen = () => {
               text: t("ok", "OK"),
               onPress: () => router.replace("/(screens)/CompleteProfileScreen"),
             },
-          ]
+          ],
         );
         return;
       }
@@ -118,12 +174,7 @@ const ProfileScreen = () => {
     confirmText,
     confirmColor,
   }: any) => (
-    <Modal
-      animationType="fade"
-      transparent={true}
-      visible={visible}
-      onRequestClose={onClose}
-    >
+    <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
         <View style={{ width: "85%", backgroundColor: "#FFF", borderRadius: 20, padding: 25, alignItems: "center" }}>
           <Text style={{ fontSize: 20, fontWeight: "bold", marginVertical: 10 }}>{title}</Text>
@@ -146,6 +197,7 @@ const ProfileScreen = () => {
       </View>
     </Modal>
   );
+
   const userData = {
     name: displayUser?.buyer?.fullName || displayUser?.fullName || displayUser?.name || displayUser?.fulllName || "User",
     avatar:
@@ -155,311 +207,256 @@ const ProfileScreen = () => {
       displayUser?.image ||
       displayUser?.logo,
   };
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/*Account Information Card*/}
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 20 }} showsVerticalScrollIndicator={false}>
+        {shouldShowProfileSkeleton ? (
+          <>
+            <View style={{ alignItems: "center", marginBottom: 24 }}>
+              <SkeletonBlock style={{ width: 100, height: 100, borderRadius: 50, marginBottom: 12 }} />
+              <SkeletonBlock style={{ width: 156, height: 22, borderRadius: 11 }} />
+            </View>
 
-        {/* Profile Header */}
-        <View style={{ alignItems: "center", marginBottom: 24 }}>
-          <Image
-            source={{ uri: userData.avatar }}
-            style={{
-              width: 100,
-              height: 100,
-              borderRadius: 50,
-              marginBottom: 12,
-            }}
-          />
-          <Text style={{ fontSize: 22, fontWeight: "600", color: "#111" }}>
-            {userData.name}
-          </Text>
-        </View>
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: "#1F2937",
-              marginBottom: 20,
-            }}
-          >
-            {t("account_information", "Account Information")}
-          </Text>
+            <View style={cardStyle}>
+              <SkeletonBlock style={{ width: 170, height: 22, borderRadius: 10, marginBottom: 20 }} />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+            </View>
 
+            <View style={cardStyle}>
+              <SkeletonBlock style={{ width: 92, height: 22, borderRadius: 10, marginBottom: 20 }} />
+              <ProfileActionRowSkeleton switchRow />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+              <ProfileActionRowSkeleton />
+            </View>
 
-          {/* Personal Info Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(user_screen)/ProfileInfoScreen")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
             <View
               style={{
+                ...cardStyle,
                 flexDirection: "row",
                 alignItems: "center",
-                paddingVertical: 14,
+                marginBottom: 0,
               }}
             >
-              <Ionicons name="person-outline" size={26} color="#4B5563" />
-              <Text
+              <SkeletonBlock style={{ width: 26, height: 26, borderRadius: 13 }} />
+              <SkeletonBlock style={{ width: 90, height: 16, borderRadius: 8, marginLeft: 14 }} />
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={{ alignItems: "center", marginBottom: 24 }}>
+              <Image
+                source={{ uri: userData.avatar }}
                 style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
+                  width: 100,
+                  height: 100,
+                  borderRadius: 50,
+                  marginBottom: 12,
+                }}
+              />
+              <Text style={{ fontSize: 22, fontWeight: "600", color: "#111" }}>{userData.name}</Text>
+            </View>
+
+            <View style={cardStyle}>
+              <Text style={headerTitleStyle}>{t("account_information", "Account Information")}</Text>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(user_screen)/ProfileInfoScreen")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="person-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("personal_info", "Personal info")}
+                  </Text>
+                </View>
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(user_screen)/BuyerTransactionHistoryScreen")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <AntDesign name="transaction" size={24} color="black" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("transaction_history", "Transaction History")}
+                  </Text>
+                </View>
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={cardStyle}>
+              <Text style={headerTitleStyle}>{t("setting", "Setting")}</Text>
+
+              <View
+                style={{
+                  paddingVertical: 8,
+                  borderRadius: 18,
+                  backgroundColor: "#F5FBFA",
+                  borderWidth: 1,
+                  borderColor: "#D9EEEC",
+                  padding: 16,
+                  marginBottom: 8,
                 }}
               >
-                {t("personal_info", "Personal info")}
-              </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: "#DDF3F1",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="swap-horizontal" size={22} color="#278687" />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={{ fontSize: 16, color: "#111827", fontWeight: "700" }}>
+                      {t("switch_profile", "Switch profile")}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: "#6B7280", marginTop: 4, lineHeight: 18 }}>
+                      {t("current_mode_customer", "You are currently using the Customer profile.")}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 14 }}>
+                  <View
+                    style={{
+                      backgroundColor: "#278687",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>{currentModeLabel}</Text>
+                  </View>
+                  <Ionicons
+                    name={language === "he" ? "arrow-back" : "arrow-forward"}
+                    size={16}
+                    color="#94A3B8"
+                    style={{ marginHorizontal: 10 }}
+                  />
+                  <View
+                    style={{
+                      backgroundColor: "#E7F0EF",
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 999,
+                    }}
+                  >
+                    <Text style={{ color: "#355E5E", fontSize: 12, fontWeight: "700" }}>{targetModeLabel}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={toggleSwitch}
+                  disabled={isSwitchingProfile}
+                  style={{
+                    minHeight: 56,
+                    borderRadius: 16,
+                    backgroundColor: isSwitchingProfile ? "#97C9C5" : "#278687",
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={{ color: "#FFF", fontSize: 15, fontWeight: "700" }}>{switchButtonLabel}</Text>
+
+                  </View>
+                  {isSwitchingProfile ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Ionicons
+                      name={language === "he" ? "arrow-back" : "arrow-forward"}
+                      size={18}
+                      color="#FFF"
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/permission")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Feather name="check-circle" size={24} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("permission", "Permission")}
+                  </Text>
+                </View>
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/settings")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="settings-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("settings", "Settings")}
+                  </Text>
+                </View>
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push("/(screens)/language")}
+                style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14 }}>
+                  <Ionicons name="language-outline" size={26} color="#4B5563" />
+                  <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "500" }}>
+                    {t("language", "Language")}
+                  </Text>
+                </View>
+                <MaterialIcons name={profileArrowIcon} size={16} color="black" />
+              </TouchableOpacity>
             </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/(user_screen)/BuyerTransactionHistoryScreen")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
+
+            <TouchableOpacity
               style={{
+                ...cardStyle,
                 flexDirection: "row",
                 alignItems: "center",
-                paddingVertical: 14,
+                marginBottom: 0,
               }}
+              onPress={() => setShowLogoutModal(true)}
             >
-              <AntDesign name="transaction" size={24} color="black" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("transaction_history", "Transaction History")}
+              <MaterialIcons name="logout" size={26} color="#4B5563" />
+              <Text style={{ fontSize: 16, color: "#4B5563", marginLeft: 14, fontWeight: "600" }}>
+                {t("logout", "Log Out")}
               </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-        </View>
-
-
-        {/* Setting Card */}
-        <View
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            marginBottom: 16,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: "#1F2937",
-              marginBottom: 20,
-            }}
-          >
-            {t("setting", "Setting")}
-          </Text>
-
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingVertical: 14,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Ionicons name="people-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("switch_profile", "Switch profile")}
-              </Text>
-            </View>
-            <Switch
-              trackColor={{ false: "#78788029", true: "#E3E6F0" }}
-              thumbColor="#278687"
-              ios_backgroundColor="#3e3e3e"
-              onValueChange={toggleSwitch}
-              value={false}
-              disabled={isSwitchingProfile}
-            />
-          </View>
-
-
-          {/* Permission Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/permission")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Feather name="check-circle" size={24} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("permission", "Permission")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          {/* Settings Link */}
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/settings")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="settings-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("settings", "Settings")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => router.push("/(screens)/language")}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 14,
-              }}
-            >
-              <Ionicons name="language-outline" size={26} color="#4B5563" />
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#4B5563",
-                  marginLeft: 14,
-                  fontWeight: "500",
-                }}
-              >
-                {t("language", "Language")}
-              </Text>
-            </View>
-            <MaterialIcons name="arrow-back-ios-new" size={16} color="black" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Logout Card */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: "#fff",
-            borderRadius: 16,
-            padding: 20,
-            flexDirection: "row",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 1,
-          }}
-          onPress={() => setShowLogoutModal(true)}
-        >
-          <MaterialIcons name="logout" size={26} color="#4B5563" />
-          <Text
-            style={{
-              fontSize: 16,
-              color: "#4B5563",
-              marginLeft: 14,
-              fontWeight: "600",
-            }}
-          >
-            {t("logout", "Log Out")}
-          </Text>
-        </TouchableOpacity>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
-      {/* Confirmation Modal */}
       <ConfirmationModal
         visible={showSwitchModal}
         onClose={() => setShowSwitchModal(false)}
         onConfirm={onConfirmSwitch}
         title={t("switch_profile_q", "Switch Profile?")}
-        subtitle={t("switch_profile_desc_business", "Are you sure you want to switch to Business profile?")}
+        subtitle={t(
+          "switch_profile_desc_vendor",
+          "Are you sure you want to switch to the Vendor profile?",
+        )}
         confirmText={t("confirm", "Confirm")}
         confirmColor="#2D8C8C"
       />
 
-      {/* Logout Confirmation Modal */}
       <ConfirmationModal
         visible={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
@@ -469,7 +466,7 @@ const ProfileScreen = () => {
         confirmText={t("logout", "Log Out")}
         confirmColor="#FF3B30"
       />
-    </SafeAreaView >
+    </SafeAreaView>
   );
 };
 
