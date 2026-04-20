@@ -1,4 +1,5 @@
-﻿import { useTranslation } from "@/hooks/use-translation";
+import { getLayoutDirection } from "@/constants/rtl";
+import { useTranslation } from "@/hooks/use-translation";
 import { useGetProfileQuery } from "@/store/api/authApiSlice";
 import { useGetVendorQrQuery } from "@/store/api/connectionApiSlice";
 import { useAppSelector } from "@/store/hooks";
@@ -8,19 +9,20 @@ import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import React from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Share,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Share,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
+
 const normalizeVendorCode = (rawCode: string) => {
   const trimmed = (rawCode || "").trim();
   if (!trimmed) return "";
@@ -32,8 +34,9 @@ const normalizeVendorCode = (rawCode: string) => {
     .replace(/^[./]+/, "");
 };
 
-const AbcdStoreCard = () => {
-  const { language } = useTranslation();
+const QrCodeScreen = () => {
+  const { language, t } = useTranslation();
+  const isRTL = getLayoutDirection(language) === "rtl";
   const user = useAppSelector(selectCurrentUser);
   const { data: profileData } = useGetProfileQuery(undefined, {
     refetchOnFocus: true,
@@ -77,70 +80,38 @@ const AbcdStoreCard = () => {
   const hasVendorCode = Boolean(vendorCode);
   const storeUrl = hasVendorCode ? `https://abcd.store/v/${vendorCode}` : "";
   const qrValue = vendorCode || storeUrl || "https://abcd.store";
-
-  const ui = React.useMemo(() => {
-    if (language === "he") {
-      return {
-        myQrCode: "×§×•×“ ×”-QR ×©×œ×™",
-        officialStoreLink: "×§×™×©×•×¨ ×—× ×•×ª ×¨×©×ž×™",
-        shareQrCode: "×©×ª×£ ×§×•×“ QR",
-        vendorCode: "×§×•×“ ×¡×¤×§",
-        copy: "×”×¢×ª×§",
-        copied: "×”×•×¢×ª×§",
-        codeCopied: "Vendor code copied to clipboard!",
-        shareMessage: `×‘×“×§×• ××ª ×”×—× ×•×ª ×”×¨×©×ž×™×ª ×©×œ× ×•: ${storeUrl}`,
-        qrFallback:
-          "×œ× × ×™×ª×Ÿ ×”×™×” ×œ×˜×¢×•×Ÿ QR ×ž×”×©×¨×ª. ×ž×•×¦×’ QR ×ž×§×•×ž×™.",
-      };
-    }
-    if (language === "hi") {
-      return {
-        myQrCode: "à¤®à¥‡à¤°à¤¾ QR à¤•à¥‹à¤¡",
-        officialStoreLink: "à¤‘à¤«à¤¿à¤¶à¤¿à¤¯à¤² à¤¸à¥à¤Ÿà¥‹à¤° à¤²à¤¿à¤‚à¤•",
-        shareQrCode: "QR à¤•à¥‹à¤¡ à¤¶à¥‡à¤¯à¤° à¤•à¤°à¥‡à¤‚",
-        vendorCode: "à¤µà¥‡à¤‚à¤¡à¤° à¤•à¥‹à¤¡",
-        copy: "à¤•à¥‰à¤ªà¥€ à¤•à¤°à¥‡à¤‚",
-        copied: "à¤•à¥‰à¤ªà¥€ à¤¹à¥à¤†",
-        codeCopied: "Vendor code copied to clipboard!",
-        shareMessage: `à¤¹à¤®à¤¾à¤°à¥‡ à¤†à¤§à¤¿à¤•à¤¾à¤°à¤¿à¤• à¤¸à¥à¤Ÿà¥‹à¤° à¤•à¥‹ à¤¦à¥‡à¤–à¥‡à¤‚: ${storeUrl}`,
-        qrFallback:
-          "à¤¸à¤°à¥à¤µà¤° QR à¤²à¥‹à¤¡ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤ à¤²à¥‹à¤•à¤² QR à¤¦à¤¿à¤–à¤¾à¤¯à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤",
-      };
-    }
-    return {
-      myQrCode: "My QR Code",
-      officialStoreLink: "Official Store Link",
-      shareQrCode: "Share QR Code",
-      vendorCode: "Vendor Code",
-      copy: "Copy",
-      copied: "Copied",
-      codeCopied: "Vendor code copied to clipboard!",
-      shareMessage: `Check out our official store: ${storeUrl}`,
-      qrFallback: "Could not load server QR. Showing local fallback QR.",
-    };
-  }, [language, storeUrl]);
+  const shareMessage = `${t("qr_share_message_prefix", "Check out our official store:")} ${storeUrl}`.trim();
 
   const copyToClipboard = async () => {
     if (!vendorCode) {
-      Alert.alert("Unavailable", "Vendor code not found yet.");
+      Alert.alert(
+        t("qr_unavailable_title", "Unavailable"),
+        t("qr_vendor_not_found", "Vendor code not found yet."),
+      );
       return;
     }
+
     await Clipboard.setStringAsync(vendorCode);
-    Alert.alert(ui.copied, ui.codeCopied);
+    Alert.alert(
+      t("qr_copied", "Copied"),
+      t("qr_code_copied", "Vendor code copied to clipboard!"),
+    );
   };
 
-  // Function for the Share button
   const onShare = async () => {
     try {
       if (!vendorCode) {
-        Alert.alert("Unavailable", "Vendor code not found yet.");
+        Alert.alert(
+          t("qr_unavailable_title", "Unavailable"),
+          t("qr_vendor_not_found", "Vendor code not found yet."),
+        );
         return;
       }
+
       await Share.share({
-        message: ui.shareMessage,
+        message: shareMessage,
       });
     } catch (error) {
-      // Check if error is an instance of Error to access .message safely
       if (error instanceof Error) {
         console.log(error.message);
       } else {
@@ -151,10 +122,9 @@ const AbcdStoreCard = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F7F5" }}>
-      {/* Header */}
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: isRTL ? "row-reverse" : "row",
           alignItems: "center",
           justifyContent: "space-between",
           paddingVertical: 12,
@@ -164,7 +134,9 @@ const AbcdStoreCard = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={24} color="black" />
         </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "600" }}>{ui.myQrCode}</Text>
+        <Text style={{ fontSize: 18, fontWeight: "600" }}>
+          {t("qr_my_code", "My QR Code")}
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -193,7 +165,11 @@ const AbcdStoreCard = () => {
         >
           <View style={{ marginBottom: 16 }}>
             <Image
-              source={{ uri: avatarUri }}
+              source={
+                avatarUri
+                  ? { uri: avatarUri }
+                  : require("@/assets/images/logo.png")
+              }
               style={{ width: 100, height: 100, borderRadius: 50 }}
             />
           </View>
@@ -204,6 +180,7 @@ const AbcdStoreCard = () => {
               fontWeight: "700",
               color: "#1A1A1A",
               marginBottom: 12,
+              textAlign: "center",
             }}
           >
             {businessName}
@@ -215,19 +192,19 @@ const AbcdStoreCard = () => {
               fontWeight: "600",
               color: "#328888",
               marginBottom: 24,
+              textAlign: "center",
             }}
           >
-            {ui.officialStoreLink}
+            {t("qr_official_store_link", "Official Store Link")}
           </Text>
 
-          {/* QR Code Section */}
           <View
             style={{
               padding: 16,
               borderWidth: 1,
               borderColor: "#E8F0FE",
               borderRadius: 24,
-              marginBottom: 24, // Adjusted spacing
+              marginBottom: 24,
               backgroundColor: "#FFF",
               justifyContent: "center",
               alignItems: "center",
@@ -253,13 +230,23 @@ const AbcdStoreCard = () => {
               />
             )}
           </View>
+
           {isQrError ? (
-            <Text style={{ color: "#B45309", fontSize: 12, marginBottom: 12 }}>
-              {ui.qrFallback}
+            <Text
+              style={{
+                color: "#B45309",
+                fontSize: 12,
+                marginBottom: 12,
+                textAlign: "center",
+              }}
+            >
+              {t(
+                "qr_fallback",
+                "Could not load server QR. Showing local fallback QR.",
+              )}
             </Text>
           ) : null}
 
-          {/* --- ADDED SHARE BUTTON --- */}
           <TouchableOpacity
             onPress={onShare}
             activeOpacity={0.8}
@@ -274,11 +261,10 @@ const AbcdStoreCard = () => {
             }}
           >
             <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>
-              {ui.shareQrCode}
+              {t("qr_share_code", "Share QR Code")}
             </Text>
           </TouchableOpacity>
 
-          {/* Vendor Input Section */}
           <View style={{ width: "100%" }}>
             <Text
               style={{
@@ -286,14 +272,15 @@ const AbcdStoreCard = () => {
                 color: "#444",
                 fontWeight: "500",
                 marginBottom: 10,
+                textAlign: isRTL ? "right" : "left",
               }}
             >
-              {ui.vendorCode}
+              {t("qr_vendor_code", "Vendor Code")}
             </Text>
 
             <View
               style={{
-                flexDirection: "row",
+                flexDirection: isRTL ? "row-reverse" : "row",
                 height: 54,
                 width: "100%",
                 borderRadius: 12,
@@ -310,7 +297,13 @@ const AbcdStoreCard = () => {
                   backgroundColor: "#F9F9F9",
                 }}
               >
-                <Text style={{ color: "#666", fontSize: 15 }}>
+                <Text
+                  style={{
+                    color: "#666",
+                    fontSize: 15,
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
                   {vendorCode || "-"}
                 </Text>
               </View>
@@ -325,10 +318,8 @@ const AbcdStoreCard = () => {
                   alignItems: "center",
                 }}
               >
-                <Text
-                  style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}
-                >
-                  {ui.copy}
+                <Text style={{ color: "#FFF", fontSize: 16, fontWeight: "600" }}>
+                  {t("qr_copy", "Copy")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -339,4 +330,4 @@ const AbcdStoreCard = () => {
   );
 };
 
-export default AbcdStoreCard;
+export default QrCodeScreen;
