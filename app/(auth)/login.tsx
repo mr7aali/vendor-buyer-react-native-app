@@ -1,4 +1,4 @@
-import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
+﻿import { FontAwesome, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppleAuth, {
   AppleRequestOperation,
@@ -28,7 +28,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
 import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -76,8 +76,80 @@ export default function LoginScreen() {
   const googleWebClientId = (process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "").trim();
   const isRTL = getLayoutDirection(language) === "rtl";
 
-  const ui = useMemo(
-    () => ({
+  const ui = React.useMemo(() => {
+    if (language === "he") {
+      return {
+        welcomeBack: "ברוך שובך",
+        loginToAccount: "התחבר לחשבון שלך",
+        enterEmail: "הזן אימייל או טלפון",
+        emailAddress: "כתובת אימייל או טלפון",
+        password: "סיסמה",
+        rememberMe: "זכור אותי",
+        forgotPassword: "שכחת סיסמה?",
+        login: "התחברות",
+        loggingIn: "מתחבר...",
+        orContinue: "או המשך עם",
+        noAccount: "אין לך חשבון?",
+        signUp: "הרשמה",
+        loginFailed: "ההתחברות נכשלה",
+        invalidResponse: "התחברות נכשלה: תגובת שרת לא תקינה",
+        quickLoginTitle: "כניסה מאובטחת מהירה",
+        quickLoginSubtitle: "השתמש באישורים השמורים שלך עם אימות ביומטרי.",
+        quickLoginButton: "המשך עם ביומטריה",
+        disableBiometric: "השבת",
+        enableBiometricTitle: "לאפשר כניסה ביומטרית?",
+        enableBiometricBody:
+          "השתמש בטביעת האצבע או בביומטריה של המכשיר להתחברות מהירה ובטוחה יותר בפעם הבאה.",
+        notNow: "לא עכשיו",
+        enableNow: "אפשר עכשיו",
+        biometricUnsupported: "אימות ביומטרי אינו נתמך במכשיר זה.",
+        biometricNotEnrolled: "לא מוגדרת טביעת אצבע או ביומטריה במכשיר זה.",
+        biometricFailed: "האימות הביומטרי נכשל. נסה שוב או התחבר ידנית.",
+        biometricCancelled: "האימות הביומטרי בוטל.",
+        credentialsMissing:
+          "פרטי ההתחברות הביומטריים השמורים אינם זמינים. התחבר שוב ידנית.",
+        fillCredentials: "אנא הזן גם אימייל או טלפון וגם סיסמה.",
+      };
+    }
+
+    if (language === "hi") {
+      return {
+        welcomeBack: "वापसी पर स्वागत है",
+        loginToAccount: "अपने अकाउंट में लॉगिन करें",
+        enterEmail: "अपना ईमेल या फोन दर्ज करें",
+        emailAddress: "ईमेल पता या फोन",
+        password: "पासवर्ड",
+        rememberMe: "मुझे याद रखें",
+        forgotPassword: "पासवर्ड भूल गए?",
+        login: "लॉगिन",
+        loggingIn: "लॉगिन हो रहा है...",
+        orContinue: "या जारी रखें",
+        noAccount: "क्या आपका अकाउंट नहीं है?",
+        signUp: "साइन अप",
+        loginFailed: "लॉगिन विफल",
+        invalidResponse: "लॉगिन विफल: अमान्य सर्वर रिस्पॉन्स",
+        quickLoginTitle: "त्वरित सुरक्षित लॉगिन",
+        quickLoginSubtitle:
+          "बायोमेट्रिक सत्यापन के साथ अपने सेव किए गए क्रेडेंशियल्स का उपयोग करें।",
+        quickLoginButton: "बायोमेट्रिक्स के साथ जारी रखें",
+        disableBiometric: "बंद करें",
+        enableBiometricTitle: "बायोमेट्रिक लॉगिन सक्षम करें?",
+        enableBiometricBody:
+          "अगली बार तेज और सुरक्षित लॉगिन के लिए अपने फिंगरप्रिंट या डिवाइस बायोमेट्रिक्स का उपयोग करें।",
+        notNow: "अभी नहीं",
+        enableNow: "अभी सक्षम करें",
+        biometricUnsupported: "इस डिवाइस पर बायोमेट्रिक ऑथेंटिकेशन समर्थित नहीं है।",
+        biometricNotEnrolled: "इस डिवाइस पर कोई फिंगरप्रिंट या बायोमेट्रिक सेट नहीं है।",
+        biometricFailed:
+          "बायोमेट्रिक ऑथेंटिकेशन विफल रहा। कृपया फिर से कोशिश करें या मैन्युअली लॉगिन करें।",
+        biometricCancelled: "बायोमेट्रिक ऑथेंटिकेशन रद्द कर दिया गया।",
+        credentialsMissing:
+          "सेव किए गए बायोमेट्रिक क्रेडेंशियल्स उपलब्ध नहीं हैं। कृपया फिर से मैन्युअली लॉगिन करें।",
+        fillCredentials: "कृपया ईमेल या फोन और पासवर्ड दोनों दर्ज करें।",
+      };
+    }
+
+    return {
       welcomeBack: "Welcome Back",
       loginToAccount: "Login to your account",
       enterEmail: "Enter your e-mail or phone",
@@ -108,19 +180,18 @@ export default function LoginScreen() {
       credentialsMissing:
         "Saved biometric credentials are unavailable. Please log in manually again.",
       fillCredentials: "Please enter both your e-mail/phone and password.",
-    }),
-    [],
-  );
+    };
+  }, [language]);
 
   const languageSheetTitle = React.useMemo(() => {
-    if (language === "he") return "×‘×—×¨ ×©×¤×”";
-    if (language === "hi") return "à¤­à¤¾à¤·à¤¾ à¤šà¥à¤¨à¥‡à¤‚";
+    if (language === "he") return "בחר שפה";
+    if (language === "hi") return "भाषा चुनें";
     return "Choose Language";
   }, [language]);
 
   const languageSheetSubtitle = React.useMemo(() => {
-    if (language === "he") return "×”×‘×—×™×¨×” ×ª×—×•×œ ×ž×™×“ ×•×ª×¢×“×›×Ÿ ××ª ×©×¤×ª ×”×ž×ž×©×§.";
-    if (language === "hi") return "à¤†à¤ªà¤•à¥€ à¤šà¥à¤¨à¥€ à¤¹à¥à¤ˆ à¤­à¤¾à¤·à¤¾ à¤¤à¥à¤°à¤‚à¤¤ à¤ªà¥‚à¤°à¥‡ à¤‡à¤‚à¤Ÿà¤°à¤«à¤¼à¥‡à¤¸ à¤ªà¤° à¤²à¤¾à¤—à¥‚ à¤¹à¥‹à¤—à¥€à¥¤";
+    if (language === "he") return "הבחירה שלך תחול מיד בכל רחבי האפליקציה.";
+    if (language === "hi") return "आपका चयन तुरंत पूरे ऐप में लागू हो जाएगा।";
     return "Your selection will apply instantly across the app.";
   }, [language]);
 
@@ -135,13 +206,13 @@ export default function LoginScreen() {
       {
         code: "he" as const,
         label: t("hebrew", "Hebrew"),
-        nativeLabel: "×¢×‘×¨×™×ª",
+        nativeLabel: "עברית",
         shortLabel: "HE",
       },
       {
         code: "hi" as const,
         label: t("hindi", "Hindi"),
-        nativeLabel: "à¤¹à¤¿à¤¨à¥à¤¦à¥€",
+        nativeLabel: "हिंदी",
         shortLabel: "HI",
       },
     ],
@@ -686,7 +757,7 @@ export default function LoginScreen() {
                   <Text style={styles.quickLoginTitle}>{ui.quickLoginTitle}</Text>
                   <Text style={styles.quickLoginSubtitle}>{ui.quickLoginSubtitle}</Text>
                   <Text style={styles.quickLoginMeta}>
-                    {ui.quickLoginButton} • {savedLoginHint}
+                    {ui.quickLoginButton} {"\u2022"} {savedLoginHint}
                   </Text>
                 </View>
               </LinearGradient>
