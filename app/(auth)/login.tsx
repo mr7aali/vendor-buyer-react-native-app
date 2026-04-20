@@ -262,19 +262,6 @@ export default function LoginScreen() {
       availableProfiles,
     });
 
-    if (!rememberMe) {
-      await clearRememberedLogin();
-      routeAfterAuth(effectiveRole);
-      return;
-    }
-
-    await saveRememberedLogin({
-      identifier,
-      password: secret,
-      biometricEnabled: keepBiometricEnabled,
-    });
-    setSavedLoginHint(maskLoginIdentifier(identifier));
-
     if (biometricSupported && biometricEnrolled && !biometricEnabled) {
       setPendingBiometricEnrollment({
         identifier,
@@ -286,6 +273,19 @@ export default function LoginScreen() {
       setShowEnableBiometricModal(true);
       return;
     }
+
+    if (!rememberMe && !keepBiometricEnabled) {
+      await clearRememberedLogin();
+      routeAfterAuth(effectiveRole);
+      return;
+    }
+
+    await saveRememberedLogin({
+      identifier,
+      password: secret,
+      biometricEnabled: keepBiometricEnabled,
+    });
+    setSavedLoginHint(maskLoginIdentifier(identifier));
 
     routeAfterAuth(effectiveRole);
   }, [
@@ -482,11 +482,15 @@ export default function LoginScreen() {
     }
 
     const { identifier, password: passwordValue, effectiveRole } = pendingBiometricEnrollment;
-    void saveRememberedLogin({
-      identifier,
-      password: passwordValue,
-      biometricEnabled: false,
-    });
+    if (rememberMe) {
+      void saveRememberedLogin({
+        identifier,
+        password: passwordValue,
+        biometricEnabled: false,
+      });
+    } else {
+      void clearRememberedLogin();
+    }
     setPendingBiometricEnrollment(null);
     routeAfterAuth(effectiveRole);
   };
