@@ -1,6 +1,7 @@
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { persistAuthState } from "@/services/authStorage";
 import {
+  clearRememberedLogin,
   disableBiometricLogin,
   enableBiometricLogin,
   getBiometricLoginState,
@@ -158,6 +159,7 @@ const ProfileScreen = () => {
       await AsyncStorage.removeItem("userRole");
       await AsyncStorage.removeItem("userType");
       await AsyncStorage.removeItem("availableProfiles");
+      await clearRememberedLogin();
 
       dispatch(logOut());
       router.replace("/(onboarding)/GetStarted");

@@ -26,7 +26,7 @@ import { useAppDispatch } from "@/store/hooks";
 import { setCredentials } from "@/store/slices/authSlice";
 import { LinearGradient } from "expo-linear-gradient";
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -178,29 +178,13 @@ export default function LoginScreen() {
         setSavedLoginHint(maskLoginIdentifier(state.savedCredentials.identifier));
       }
 
-      if (
-        state.biometricSupported &&
-        state.biometricEnrolled &&
-        state.biometricEnabled &&
-        state.savedCredentials &&
-        !autoPromptedRef.current
-      ) {
-        autoPromptedRef.current = true;
-        setTimeout(() => {
-          if (mounted) {
-            void handleBiometricLogin();
-          }
-        }, 300);
-      }
     };
 
-    // We intentionally bootstrap once on mount so the biometric prompt appears only once per screen entry.
     void bootstrap();
 
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLanguageSelect = async (nextLanguage: typeof language) => {
@@ -228,7 +212,7 @@ export default function LoginScreen() {
     return "Something went wrong. Please try again.";
   };
 
-  const routeAfterAuth = (role: string) => {
+  const routeAfterAuth = React.useCallback((role: string) => {
     if (role === "vendor") {
       router.replace("/(tabs)");
       return;
@@ -240,9 +224,9 @@ export default function LoginScreen() {
     }
 
     router.replace("/(onboarding)/user-selection");
-  };
+  }, [router]);
 
-  const finalizeSuccessfulLogin = async ({
+  const finalizeSuccessfulLogin = React.useCallback(async ({
     identifier,
     password: secret,
     accessToken,
@@ -250,6 +234,7 @@ export default function LoginScreen() {
     normalizedUser,
     availableProfiles,
     effectiveRole,
+    keepBiometricEnabled = false,
   }: {
     identifier: string;
     password: string;
@@ -258,6 +243,7 @@ export default function LoginScreen() {
     normalizedUser: any;
     availableProfiles: any;
     effectiveRole: string;
+    keepBiometricEnabled?: boolean;
   }) => {
     dispatch(apiSlice.util.resetApiState());
     dispatch(
@@ -285,7 +271,7 @@ export default function LoginScreen() {
     await saveRememberedLogin({
       identifier,
       password: secret,
-      biometricEnabled: false,
+      biometricEnabled: keepBiometricEnabled,
     });
     setSavedLoginHint(maskLoginIdentifier(identifier));
 
@@ -302,9 +288,16 @@ export default function LoginScreen() {
     }
 
     routeAfterAuth(effectiveRole);
-  };
+  }, [
+    biometricEnabled,
+    biometricEnrolled,
+    biometricSupported,
+    dispatch,
+    rememberMe,
+    routeAfterAuth,
+  ]);
 
-  const submitLogin = async (identifier: string, secret: string) => {
+  const submitLogin = React.useCallback(async (identifier: string, secret: string) => {
     const normalizedIdentifier = String(identifier || "").trim();
     if (!normalizedIdentifier || !secret) {
       Alert.alert(ui.loginFailed, ui.fillCredentials);
@@ -344,6 +337,7 @@ export default function LoginScreen() {
         normalizedUser,
         availableProfiles: data.availableProfiles || null,
         effectiveRole,
+        keepBiometricEnabled: biometricEnabled,
       });
     } catch (err) {
       Alert.alert(
@@ -351,9 +345,16 @@ export default function LoginScreen() {
         ((err as any)?.data?.message || "Check your credentials.") as string,
       );
     }
-  };
+  }, [
+    biometricEnabled,
+    finalizeSuccessfulLogin,
+    login,
+    ui.fillCredentials,
+    ui.invalidResponse,
+    ui.loginFailed,
+  ]);
 
-  const handleBiometricLogin = async () => {
+  const handleBiometricLogin = React.useCallback(async () => {
     setIsBiometricBusy(true);
 
     try {
@@ -384,7 +385,57 @@ export default function LoginScreen() {
     } finally {
       setIsBiometricBusy(false);
     }
-  };
+  }, [
+    biometricTypeLabel,
+    submitLogin,
+    ui.biometricCancelled,
+    ui.biometricFailed,
+    ui.biometricNotEnrolled,
+    ui.biometricUnsupported,
+    ui.credentialsMissing,
+  ]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      autoPromptedRef.current = false;
+
+      const runAutoBiometricLogin = async () => {
+        const state = await getBiometricLoginState();
+
+        if (
+          autoPromptedRef.current ||
+          isBiometricBusy ||
+          isLoading ||
+          isSocialLoading ||
+          showEnableBiometricModal ||
+          !state.biometricSupported ||
+          !state.biometricEnrolled ||
+          !state.biometricEnabled ||
+          !state.savedCredentials
+        ) {
+          return;
+        }
+
+        autoPromptedRef.current = true;
+        await handleBiometricLogin();
+      };
+
+      const timer = setTimeout(() => {
+        void runAutoBiometricLogin();
+      }, 250);
+
+      return () => {
+        clearTimeout(timer);
+        autoPromptedRef.current = false;
+      };
+    }, [
+      handleBiometricLogin,
+      isBiometricBusy,
+      isLoading,
+      isSocialLoading,
+      showEnableBiometricModal,
+    ]),
+  );
 
   const handleDisableBiometric = async () => {
     await disableBiometricLogin();

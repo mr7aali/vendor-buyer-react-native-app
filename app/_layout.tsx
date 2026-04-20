@@ -1,11 +1,11 @@
 import { useAppSelector } from "@/store/hooks";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StripeProvider } from "@stripe/stripe-react-native";
-import { Stack } from "expo-router";
+import { Stack, router, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
 import "react-native-reanimated";
 import { CountryModalProvider } from "react-native-country-picker-modal";
 import {
@@ -15,13 +15,20 @@ import {
 import { Provider, useSelector } from "react-redux";
 import { getLayoutDirection, syncRTLForLanguage } from "../constants/rtl";
 import { SocketProvider } from "../context/SocketContext";
-import { persistAuthState } from "../services/authStorage";
+import {
+  clearPersistedAuthState,
+  persistAuthState,
+} from "../services/authStorage";
+import {
+  getBiometricLoginState,
+  promptBiometricUnlock,
+} from "../services/biometricAuth";
 import {
   registerForPushNotificationsAsync,
   syncPushTokenToBackend,
 } from "../services/pushNotifications";
 import { useGetProfileQuery } from "../store/api/authApiSlice";
-import { setCredentials } from "../store/slices/authSlice";
+import { logOut, setCredentials } from "../store/slices/authSlice";
 import { selectLanguage, setLanguage } from "../store/slices/languageSlice";
 import { RootState, store } from "../store/store";
 import "./global.css";
@@ -31,6 +38,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 const APP_BACKGROUND_COLOR = "#F8FAF9";
+const ONBOARDING_ROUTE_PREFIXES = ["/(onboarding)"];
 
 const AuthSync = () => {
   const dispatch = store.dispatch;
@@ -147,6 +155,83 @@ const AppNavigator = () => {
   );
 };
 
+const BiometricAppLock = () => {
+  const token = useSelector((state: RootState) => state.auth.accessToken);
+  const pathname = usePathname();
+  const appStateRef = React.useRef(AppState.currentState);
+  const isPromptingRef = React.useRef(false);
+  const hasBootPromptedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    const shouldSkipCurrentRoute = ONBOARDING_ROUTE_PREFIXES.some((prefix) =>
+      pathname.startsWith(prefix),
+    );
+
+    const lockToLogin = async () => {
+      await clearPersistedAuthState();
+      store.dispatch(logOut());
+      router.replace("/(auth)/login");
+    };
+
+    const maybePromptForUnlock = async () => {
+      if (shouldSkipCurrentRoute || isPromptingRef.current) {
+        return;
+      }
+
+      const biometricState = await getBiometricLoginState();
+
+      if (
+        !biometricState.biometricSupported ||
+        !biometricState.biometricEnrolled ||
+        !biometricState.biometricEnabled ||
+        !biometricState.savedCredentials
+      ) {
+        return;
+      }
+
+      isPromptingRef.current = true;
+
+      try {
+        const result = await promptBiometricUnlock(
+          `Use ${biometricState.biometricTypeLabel} to unlock the app`,
+        );
+
+        if (!result.success) {
+          await lockToLogin();
+        }
+      } finally {
+        isPromptingRef.current = false;
+      }
+    };
+
+    if (!hasBootPromptedRef.current) {
+      hasBootPromptedRef.current = true;
+      setTimeout(() => {
+        void maybePromptForUnlock();
+      }, 250);
+    }
+
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      const previousAppState = appStateRef.current;
+
+      if (
+        (previousAppState === "inactive" || previousAppState === "background") &&
+        nextAppState === "active"
+      ) {
+        void maybePromptForUnlock();
+      }
+
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [pathname, token]);
+
+  return null;
+};
+
 export default function RootLayout() {
   const stripePublishableKey = (
     process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
@@ -191,6 +276,7 @@ export default function RootLayout() {
           urlScheme="yozietranceapp"
         >
           <AuthSync />
+          <BiometricAppLock />
           <SocketProvider>
             <CountryModalProvider>
               <AppNavigator />
