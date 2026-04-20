@@ -38,7 +38,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 });
 
 const APP_BACKGROUND_COLOR = "#F8FAF9";
-const ONBOARDING_ROUTE_PREFIXES = ["/(onboarding)"];
+const UNLOCK_EXCLUDED_ROUTE_PREFIXES = ["/(auth)", "/(onboarding)"];
 
 const AuthSync = () => {
   const dispatch = store.dispatch;
@@ -163,7 +163,7 @@ const BiometricAppLock = () => {
   const hasBootPromptedRef = React.useRef(false);
 
   React.useEffect(() => {
-    const shouldSkipCurrentRoute = ONBOARDING_ROUTE_PREFIXES.some((prefix) =>
+    const shouldSkipCurrentRoute = UNLOCK_EXCLUDED_ROUTE_PREFIXES.some((prefix) =>
       pathname.startsWith(prefix),
     );
 
@@ -174,7 +174,7 @@ const BiometricAppLock = () => {
     };
 
     const maybePromptForUnlock = async () => {
-      if (shouldSkipCurrentRoute || isPromptingRef.current) {
+      if (!token || shouldSkipCurrentRoute || isPromptingRef.current) {
         return;
       }
 
