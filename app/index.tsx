@@ -5,6 +5,7 @@ import {
   loadPersistedAuthState,
   persistAuthState,
 } from "@/services/authStorage";
+import { getBiometricLoginState } from "@/services/biometricAuth";
 import { logOut, setCredentials } from "@/store/slices/authSlice";
 import { router } from "expo-router";
 import React from "react";
@@ -26,6 +27,20 @@ export default function AppIndex() {
 
     const bootstrapApp = async () => {
       try {
+        const biometricState = await getBiometricLoginState();
+
+        if (
+          biometricState.biometricSupported &&
+          biometricState.biometricEnrolled &&
+          biometricState.biometricEnabled &&
+          biometricState.savedCredentials
+        ) {
+          if (isMounted) {
+            router.replace("/(auth)/login");
+          }
+          return;
+        }
+
         const persistedAuth = await loadPersistedAuthState();
 
         if (!persistedAuth?.accessToken) {

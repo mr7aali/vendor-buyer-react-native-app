@@ -1,5 +1,10 @@
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { persistAuthState } from "@/services/authStorage";
+import {
+  disableBiometricLogin,
+  enableBiometricLogin,
+  getBiometricLoginState,
+} from "@/services/biometricAuth";
 import { unregisterPushTokenFromBackend } from "@/services/pushNotifications";
 import { useGetProfileQuery, useSwitchProfileMutation } from "@/store/api/authApiSlice";
 import { apiSlice } from "@/store/api/apiSlice";
@@ -17,10 +22,10 @@ import {
   MaterialIcons,
 } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useState } from "react";
-import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTranslation } from "../../hooks/use-translation";
 
@@ -74,6 +79,12 @@ const ProfileScreen = () => {
   const availableProfiles = useAppSelector(selectAvailableProfiles);
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricTypeLabel, setBiometricTypeLabel] = useState("Fingerprint");
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnrolled, setBiometricEnrolled] = useState(false);
+  const [hasSavedLogin, setHasSavedLogin] = useState(false);
+  const [isUpdatingBiometric, setIsUpdatingBiometric] = useState(false);
   const [switchProfile, { isLoading: isSwitchingProfile }] = useSwitchProfileMutation();
   const {
     data: profileData,
@@ -85,7 +96,55 @@ const ProfileScreen = () => {
   const currentModeLabel = t("customer_mode", "Customer");
   const targetModeLabel = t("vendor_mode", "Vendor");
   const switchButtonLabel = t("switch_to_vendor", "Switch to Vendor");
- 
+
+  const refreshBiometricState = useCallback(async () => {
+    const state = await getBiometricLoginState();
+    setBiometricEnabled(state.biometricEnabled);
+    setBiometricTypeLabel(state.biometricTypeLabel);
+    setBiometricSupported(state.biometricSupported);
+    setBiometricEnrolled(state.biometricEnrolled);
+    setHasSavedLogin(!!state.savedCredentials);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshBiometricState();
+    }, [refreshBiometricState]),
+  );
+
+  const handleBiometricToggle = async (value: boolean) => {
+    if (isUpdatingBiometric) return;
+
+    setIsUpdatingBiometric(true);
+    try {
+      if (!value) {
+        await disableBiometricLogin();
+        setBiometricEnabled(false);
+        return;
+      }
+
+      const result = await enableBiometricLogin();
+
+      if (!result.success) {
+        if (result.reason === "not_supported") {
+          Alert.alert("Biometric unavailable", "This device does not support biometric login.");
+        } else if (result.reason === "not_enrolled") {
+          Alert.alert("Biometric unavailable", "No fingerprint or biometric is enrolled on this device.");
+        } else {
+          Alert.alert(
+            "Saved login required",
+            "Log in once with Remember me enabled before turning on biometric login.",
+          );
+        }
+        return;
+      }
+
+      setBiometricEnabled(true);
+    } finally {
+      setIsUpdatingBiometric(false);
+      await refreshBiometricState();
+    }
+  };
 
   const onLogout = async () => {
     setShowLogoutModal(false);
@@ -411,6 +470,39 @@ const ProfileScreen = () => {
                 </View>
                 <MaterialIcons name={profileArrowIcon} size={16} color="black" />
               </TouchableOpacity>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, flex: 1 }}>
+                  <Ionicons name="finger-print-outline" size={26} color="#4B5563" />
+                  <View style={{ marginLeft: 14, flex: 1, paddingRight: 12 }}>
+                    <Text style={{ fontSize: 16, color: "#4B5563", fontWeight: "500" }}>
+                      {`${biometricTypeLabel} Login`}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 4, lineHeight: 17 }}>
+                      {biometricEnabled
+                        ? "Biometric login is on for your saved account."
+                        : !biometricSupported
+                          ? "This device does not support biometric login."
+                          : !biometricEnrolled
+                            ? "Set up a fingerprint or biometric on this device first."
+                            : hasSavedLogin
+                              ? "Turn this on to use biometric login next time."
+                              : "Use Remember me on login once before enabling this."}
+                    </Text>
+                  </View>
+                </View>
+
+                {isUpdatingBiometric ? (
+                  <ActivityIndicator size="small" color="#278687" />
+                ) : (
+                  <Switch
+                    value={biometricEnabled}
+                    onValueChange={(value) => void handleBiometricToggle(value)}
+                    trackColor={{ false: "#D1D5DB", true: "#9FD6D1" }}
+                    thumbColor={biometricEnabled ? "#278687" : "#FFFFFF"}
+                  />
+                )}
+              </View>
 
               <TouchableOpacity
                 onPress={() => router.push("/(screens)/language")}
