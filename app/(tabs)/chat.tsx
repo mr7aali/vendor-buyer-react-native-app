@@ -1,4 +1,5 @@
 import { supportTickets } from "@/constants/common";
+import { getLayoutDirection } from "@/constants/rtl";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { useTranslation } from "@/hooks/use-translation";
 import { formatRoleLabel, resolveConversationRole, resolveCurrentRole } from "@/services/chatRole";
@@ -107,14 +108,16 @@ const ChatListSkeleton = () => (
   <View style={styles.listWrap}>
     {Array.from({ length: 7 }).map((_, index) => (
       <View key={`chat-skeleton-${index}`} style={styles.row}>
-        <SkeletonBlock style={styles.skeletonAvatar} />
-        <View style={styles.middle}>
-          <SkeletonBlock style={styles.skeletonName} />
-          <SkeletonBlock style={styles.skeletonPreview} />
-        </View>
         <View style={styles.right}>
           <SkeletonBlock style={styles.skeletonTime} />
           <SkeletonBlock style={styles.skeletonBadge} />
+        </View>
+        <View style={styles.rowMain}>
+          <SkeletonBlock style={styles.skeletonAvatar} />
+          <View style={styles.middle}>
+            <SkeletonBlock style={styles.skeletonName} />
+            <SkeletonBlock style={styles.skeletonPreview} />
+          </View>
         </View>
       </View>
     ))}
@@ -123,10 +126,11 @@ const ChatListSkeleton = () => (
 
 export default function ChatTabs() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const user = useSelector((state: RootState) => state.auth.user);
   const currentUserId = resolveChatUserId(user);
   const currentRole = resolveCurrentRole(user);
+  const isRTL = getLayoutDirection(language) === "rtl";
 
   const [activeTab, setActiveTab] = useState<"chat" | "support">("chat");
   const [searchQuery, setSearchQuery] = useState("");
@@ -163,9 +167,9 @@ export default function ChatTabs() {
   }, [searchQuery]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, isRTL && styles.containerRtl]}>
       <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && styles.headerRtl]}>
         <TouchableOpacity onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#1F2937" />
         </TouchableOpacity>
@@ -173,20 +177,20 @@ export default function ChatTabs() {
         <View style={{ width: 20 }} />
       </View>
 
-      <View style={styles.searchWrap}>
+      <View style={[styles.searchWrap, isRTL && styles.searchWrapRtl]}>
         <Ionicons name="search-outline" size={22} color="#111827" />
         <TextInput
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholder={t("chat_search_by_name", "Search by name")}
           placeholderTextColor="#9CA3AF"
-          style={styles.searchInput}
+          style={[styles.searchInput, isRTL && styles.searchInputRtl]}
         />
       </View>
 
-      <View style={styles.tabRow}>
+      <View style={[styles.tabRow, isRTL && styles.tabRowRtl]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === "chat" && styles.tabActive]}
+          style={[styles.tab, activeTab === "chat" && styles.tabActive, isRTL && styles.tabRtl]}
           onPress={() => setActiveTab("chat")}
         >
           <Text
@@ -199,7 +203,7 @@ export default function ChatTabs() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === "support" && styles.tabActive]}
+          style={[styles.tab, activeTab === "support" && styles.tabActive, isRTL && styles.tabRtl]}
           onPress={() => setActiveTab("support")}
         >
           <Text
@@ -249,6 +253,77 @@ export default function ChatTabs() {
                 const messageId =
                   conversation?.lastMessage?.id ||
                   conversation?.lastMessage?._id;
+                const timeBlock = (
+                  <View style={[styles.right, isRTL && styles.rightRtl]}>
+                    <Text
+                      style={[
+                        styles.time,
+                        unreadCount > 0 && styles.timeActive,
+                        isRTL && styles.timeRtl,
+                      ]}
+                    >
+                      {formatTime(conversation?.lastMessage?.createdAt)}
+                    </Text>
+                    {unreadCount > 0 ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+                const contentBlock = (
+                  <View style={styles.rowMain}>
+                    {isRTL ? (
+                      <>
+                        <View style={[styles.middle, styles.middleRtl]}>
+                          <View style={[styles.nameRow, styles.nameRowRtl]}>
+                            <Text style={[styles.name, styles.nameRtl]}>{displayName}</Text>
+                            <View
+                              style={[
+                                styles.roleBadge,
+                                isRoleMismatch && styles.roleBadgeMuted,
+                              ]}
+                            >
+                              <Text style={styles.roleBadgeText}>
+                                {formatRoleLabel(conversationRole)} Chat
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={[styles.preview, styles.previewRtl]} numberOfLines={1}>
+                            {isRoleMismatch
+                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                              : lastText}
+                          </Text>
+                        </View>
+                        <Image source={{ uri: avatar }} style={styles.avatar} />
+                      </>
+                    ) : (
+                      <>
+                        <Image source={{ uri: avatar }} style={styles.avatar} />
+                        <View style={styles.middle}>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.name}>{displayName}</Text>
+                            <View
+                              style={[
+                                styles.roleBadge,
+                                isRoleMismatch && styles.roleBadgeMuted,
+                              ]}
+                            >
+                              <Text style={styles.roleBadgeText}>
+                                {formatRoleLabel(conversationRole)} Chat
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.preview} numberOfLines={1}>
+                            {isRoleMismatch
+                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                              : lastText}
+                          </Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
+                );
 
                 return (
                   <TouchableOpacity
@@ -279,42 +354,8 @@ export default function ChatTabs() {
                       });
                     }}
                   >
-                    <Image source={{ uri: avatar }} style={styles.avatar} />
-                    <View style={styles.middle}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.name}>{displayName}</Text>
-                        <View
-                          style={[
-                            styles.roleBadge,
-                            isRoleMismatch && styles.roleBadgeMuted,
-                          ]}
-                        >
-                          <Text style={styles.roleBadgeText}>
-                            {formatRoleLabel(conversationRole)} Chat
-                          </Text>
-                        </View>
-                      </View>
-                      <Text style={styles.preview} numberOfLines={1}>
-                        {isRoleMismatch
-                          ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
-                          : lastText}
-                      </Text>
-                    </View>
-                    <View style={styles.right}>
-                      <Text
-                        style={[
-                          styles.time,
-                          unreadCount > 0 && styles.timeActive,
-                        ]}
-                      >
-                        {formatTime(conversation?.lastMessage?.createdAt)}
-                      </Text>
-                      {unreadCount > 0 ? (
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>{unreadCount}</Text>
-                        </View>
-                      ) : null}
-                    </View>
+                    {isRTL ? timeBlock : contentBlock}
+                    {isRTL ? contentBlock : timeBlock}
                   </TouchableOpacity>
                 );
                 })
@@ -344,6 +385,7 @@ export default function ChatTabs() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F2F6F5", direction: "ltr" },
+  containerRtl: { direction: "rtl" },
   header: {
     direction: "ltr",
     flexDirection: "row",
@@ -352,6 +394,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
+  headerRtl: { direction: "rtl", flexDirection: "row-reverse" },
   headerTitle: { fontSize: 22, fontWeight: "700", textAlign: "center" },
   searchWrap: {
     marginHorizontal: 20,
@@ -365,13 +408,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  searchWrapRtl: { flexDirection: "row-reverse" },
   searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: "#111827" },
+  searchInputRtl: { marginLeft: 0, marginRight: 10, textAlign: "right" },
   tabRow: {
     flexDirection: "row",
     marginHorizontal: 20,
     marginTop: 16,
     gap: 10,
   },
+  tabRowRtl: { flexDirection: "row-reverse" },
   tab: {
     flex: 1,
     height: 44,
@@ -381,6 +427,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingHorizontal: 12,
   },
+  tabRtl: { alignItems: "flex-end" },
   tabActive: { backgroundColor: "#2A8B8A" },
   tabText: { color: "#374151", fontSize: 16, fontWeight: "500" },
   tabTextActive: { color: "#FFFFFF" },
@@ -389,9 +436,16 @@ const styles = StyleSheet.create({
     direction: "ltr",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#DEE5EA",
+  },
+  rowMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
   },
   avatar: {
     width: 46,
@@ -399,11 +453,17 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     backgroundColor: "#CCEFDB",
   },
-  middle: { flex: 1, marginLeft: 12, marginRight: 8, direction: "ltr" },
+  middle: { flex: 1, minWidth: 0, marginLeft: 12, marginRight: 8 },
+  middleRtl: { marginLeft: 8, marginRight: 12, alignItems: "flex-end" },
   nameRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  nameRowRtl: {
+    flexDirection: "row-reverse",
+    justifyContent: "flex-start",
+    alignSelf: "flex-end",
   },
   name: {
     fontSize: 31 / 2,
@@ -411,12 +471,14 @@ const styles = StyleSheet.create({
     color: "#263238",
     textAlign: "left",
   },
+  nameRtl: { textAlign: "right", alignSelf: "flex-end" },
   preview: {
     fontSize: 29 / 2,
     color: "#4B5563",
     marginTop: 2,
     textAlign: "left",
   },
+  previewRtl: { textAlign: "right", alignSelf: "stretch" },
   roleBadge: {
     backgroundColor: "#DDF2F0",
     borderRadius: 999,
@@ -431,8 +493,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#206C69",
   },
-  right: { alignItems: "flex-start", minWidth: 64, direction: "ltr" },
+  right: { alignItems: "flex-end", minWidth: 64, marginLeft: 12 },
+  rightRtl: { alignItems: "flex-start", marginLeft: 0, marginRight: 12 },
   time: { fontSize: 14, color: "#4B5563", textAlign: "left" },
+  timeRtl: { textAlign: "left" },
   timeActive: { color: "#1E8A8D" },
   badge: {
     marginTop: 6,

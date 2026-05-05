@@ -42,6 +42,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -853,10 +854,11 @@ const ChatBox: React.FC = () => {
   const [assignCoupon] = useAssignCouponMutation();
   const [markAsRead] = useMarkAsReadMutation();
   const [uploadChatImage, { isLoading: isUploadingImage }] =
-    useUploadChatImageMutation();
+      useUploadChatImageMutation();
   const flatListRef = useRef<FlatList>(null);
   const autoPinnedMessageKeyRef = useRef("");
   const [highlightedMessageId, setHighlightedMessageId] = useState("");
+  const [copiedMessageId, setCopiedMessageId] = useState("");
   const keyboardOffset = useRef(new Animated.Value(0)).current;
   const [composerHeight, setComposerHeight] = useState(88);
 
@@ -1367,6 +1369,31 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  const handleCopyMessage = async (message?: CustomChatMessage) => {
+    const value = String(message?.text || "").trim();
+    if (!value) return;
+
+    try {
+      await Clipboard.setStringAsync(value);
+
+      const messageId = normalizeId(message?.id);
+      setCopiedMessageId(messageId);
+      setTimeout(() => {
+        setCopiedMessageId((current) =>
+          current === messageId ? "" : current,
+        );
+      }, 1800);
+
+      if (Platform.OS === "android") {
+        ToastAndroid.show("Message copied", ToastAndroid.SHORT);
+      } else {
+        Alert.alert("Copied", "Message copied to clipboard");
+      }
+    } catch {
+      Alert.alert("Copy failed", "Could not copy message");
+    }
+  };
+
   const handlePinMessage = (message: CustomChatMessage) => {
     const targetConversationId = normalizeId(message.conversationId) || effectiveConversationId;
 
@@ -1647,11 +1674,11 @@ const ChatBox: React.FC = () => {
             />
           ) : isOrderMessageType(msg.type) ? (
             renderOrderCard(msg)
-          ) : msg.type === "image" ? (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => handlePreviewImage(msg.text)}
-              style={[
+            ) : msg.type === "image" ? (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => handlePreviewImage(msg.text)}
+                style={[
                 styles.bubble,
                 msg.isOwn ? styles.myBubble : styles.otherBubble,
                 styles.imageBubble,
@@ -1662,31 +1689,39 @@ const ChatBox: React.FC = () => {
                 style={styles.chatImage}
                 resizeMode="cover"
               />
-              <View style={styles.imagePreviewBadge}>
-                <Text style={styles.imagePreviewBadgeText}>Preview</Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View
-              style={[
-                styles.bubble,
-                msg.isOwn ? styles.myBubble : styles.otherBubble,
-              ]}
-            >
-              <Text
+                <View style={styles.imagePreviewBadge}>
+                  <Text style={styles.imagePreviewBadgeText}>Preview</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => handleCopyMessage(msg)}
+                onLongPress={() => handleCopyMessage(msg)}
+                delayLongPress={220}
                 style={[
-                  styles.msgText,
-                  msg.isOwn ? styles.myMsgText : styles.otherMsgText,
+                  styles.bubble,
+                  msg.isOwn ? styles.myBubble : styles.otherBubble,
+                  styles.copyableBubble,
                 ]}
               >
-                {msg.text}
-              </Text>
-            </View>
-          )}
+                <Text
+                  style={[
+                    styles.msgText,
+                  msg.isOwn ? styles.myMsgText : styles.otherMsgText,
+                ]}
+                >
+                  {msg.text}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {copiedMessageId === normalizeId(msg.id) ? (
+              <Text style={styles.copyHintText}>Copied to clipboard</Text>
+            ) : null}
             <Text style={styles.timeText}>{formatTime(msg.timestamp)}</Text>
+          </View>
         </View>
-      </View>
-    );
+      );
   };
 
   // Helper to parse coupon info from text fallback
@@ -2358,6 +2393,9 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
   },
+  copyableBubble: {
+    minHeight: 44,
+  },
   myBubble: { backgroundColor: "#2A8383", borderBottomRightRadius: 2 },
   otherBubble: { backgroundColor: "#fff", borderBottomLeftRadius: 2 },
   imageBubble: { padding: 4, overflow: "hidden" },
@@ -2420,6 +2458,12 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 14, lineHeight: 20 },
   myMsgText: { color: "#FFF" },
   otherMsgText: { color: "#374151" },
+  copyHintText: {
+    marginTop: 6,
+    fontSize: 11,
+    color: "#2A8383",
+    fontWeight: "600",
+  },
   timeText: { fontSize: 10, color: "#9CA3AF", marginTop: 4 },
   skeletonMsgAvatar: {
     width: 32,

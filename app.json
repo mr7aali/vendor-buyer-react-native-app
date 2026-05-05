@@ -52,6 +52,19 @@
         }
       ],
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow LinkooTo to use biometrics for secure sign in."
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow LinkooTo to securely access your saved login details."
+        }
+      ],
+      [
         "@stripe/stripe-react-native",
         {
           "merchantIdentifier": "merchant.com.yozietranceapp",
