@@ -1,4 +1,3 @@
-const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 
@@ -8,5 +7,5 @@ config.resolver.sourceExts.push("cjs");
 config.resolver.packageExportsConditions = ["react-native", "browser", "require"];
 
 module.exports = withNativeWind(config, {
-  input: path.resolve(__dirname, "app/global.css"),
+  input: "./app/global.css",
 });
