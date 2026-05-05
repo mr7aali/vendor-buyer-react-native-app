@@ -1837,13 +1837,33 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  const handleOpenCustomerProfile = () => {
+    if (shouldShowHeaderSkeleton) return;
+
+    router.push({
+      pathname: "/(screens)/customer_profile",
+      params: {
+        name: displayName || partnerData?.name || "Customer",
+        avatar: partnerAvatar || partnerData?.avatar || "",
+        partnerId: activePartnerId || canonicalPartnerId || "",
+        profileType: isVendorSide ? "buyer" : "vendor",
+        profileBadge: isVendorSide ? "Buyer Profile" : "Vendor Profile",
+      },
+    });
+  };
+
   const renderHeader = () => {
     return (
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#333" />
         </TouchableOpacity>
-        <View style={styles.headerPartnerContainer}>
+        <TouchableOpacity
+          style={styles.headerPartnerContainer}
+          onPress={handleOpenCustomerProfile}
+          activeOpacity={0.85}
+          disabled={shouldShowHeaderSkeleton}
+        >
           <View style={styles.avatarContainer}>
             {shouldShowHeaderSkeleton ? (
               <SkeletonBlock style={styles.headerAvatar} />
@@ -1882,7 +1902,7 @@ const ChatBox: React.FC = () => {
               </>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
