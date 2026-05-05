@@ -9,6 +9,8 @@ import {
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -53,6 +55,9 @@ const getProductIdFromResponse = (response: any) =>
   "";
 
 const INPUT_PLACEHOLDER_COLOR = "#8A969D";
+const MAX_UPLOAD_IMAGE_BYTES = 900 * 1024;
+const MAX_IMAGE_DIMENSION = 1600;
+const IMAGE_COMPRESSION_STEPS = [0.7, 0.55, 0.4];
 
 const toCleanNumberString = (value: string) => value.replace(/[^0-9.]/g, "");
 const imagePickerMediaTypes: ImagePicker.MediaType[] = ["images"];
@@ -81,11 +86,75 @@ const formatApiErrorMessage = (error: any, fallback: string) => {
     return error.data.message;
   }
 
+  if (
+    error?.originalStatus === 413 ||
+    error?.status === 413 ||
+    String(error?.data || "").includes("413 Request Entity Too Large")
+  ) {
+    return "Image size is too large. Please use a smaller or compressed photo.";
+  }
+
   if (typeof error?.message === "string" && error.message.trim()) {
     return error.message;
   }
 
   return fallback;
+};
+
+const getImageInfoSize = async (uri: string) => {
+  try {
+    const fileInfo = await FileSystem.getInfoAsync(uri, { size: true });
+    return fileInfo.exists ? Number(fileInfo.size || 0) : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const buildResizeAction = (width?: number, height?: number) => {
+  const safeWidth = Number(width || 0);
+  const safeHeight = Number(height || 0);
+
+  if (!safeWidth || !safeHeight) {
+    return { width: MAX_IMAGE_DIMENSION };
+  }
+
+  if (safeWidth >= safeHeight) {
+    return safeWidth > MAX_IMAGE_DIMENSION
+      ? { width: MAX_IMAGE_DIMENSION }
+      : undefined;
+  }
+
+  return safeHeight > MAX_IMAGE_DIMENSION
+    ? { height: MAX_IMAGE_DIMENSION }
+    : undefined;
+};
+
+const optimizePickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
+  const originalUri = String(asset?.uri || "");
+  if (!originalUri || originalUri.startsWith("http")) return originalUri;
+
+  const initialSize = await getImageInfoSize(originalUri);
+  const resizeAction = buildResizeAction(asset?.width, asset?.height);
+
+  let currentUri = originalUri;
+  let currentSize = initialSize;
+
+  for (const compress of IMAGE_COMPRESSION_STEPS) {
+    const actions = resizeAction ? [{ resize: resizeAction }] : [];
+    const manipulated = await manipulateAsync(currentUri, actions, {
+      compress,
+      format: SaveFormat.JPEG,
+    });
+
+    currentUri = manipulated.uri;
+    currentSize = await getImageInfoSize(currentUri);
+
+    if (currentSize > 0 && currentSize <= MAX_UPLOAD_IMAGE_BYTES) {
+      return currentUri;
+    }
+  }
+
+  return currentUri;
 };
 
 export default function EditProduct() {
@@ -120,6 +189,7 @@ export default function EditProduct() {
   const [isActive, setIsActive] = useState(true);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [specifications, setSpecifications] = useState<SpecItem[]>([]);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const [isSpecModalVisible, setIsSpecModalVisible] = useState(false);
   const [newSpecLabel, setNewSpecLabel] = useState("");
@@ -293,9 +363,23 @@ export default function EditProduct() {
     [categories],
   );
 
-  const handleImagePickerResult = (result: ImagePicker.ImagePickerResult) => {
-    if (!result.canceled && result.assets?.length) {
-      setSelectedImages((prev) => [...prev, result.assets[0].uri]);
+  const handleImagePickerResult = async (
+    result: ImagePicker.ImagePickerResult,
+  ) => {
+    if (result.canceled || !result.assets?.length) return;
+
+    try {
+      setIsPreparingImage(true);
+      const optimizedUri = await optimizePickedImage(result.assets[0]);
+      setSelectedImages((prev) => [...prev, optimizedUri]);
+    } catch (error) {
+      console.error("Failed to prepare image:", error);
+      Alert.alert(
+        t("error", "Error"),
+        "We couldn't prepare that image. Please try another photo.",
+      );
+    } finally {
+      setIsPreparingImage(false);
     }
   };
 
@@ -309,10 +393,10 @@ export default function EditProduct() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: imagePickerMediaTypes,
       allowsEditing: true,
-      quality: 0.8,
+      quality: 0.6,
     });
 
-    handleImagePickerResult(result);
+    await handleImagePickerResult(result);
   };
 
   const openCamera = async () => {
@@ -329,10 +413,10 @@ export default function EditProduct() {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: imagePickerMediaTypes,
         allowsEditing: true,
-        quality: 0.8,
+        quality: 0.6,
       });
 
-      handleImagePickerResult(result);
+      await handleImagePickerResult(result);
     } catch (error) {
       console.error("Failed to launch camera:", error);
       Alert.alert(
@@ -567,7 +651,11 @@ export default function EditProduct() {
           >
             <TouchableOpacity style={styles.uploadBox} onPress={pickImage}>
               <View style={styles.cameraCircle}>
-                <Ionicons name="camera" size={20} color="#FFF" />
+                {isPreparingImage ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="camera" size={20} color="#FFF" />
+                )}
               </View>
             </TouchableOpacity>
             {selectedImages.map((uri, index) => (
