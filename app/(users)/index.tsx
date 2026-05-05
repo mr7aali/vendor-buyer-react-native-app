@@ -327,7 +327,13 @@ const Dashboard: React.FC = () => {
                 const isThisVendorConnecting = connectingVendorId === cardKey;
 
                 return (
-                  <View key={cardKey} style={styles.previewCard}>
+                  <TouchableOpacity
+                    key={cardKey}
+                    style={styles.previewCard}
+                    activeOpacity={0.9}
+                    disabled={isThisVendorConnecting}
+                    onPress={() => handleConnect(vendor)}
+                  >
                     <Image
                       source={{
                         uri:
@@ -378,7 +384,7 @@ const Dashboard: React.FC = () => {
                         </Text>
                       )}
                     </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 );
               }))}
         </View>
@@ -482,7 +488,7 @@ const styles = StyleSheet.create({
     width: (width - 52) / 2,
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 10,
+    padding: 9,
     borderWidth: 1,
     borderColor: "#DDEBE8",
     shadowColor: "#6AA8A1",
@@ -493,32 +499,32 @@ const styles = StyleSheet.create({
   },
   previewImage: {
     width: "100%",
-    height: 138,
+    height: 118,
     borderRadius: 18,
     backgroundColor: "#D9E8E6",
-    marginBottom: 14,
+    marginBottom: 10,
   },
   previewCardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: "#101010",
     textAlign: "center",
-    minHeight: 42,
+    minHeight: 36,
     paddingHorizontal: 4,
   },
   previewCardSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     color: "#667085",
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 8,
     paddingHorizontal: 4,
   },
   previewMetaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   previewMetaBadgeSolid: {
     flex: 1,
@@ -535,7 +541,7 @@ const styles = StyleSheet.create({
     color: "#2B6E6F",
   },
   previewButton: {
-    minHeight: 48,
+    minHeight: 42,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: "#6DA8A4",
@@ -583,7 +589,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   previewButtonSkeleton: {
-    minHeight: 48,
+    minHeight: 42,
     borderRadius: 16,
   },
 });

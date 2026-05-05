@@ -182,7 +182,13 @@ export default function ExploreScreen() {
     const isThisVendorConnecting = connectingVendorId === cardKey;
 
     return (
-      <View key={cardKey} style={styles.card}>
+      <TouchableOpacity
+        key={cardKey}
+        style={styles.card}
+        activeOpacity={0.9}
+        disabled={isThisVendorConnecting}
+        onPress={() => handleConnect(vendor)}
+      >
         <Image
           source={{
             uri:
@@ -239,7 +245,7 @@ export default function ExploreScreen() {
             </Text>
           )}
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
