@@ -70,6 +70,24 @@ const CategoriesScreen: React.FC = () => {
       vendorIdParam ||
       "",
   );
+  const activeVendorUserId = String(
+    matchedConnection?.vendor?.userId ||
+      matchedConnection?.vendorId?.userId ||
+      fallbackVendor?.userId ||
+      "",
+  );
+  const activeVendorName = String(
+    matchedConnection?.vendor?.storename ||
+      matchedConnection?.vendor?.businessName ||
+      matchedConnection?.vendor?.fullName ||
+      matchedConnection?.vendorId?.storename ||
+      matchedConnection?.vendorId?.businessName ||
+      matchedConnection?.vendorId?.fullName ||
+      fallbackVendor?.storename ||
+      fallbackVendor?.businessName ||
+      fallbackVendor?.fullName ||
+      "Vendor",
+  );
   console.log("Active Vendor ID:", activeVendorId);
   const { data: categoriesData, isLoading: isCategoriesLoading } = useGetCategoriesByVendorQuery(
     activeVendorId,
@@ -92,6 +110,22 @@ const CategoriesScreen: React.FC = () => {
         categoryId: category._id || category.id,
         categoryName: category.name || category.title
       }
+    });
+  };
+
+  const handleOpenChat = () => {
+    if (!activeVendorUserId) return;
+
+    router.push({
+      pathname: "/(screens)/chat_box",
+      params: {
+        role: "buyer",
+        partnerId: activeVendorUserId,
+        vendorId: activeVendorId,
+        conversationId: activeVendorUserId,
+        fullname: activeVendorName,
+        name: activeVendorName,
+      },
     });
   };
 
@@ -166,6 +200,16 @@ const CategoriesScreen: React.FC = () => {
           />
         }
       />
+
+      {activeVendorUserId ? (
+        <TouchableOpacity
+          style={styles.chatFab}
+          activeOpacity={0.88}
+          onPress={handleOpenChat}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={30} color="#2E8B8B" />
+        </TouchableOpacity>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -219,6 +263,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   categoryText: { color: "#4FB0A8", fontWeight: "600", fontSize: 15 },
+  chatFab: {
+    position: "absolute",
+    right: 20,
+    bottom: 28,
+    width: 92,
+    height: 58,
+    borderRadius: 24,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#2E8B8B",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#1E7D7D",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 10,
+    elevation: 8,
+  },
 });
 
 export default CategoriesScreen;
