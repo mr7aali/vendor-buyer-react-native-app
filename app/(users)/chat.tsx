@@ -87,6 +87,28 @@ const resolveAvatarUri = (partner: any) =>
       partner?.profileImage ||
       "",
   ) || "https://via.placeholder.com/48";
+
+const isImageLikeMessageText = (value: any) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  return (
+    /^data:image\//i.test(text) ||
+    /^file:\/\//i.test(text) ||
+    /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i.test(text) ||
+    /res\.cloudinary\.com\/.+\/image\/upload\//i.test(text)
+  );
+};
+
+const buildMessagePreview = (value: any, t: any) => {
+  const text = String(value || "").trim();
+  if (!text) return t("chat_no_messages_yet", "No messages yet");
+  if (isImageLikeMessageText(text)) {
+    return t("chat_attachment_photo", "Photo");
+  }
+  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
+};
+
 const formatTime = (value: any) => {
   if (!value) return "";
   const date = new Date(value);
@@ -167,7 +189,16 @@ export default function ChatScreen() {
         resolveVendorProfileId(partner) ||
         resolveVendorProfileId(row?.vendor) ||
         resolveVendorProfileId(row?.vendorId);
-      if (partnerId) byPartnerId.set(partnerId, { ...row, vendorProfileId });
+      if (partnerId) {
+        byPartnerId.set(partnerId, {
+          ...row,
+          vendorProfileId,
+          lastMessagePreview: buildMessagePreview(
+            row?.lastMessage?.messageText || row?.lastMessage?.text,
+            t,
+          ),
+        });
+      }
     });
 
     rawConnections.forEach((conn: any) => {
@@ -196,6 +227,7 @@ export default function ChatScreen() {
           messageText: t("chat_no_messages_yet", "No messages yet"),
           createdAt: conn?.createdAt || conn?.updatedAt || null,
         },
+        lastMessagePreview: t("chat_no_messages_yet", "No messages yet"),
       });
     });
 
@@ -214,7 +246,7 @@ export default function ChatScreen() {
         partner?.storename ||
         partner?.email ||
         "";
-      const preview = row?.lastMessage?.messageText || "";
+      const preview = row?.lastMessagePreview || "";
       return (
         String(name).toLowerCase().includes(q) ||
         String(preview).toLowerCase().includes(q)
@@ -388,13 +420,13 @@ export default function ChatScreen() {
                             </View>
                           </View>
                           <Text style={[styles.preview, styles.previewRtl]} numberOfLines={1}>
-                            {isRoleMismatch
-                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
-                              : conversation?.lastMessage?.messageText ||
-                                t("chat_no_messages_yet", "No messages yet")}
-                          </Text>
-                        </View>
-                        <Image source={{ uri: avatar }} style={styles.avatar} />
+                {isRoleMismatch
+                  ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                  : conversation?.lastMessagePreview ||
+                    t("chat_no_messages_yet", "No messages yet")}
+              </Text>
+            </View>
+            <Image source={{ uri: avatar }} style={styles.avatar} />
                       </>
                     ) : (
                       <>
@@ -414,13 +446,13 @@ export default function ChatScreen() {
                             </View>
                           </View>
                           <Text style={styles.preview} numberOfLines={1}>
-                            {isRoleMismatch
-                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
-                              : conversation?.lastMessage?.messageText ||
-                                t("chat_no_messages_yet", "No messages yet")}
-                          </Text>
-                        </View>
-                      </>
+                {isRoleMismatch
+                  ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                  : conversation?.lastMessagePreview ||
+                    t("chat_no_messages_yet", "No messages yet")}
+              </Text>
+            </View>
+          </>
                     )}
                   </View>
                 );

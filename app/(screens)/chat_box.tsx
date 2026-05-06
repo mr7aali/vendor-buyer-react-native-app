@@ -23,6 +23,7 @@ import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -143,6 +144,7 @@ const getCouponDisabledState = (coupon: any) => {
 const imageMediaTypes = (ImagePicker as any).MediaType?.Images
   ? [(ImagePicker as any).MediaType.Images]
   : ["images"];
+const MAX_CHAT_IMAGE_DIMENSION = 1280;
 
 const getImageMimeType = (uri: string) => {
   const lower = String(uri || "").toLowerCase();
@@ -151,6 +153,37 @@ const getImageMimeType = (uri: string) => {
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
   return "image/jpeg";
+};
+
+const optimizeChatImageAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+  const width = Number(asset?.width || 0);
+  const height = Number(asset?.height || 0);
+
+  let resize: { width?: number; height?: number } | undefined;
+  if (width && height) {
+    if (width >= height && width > MAX_CHAT_IMAGE_DIMENSION) {
+      resize = { width: MAX_CHAT_IMAGE_DIMENSION };
+    } else if (height > width && height > MAX_CHAT_IMAGE_DIMENSION) {
+      resize = { height: MAX_CHAT_IMAGE_DIMENSION };
+    }
+  } else {
+    resize = { width: MAX_CHAT_IMAGE_DIMENSION };
+  }
+
+  const manipulated = await manipulateAsync(
+    asset.uri,
+    resize ? [{ resize }] : [],
+    {
+      compress: 0.45,
+      format: SaveFormat.JPEG,
+    },
+  );
+
+  return {
+    uri: manipulated.uri,
+    mimeType: "image/jpeg",
+    fileName: `chat-image-${Date.now()}.jpg`,
+  };
 };
 
 const mapCouponToChatCouponData = (coupon: any): CouponData => {
@@ -931,7 +964,7 @@ const ChatBox: React.FC = () => {
       ? (normalizedRoleParam as "vendor" | "buyer")
       : detectedConversationRole || currentRole;
   const isRoleMismatch = conversationRole !== currentRole;
-  const isVendorSide = currentRole === "vendor";
+  const isVendorSide = conversationRole === "vendor";
   const couponPrefix = t("chat_coupon_message_prefix", "Sent a coupon");
   const legacyCouponPrefix = "Sent a coupon";
 
@@ -1280,7 +1313,58 @@ const ChatBox: React.FC = () => {
     }
   };
 
-  const handlePickPhoto = async () => {
+  const sendPickedImageAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!asset?.uri) return;
+
+    setShowOptions(false);
+    const optimizedAsset = await optimizeChatImageAsset(asset);
+    const mimeType =
+      optimizedAsset.mimeType || asset.mimeType || getImageMimeType(asset.uri);
+    const fileName =
+      optimizedAsset.fileName ||
+      asset.fileName ||
+      `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
+
+    const formData = new FormData();
+    formData.append("image", {
+      uri:
+        Platform.OS === "ios"
+          ? optimizedAsset.uri.replace("file://", "file://")
+          : optimizedAsset.uri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    let imageMessageUrl = "";
+
+    try {
+      const uploadResult = await uploadChatImage(formData).unwrap();
+      imageMessageUrl = String(uploadResult?.url || "");
+    } catch (uploadError: any) {
+      const isMissingUploadRoute =
+        uploadError?.status === 404 &&
+        String(uploadError?.data?.path || "").includes("/messages/upload-image");
+
+      if (!isMissingUploadRoute) {
+        throw uploadError;
+      }
+
+      // Fallback for deployments that support chat messages but do not expose
+      // a dedicated image-upload endpoint yet.
+      const base64Image = await FileSystem.readAsStringAsync(optimizedAsset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      imageMessageUrl = `data:${mimeType};base64,${base64Image}`;
+    }
+
+    if (!imageMessageUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    await handleSendMessage(imageMessageUrl, "image");
+  };
+
+  const handlePickPhotoFromGallery = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -1298,52 +1382,71 @@ const ChatBox: React.FC = () => {
       });
 
       if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if (!asset.uri) return;
-
-      const mimeType = asset.mimeType || getImageMimeType(asset.uri);
-      const fileName =
-        asset.fileName ||
-        `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
-
-      const formData = new FormData();
-      formData.append("image", {
-        uri: Platform.OS === "ios" ? asset.uri.replace("file://", "file://") : asset.uri,
-        name: fileName,
-        type: mimeType,
-      } as any);
-
-      let imageMessageUrl = "";
-
-      try {
-        const uploadResult = await uploadChatImage(formData).unwrap();
-        imageMessageUrl = String(uploadResult?.url || "");
-      } catch (uploadError: any) {
-        const isMissingUploadRoute =
-          uploadError?.status === 404 &&
-          String(uploadError?.data?.path || "").includes("/messages/upload-image");
-
-        if (!isMissingUploadRoute) {
-          throw uploadError;
-        }
-
-        // Fallback for deployments that support chat messages but do not expose
-        // a dedicated image-upload endpoint yet.
-        const base64Image = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        imageMessageUrl = `data:${mimeType};base64,${base64Image}`;
-      }
-
-      if (!imageMessageUrl) {
-        throw new Error("Image upload failed");
-      }
-
-      await handleSendMessage(imageMessageUrl, "image");
+      await sendPickedImageAsset(result.assets[0]);
     } catch (error) {
       console.error("Photo pick/send failed", error);
       Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
     }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          t("permission_required", "Permission Required"),
+          t("need_camera_permission", "Please grant camera permission."),
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: imageMediaTypes,
+        allowsEditing: true,
+        quality: 0.35,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+      await sendPickedImageAsset(result.assets[0]);
+    } catch (error) {
+      console.error("Camera photo/send failed", error);
+      Alert.alert(
+        t("error", "Error"),
+        t("failed_take_photo", "Failed to take photo."),
+      );
+    }
+  };
+
+  const handlePickPhoto = async () => {
+    setShowOptions(false);
+    Keyboard.dismiss();
+
+    Alert.alert(
+      t("chat_attachment_photo", "Photo"),
+      t("chat_photo_source_message", "Choose how you want to add a photo."),
+      [
+        {
+          text: t("chat_photo_take_photo", "Take Photo"),
+          onPress: () => {
+            setTimeout(() => {
+              handleTakePhoto();
+            }, 120);
+          },
+        },
+        {
+          text: t("chat_photo_choose_gallery", "Choose from Gallery"),
+          onPress: () => {
+            setTimeout(() => {
+              handlePickPhotoFromGallery();
+            }, 120);
+          },
+        },
+        {
+          text: t("cancel", "Cancel"),
+          style: "cancel",
+        },
+      ],
+    );
   };
 
   const formatTime = (dateStr: string) => {

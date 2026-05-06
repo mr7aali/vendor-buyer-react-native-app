@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useMemo, useState } from "react";
 import {
+  FlatList,
   Image,
   ScrollView,
   StyleSheet,
@@ -95,6 +96,27 @@ const resolveConversationAvatar = (partner: any) =>
   partner?.avatarUrl ||
   "https://via.placeholder.com/48";
 
+const isImageLikeMessageText = (value: any) => {
+  const text = String(value || "").trim();
+  if (!text) return false;
+
+  return (
+    /^data:image\//i.test(text) ||
+    /^file:\/\//i.test(text) ||
+    /^https?:\/\/.+\.(png|jpe?g|webp|gif|bmp)(\?.*)?$/i.test(text) ||
+    /res\.cloudinary\.com\/.+\/image\/upload\//i.test(text)
+  );
+};
+
+const buildMessagePreview = (value: any, t: any) => {
+  const text = String(value || "").trim();
+  if (!text) return t("chat_no_messages_yet", "No messages yet");
+  if (isImageLikeMessageText(text)) {
+    return t("chat_attachment_photo", "Photo");
+  }
+  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
+};
+
 const formatTime = (value: any) => {
   if (!value) return "";
   const date = new Date(value);
@@ -144,12 +166,20 @@ export default function ChatTabs() {
 
   const filteredConversations = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const rows = Array.isArray(conversationsData) ? conversationsData : [];
+    const rows = Array.isArray(conversationsData)
+      ? conversationsData.map((row: any) => ({
+          ...row,
+          lastMessagePreview: buildMessagePreview(
+            row?.lastMessage?.messageText || row?.lastMessage?.text,
+            t,
+          ),
+        }))
+      : [];
     if (!q) return rows;
     return rows.filter((row: any) => {
       const partner = resolveConversationPartner(row, currentUserId);
       const name = resolveDisplayName(partner, t("chat_user_fallback", "User"));
-      const text = row?.lastMessage?.messageText || "";
+      const text = row?.lastMessagePreview || "";
       return (
         String(name).toLowerCase().includes(q) ||
         String(text).toLowerCase().includes(q)
@@ -165,6 +195,138 @@ export default function ChatTabs() {
         ticket.customer.name.toLowerCase().includes(q),
     );
   }, [searchQuery]);
+
+  const renderConversationRow = ({
+    item: conversation,
+    index,
+  }: {
+    item: any;
+    index: number;
+  }) => {
+    const partner = resolveConversationPartner(conversation, currentUserId);
+    const partnerId =
+      resolveChatUserId(partner?.userId ? partner : null) ||
+      resolveChatUserId(partner) ||
+      resolveChatUserId(conversation?.partner) ||
+      normalizeId(conversation?.partnerId);
+    const displayName = resolveDisplayName(
+      partner,
+      t("chat_user_fallback", "User"),
+    );
+    const avatar = resolveConversationAvatar(partner);
+    const lastText =
+      conversation?.lastMessagePreview ||
+      t("chat_no_messages_yet", "No messages yet");
+    const unreadCount = Number(conversation?.unreadCount || 0);
+    const conversationRole =
+      resolveConversationRole(conversation, user) || "vendor";
+    const isRoleMismatch = conversationRole !== currentRole;
+    const messageId =
+      conversation?.lastMessage?.id || conversation?.lastMessage?._id;
+    const timeBlock = (
+      <View style={[styles.right, isRTL && styles.rightRtl]}>
+        <Text
+          style={[
+            styles.time,
+            unreadCount > 0 && styles.timeActive,
+            isRTL && styles.timeRtl,
+          ]}
+        >
+          {formatTime(conversation?.lastMessage?.createdAt)}
+        </Text>
+        {unreadCount > 0 ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{unreadCount}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+    const contentBlock = (
+      <View style={styles.rowMain}>
+        {isRTL ? (
+          <>
+            <View style={[styles.middle, styles.middleRtl]}>
+              <View style={[styles.nameRow, styles.nameRowRtl]}>
+                <Text style={[styles.name, styles.nameRtl]}>{displayName}</Text>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    isRoleMismatch && styles.roleBadgeMuted,
+                  ]}
+                >
+                  <Text style={styles.roleBadgeText}>
+                    {formatRoleLabel(conversationRole)} Chat
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.preview, styles.previewRtl]} numberOfLines={1}>
+                {isRoleMismatch
+                  ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                  : lastText}
+              </Text>
+            </View>
+            <Image source={{ uri: avatar }} style={styles.avatar} />
+          </>
+        ) : (
+          <>
+            <Image source={{ uri: avatar }} style={styles.avatar} />
+            <View style={styles.middle}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{displayName}</Text>
+                <View
+                  style={[
+                    styles.roleBadge,
+                    isRoleMismatch && styles.roleBadgeMuted,
+                  ]}
+                >
+                  <Text style={styles.roleBadgeText}>
+                    {formatRoleLabel(conversationRole)} Chat
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.preview} numberOfLines={1}>
+                {isRoleMismatch
+                  ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
+                  : lastText}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+    );
+
+    return (
+      <TouchableOpacity
+        key={normalizeId(
+          conversation?.id || conversation?._id || `${partnerId}-${index}`,
+        )}
+        style={styles.row}
+        onPress={async () => {
+          if (unreadCount > 0 && messageId) {
+            try {
+              await markAsRead(messageId).unwrap();
+            } catch {}
+          }
+
+          if (!partnerId) return;
+          router.push({
+            pathname: "/(screens)/chat_box",
+            params: {
+              role: conversationRole,
+              partnerId,
+              conversationId: normalizeId(
+                conversation?.id || conversation?._id || partnerId,
+              ),
+              fullname: displayName,
+            },
+          });
+        }}
+      >
+        {isRTL ? timeBlock : contentBlock}
+        {isRTL ? contentBlock : timeBlock}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, isRTL && styles.containerRtl]}>
@@ -217,156 +379,41 @@ export default function ChatTabs() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {activeTab === "chat" ? (
-          isConversationsLoading ? (
-            <ChatListSkeleton />
-          ) : (
-            <View style={styles.listWrap}>
-              {filteredConversations.length ? (
-                filteredConversations.map((conversation: any, index: number) => {
-                const partner = resolveConversationPartner(
-                  conversation,
-                  currentUserId,
-                );
-                const partnerId =
-                  resolveChatUserId(partner?.userId ? partner : null) ||
-                  resolveChatUserId(partner) ||
-                  resolveChatUserId(conversation?.partner) ||
-                  normalizeId(conversation?.partnerId);
-                const displayName = resolveDisplayName(
-                  partner,
-                  t("chat_user_fallback", "User"),
-                );
-                const avatar = resolveConversationAvatar(partner);
-                const lastText =
-                  conversation?.lastMessage?.messageText ||
-                  t("chat_no_messages_yet", "No messages yet");
-                const unreadCount = Number(conversation?.unreadCount || 0);
-                const conversationRole =
-                  resolveConversationRole(conversation, user) || "vendor";
-                const isRoleMismatch = conversationRole !== currentRole;
-                const messageId =
-                  conversation?.lastMessage?.id ||
-                  conversation?.lastMessage?._id;
-                const timeBlock = (
-                  <View style={[styles.right, isRTL && styles.rightRtl]}>
-                    <Text
-                      style={[
-                        styles.time,
-                        unreadCount > 0 && styles.timeActive,
-                        isRTL && styles.timeRtl,
-                      ]}
-                    >
-                      {formatTime(conversation?.lastMessage?.createdAt)}
-                    </Text>
-                    {unreadCount > 0 ? (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{unreadCount}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                );
-                const contentBlock = (
-                  <View style={styles.rowMain}>
-                    {isRTL ? (
-                      <>
-                        <View style={[styles.middle, styles.middleRtl]}>
-                          <View style={[styles.nameRow, styles.nameRowRtl]}>
-                            <Text style={[styles.name, styles.nameRtl]}>{displayName}</Text>
-                            <View
-                              style={[
-                                styles.roleBadge,
-                                isRoleMismatch && styles.roleBadgeMuted,
-                              ]}
-                            >
-                              <Text style={styles.roleBadgeText}>
-                                {formatRoleLabel(conversationRole)} Chat
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={[styles.preview, styles.previewRtl]} numberOfLines={1}>
-                            {isRoleMismatch
-                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
-                              : lastText}
-                          </Text>
-                        </View>
-                        <Image source={{ uri: avatar }} style={styles.avatar} />
-                      </>
-                    ) : (
-                      <>
-                        <Image source={{ uri: avatar }} style={styles.avatar} />
-                        <View style={styles.middle}>
-                          <View style={styles.nameRow}>
-                            <Text style={styles.name}>{displayName}</Text>
-                            <View
-                              style={[
-                                styles.roleBadge,
-                                isRoleMismatch && styles.roleBadgeMuted,
-                              ]}
-                            >
-                              <Text style={styles.roleBadgeText}>
-                                {formatRoleLabel(conversationRole)} Chat
-                              </Text>
-                            </View>
-                          </View>
-                          <Text style={styles.preview} numberOfLines={1}>
-                            {isRoleMismatch
-                              ? `This conversation belongs to your ${formatRoleLabel(conversationRole)} role.`
-                              : lastText}
-                          </Text>
-                        </View>
-                      </>
-                    )}
-                  </View>
-                );
-
-                return (
-                  <TouchableOpacity
-                    key={normalizeId(
-                      conversation?.id ||
-                        conversation?._id ||
-                        `${partnerId}-${index}`,
-                    )}
-                    style={styles.row}
-                    onPress={async () => {
-                      if (unreadCount > 0 && messageId) {
-                        try {
-                          await markAsRead(messageId).unwrap();
-                        } catch {}
-                      }
-
-                      if (!partnerId) return;
-                      router.push({
-                        pathname: "/(screens)/chat_box",
-                        params: {
-                          role: conversationRole,
-                          partnerId,
-                          conversationId: normalizeId(
-                            conversation?.id || conversation?._id || partnerId,
-                          ),
-                          fullname: displayName,
-                        },
-                      });
-                    }}
-                  >
-                    {isRTL ? timeBlock : contentBlock}
-                    {isRTL ? contentBlock : timeBlock}
-                  </TouchableOpacity>
-                );
-                })
-              ) : (
-                <Text style={styles.emptyText}>
-                  {t("chat_no_conversations_found", "No conversations found.")}
-                </Text>
-              )}
-            </View>
-          )
+      {activeTab === "chat" ? (
+        isConversationsLoading ? (
+          <ChatListSkeleton />
         ) : (
+          <FlatList
+            data={filteredConversations}
+            keyExtractor={(conversation, index) =>
+              normalizeId(
+                conversation?.id || conversation?._id || conversation?.partnerId,
+              ) || `conversation-${index}`
+            }
+            renderItem={renderConversationRow}
+            contentContainerStyle={[
+              styles.listWrap,
+              !filteredConversations.length && styles.emptyListWrap,
+              { paddingBottom: 20 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={7}
+            removeClippedSubviews
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>
+                {t("chat_no_conversations_found", "No conversations found.")}
+              </Text>
+            }
+          />
+        )
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.listWrap}>
             {filteredTickets.map((ticket) => (
               <View key={ticket.id} style={styles.supportCard}>
@@ -377,8 +424,8 @@ export default function ChatTabs() {
               </View>
             ))}
           </View>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -554,4 +601,5 @@ const styles = StyleSheet.create({
   },
   supportTitle: { fontSize: 15, fontWeight: "700", color: "#1F2937" },
   supportDesc: { fontSize: 13, color: "#6B7280", marginTop: 6 },
+  emptyListWrap: { flexGrow: 1 },
 });
