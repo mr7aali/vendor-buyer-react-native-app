@@ -258,6 +258,28 @@ const resolveChatUserId = (entity: any): string =>
       entity?._id ??
       entity,
   );
+
+const resolvePartnerConversationRole = (conversation: any, partnerData?: any) => {
+  const hasVendorSignals = Boolean(
+    conversation?.vendorId ||
+      conversation?.vendor ||
+      conversation?.partner?.vendor ||
+      conversation?.participant?.vendor ||
+      partnerData?.vendorProfileId,
+  );
+  const hasBuyerSignals = Boolean(
+    conversation?.buyerId ||
+      conversation?.buyer ||
+      conversation?.partner?.buyer ||
+      conversation?.participant?.buyer ||
+      partnerData?.buyerProfileId,
+  );
+
+  if (hasVendorSignals && !hasBuyerSignals) return "vendor" as const;
+  if (hasBuyerSignals && !hasVendorSignals) return "buyer" as const;
+  return null;
+};
+
 const resolveVendorProfileId = (entity: any): string =>
   normalizeId(
     entity?.vendor?.id ??
@@ -950,7 +972,11 @@ const ChatBox: React.FC = () => {
 
   // 1. Detect role from global state & storage (strictly vendor/buyer only)
   const normalizedRoleParam = String(roleParam || "").toLowerCase();
-  const currentRole = resolveCurrentRole(user, storedRole);
+  const resolvedCurrentRole = resolveCurrentRole(user, storedRole);
+  const currentRole: "vendor" | "buyer" =
+    normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
+      ? (normalizedRoleParam as "vendor" | "buyer")
+      : resolvedCurrentRole;
   const detectedConversationRole = useMemo(
     () =>
       resolveConversationRole(
@@ -959,11 +985,18 @@ const ChatBox: React.FC = () => {
       ),
     [matchedConversation, partnerData, user],
   );
+  const partnerConversationRole = useMemo(
+    () => resolvePartnerConversationRole(matchedConversation, partnerData),
+    [matchedConversation, partnerData],
+  );
   const conversationRole: "vendor" | "buyer" =
     normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
       ? (normalizedRoleParam as "vendor" | "buyer")
-      : detectedConversationRole || currentRole;
-  const isRoleMismatch = conversationRole !== currentRole;
+      : detectedConversationRole || partnerConversationRole || currentRole;
+  const isSameRoleConversation =
+    !!partnerConversationRole && partnerConversationRole === currentRole;
+  const isRoleMismatch =
+    !isSameRoleConversation && conversationRole !== currentRole;
   const isVendorSide = conversationRole === "vendor";
   const couponPrefix = t("chat_coupon_message_prefix", "Sent a coupon");
   const legacyCouponPrefix = "Sent a coupon";
@@ -1207,7 +1240,12 @@ const ChatBox: React.FC = () => {
     if (!targetPartnerId) return;
     try {
       // Vendor-sent coupons should be assigned before sending the chat message.
-      if (type === "coupon" && coupon && isVendorSide) {
+      if (
+        type === "coupon" &&
+        coupon &&
+        isVendorSide &&
+        partnerConversationRole === "buyer"
+      ) {
         // Try to find the actual buyer profile ID from messages if possible
         const buyerProfileId =
           normalizeId((partnerData as any)?.buyerProfileId) ||
@@ -1915,14 +1953,19 @@ const ChatBox: React.FC = () => {
   const handleOpenCustomerProfile = () => {
     if (shouldShowHeaderSkeleton) return;
 
+    const resolvedProfileType =
+      partnerConversationRole || (isVendorSide ? "buyer" : "vendor");
+    const resolvedProfileBadge =
+      resolvedProfileType === "vendor" ? "Vendor Profile" : "Buyer Profile";
+
     router.push({
       pathname: "/(screens)/customer_profile",
       params: {
         name: displayName || partnerData?.name || "Customer",
         avatar: partnerAvatar || partnerData?.avatar || "",
         partnerId: activePartnerId || canonicalPartnerId || "",
-        profileType: isVendorSide ? "buyer" : "vendor",
-        profileBadge: isVendorSide ? "Buyer Profile" : "Vendor Profile",
+        profileType: resolvedProfileType,
+        profileBadge: resolvedProfileBadge,
       },
     });
   };

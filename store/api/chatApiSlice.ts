@@ -362,14 +362,6 @@ export const chatApiSlice = apiSlice.injectEndpoints({
         }),
         sendMessage: builder.mutation<any, { receiverId: string; messageText: string }>({
             async queryFn(body, _api, _extraOptions, baseQuery) {
-                console.log('Sending message body:', body);
-                const socket = socketService.getSocket();
-
-                if (socket?.connected) {
-                    socket.emit('send_message', body);
-                    return { data: { success: true, via: 'socket' } };
-                }
-
                 const result = await baseQuery({
                     url: '/messages',
                     method: 'POST',
@@ -383,7 +375,6 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                 const state = getState() as any;
                 const currentUser = state.auth.user;
                 const currentUserId = resolveChatUserId(currentUser) || '';
-                console.log('SendMessage onQueryStarted - senderId:', currentUserId);
                 const tempId = Date.now().toString();
 
                 const optimisitcMessage = {
@@ -404,13 +395,28 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                 );
 
                 try {
-                    await queryFulfilled;
-                    dispatch(apiSlice.util.invalidateTags(['Chat']));
+                    const { data } = await queryFulfilled;
+                    const persistedMessage = normalizeMessage(data?.data ?? data);
+
+                    dispatch(
+                        chatApiSlice.util.updateQueryData('getMessages', receiverId, (draft) => {
+                            const optimisticIndex = draft.findIndex(
+                                (m: any) => normalizeId(m?._id || m?.id) === tempId,
+                            );
+
+                            if (optimisticIndex >= 0) {
+                                draft[optimisticIndex] = {
+                                    ...draft[optimisticIndex],
+                                    ...persistedMessage,
+                                    isOptimistic: false,
+                                };
+                            }
+                        }),
+                    );
                 } catch {
                     patchResult.undo();
                 }
             },
-            invalidatesTags: ['Chat'],
         }),
         markAsRead: builder.mutation<null, string>({
             async queryFn(messageId, _api, _extraOptions, baseQuery) {
