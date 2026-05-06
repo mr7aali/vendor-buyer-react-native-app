@@ -53,6 +53,14 @@ const resolveChatTargetFromVendor = (vendor: any) => ({
   name: getVendorDisplayName(vendor),
 });
 
+const resolveConnectedVendor = (response: any, fallbackVendor: any) =>
+  response?.data?.vendor ||
+  response?.vendor ||
+  response?.connection?.vendor ||
+  response?.data?.vendorId ||
+  response?.connection?.vendorId ||
+  fallbackVendor;
+
 const ExploreGridSkeleton = () => (
   <View style={styles.grid}>
     {Array.from({ length: 6 }).map((_, index) => (
@@ -79,6 +87,7 @@ export default function ExploreScreen() {
   const [search, setSearch] = React.useState("");
   const [connectingVendorId, setConnectingVendorId] = React.useState("");
   const trimmedSearch = search.trim();
+  const [connectToVendor] = useConnectToVendorMutation();
 
   const {
     data: exploreData,
@@ -89,7 +98,6 @@ export default function ExploreScreen() {
     trimmedSearch ? { search: trimmedSearch } : undefined,
     { refetchOnMountOrArgChange: true },
   );
-  const [connectToVendor] = useConnectToVendorMutation();
 
   const vendors = Array.isArray(exploreData)
     ? exploreData
@@ -97,79 +105,56 @@ export default function ExploreScreen() {
       ? (exploreData as any).items
       : [];
 
-  const handleOpenChat = React.useCallback(
-    (vendorLike: any) => {
-      const target = resolveChatTargetFromVendor(vendorLike);
-      if (!target.partnerId) {
+  const handleOpenVendorCategories = React.useCallback(
+    async (vendorLike: any) => {
+      const vendorCode = String(vendorLike?.vendorCode || "").trim();
+      const currentTarget = resolveChatTargetFromVendor(vendorLike);
+      const connectionKey = normalizeId(
+        vendorLike?.id || vendorLike?.vendor?.id || vendorCode,
+      );
+
+      if (!vendorCode && !currentTarget.vendorId) {
         Alert.alert(
           t("error", "Error"),
-          t("scan_failed_connect_qr", "Failed to connect via QR code"),
+          t("explore_no_vendors", "No vendors found."),
         );
         return;
       }
 
-      router.push({
-        pathname: "/(screens)/chat_box",
-        params: {
-          role: "buyer",
-          partnerId: target.partnerId,
-          vendorId: target.vendorId,
-          conversationId: target.partnerId,
-          fullname: target.name || t("scan_vendor", "Vendor"),
-          name: target.name || t("scan_vendor", "Vendor"),
-        },
-      });
-    },
-    [t],
-  );
-
-  const handleConnect = React.useCallback(
-    async (vendor: any) => {
-      if (vendor?.isConnected) {
-        handleOpenChat(vendor);
-        return;
-      }
-
       try {
-        setConnectingVendorId(normalizeId(vendor?.id || vendor?.vendorCode));
-        const response = await connectToVendor({
-          vendorCode: String(vendor?.vendorCode || ""),
-        }).unwrap();
+        setConnectingVendorId(connectionKey);
 
-        const connectedVendor =
-          response?.data?.vendor ||
-          response?.vendor ||
-          response?.connection?.vendor ||
-          response?.data?.vendorId ||
-          response?.connection?.vendorId ||
-          vendor;
+        let target = currentTarget;
 
-        handleOpenChat({
-          ...vendor,
-          ...connectedVendor,
-          isConnected: true,
-        });
-      } catch (error: any) {
-        const message = String(error?.data?.message || "");
-        if (
-          /already connected/i.test(message) ||
-          /buyer reconnected/i.test(message)
-        ) {
-          handleOpenChat(vendor);
-          return;
+        if (!vendorLike?.isConnected && vendorCode) {
+          const response = await connectToVendor({ vendorCode }).unwrap();
+          const connectedVendor = resolveConnectedVendor(response, vendorLike);
+          target = resolveChatTargetFromVendor(connectedVendor);
         }
 
-        console.error("Explore connect failed:", error);
+        if (!target.vendorId) {
+          throw new Error(t("explore_no_vendors", "No vendors found."));
+        }
+
+        router.push({
+          pathname: "/(users)/categoriesScreen",
+          params: {
+            vendorId: target.vendorId,
+          },
+        });
+      } catch (error: any) {
+        console.error("Explore vendor connect failed:", error);
         Alert.alert(
           t("error", "Error"),
           error?.data?.message ||
+            error?.message ||
             t("scan_failed_connect_qr", "Failed to connect via QR code"),
         );
       } finally {
         setConnectingVendorId("");
       }
     },
-    [connectToVendor, handleOpenChat, t],
+    [connectToVendor, t],
   );
 
   const renderVendorCard = (vendor: any) => {
@@ -179,10 +164,16 @@ export default function ExploreScreen() {
     const imageUri = resolveAbsoluteUrl(vendor?.logoUrl);
     const productsCount = Number(vendor?.counts?.products || 0);
     const categoriesCount = Number(vendor?.counts?.categories || 0);
-    const isThisVendorConnecting = connectingVendorId === cardKey;
+    const isConnecting = connectingVendorId === cardKey;
 
     return (
-      <View key={cardKey} style={styles.card}>
+      <TouchableOpacity
+        key={cardKey}
+        style={styles.card}
+        activeOpacity={0.9}
+        disabled={isConnecting}
+        onPress={() => handleOpenVendorCategories(vendor)}
+      >
         <Image
           source={{
             uri:
@@ -216,15 +207,16 @@ export default function ExploreScreen() {
           style={[
             styles.cardButton,
             vendor?.isConnected && styles.cardButtonConnected,
+            isConnecting && styles.cardButtonDisabled,
           ]}
           activeOpacity={0.85}
-          disabled={isThisVendorConnecting}
-          onPress={() => handleConnect(vendor)}
+          disabled={isConnecting}
+          onPress={() => handleOpenVendorCategories(vendor)}
         >
-          {isThisVendorConnecting ? (
+          {isConnecting ? (
             <ActivityIndicator
               size="small"
-              color={vendor?.isConnected ? "#FFFFFF" : "#2B6E6F"}
+              color={vendor?.isConnected ? "#1D5F61" : "#FFFFFF"}
             />
           ) : (
             <Text
@@ -233,13 +225,11 @@ export default function ExploreScreen() {
                 vendor?.isConnected && styles.cardButtonTextConnected,
               ]}
             >
-              {vendor?.isConnected
-                ? t("chat_title", "Chat")
-                : t("connect", "Connect")}
+              {t("chat_tab_categories", "Categories")}
             </Text>
           )}
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -352,7 +342,7 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 10,
+    padding: 9,
     borderWidth: 1,
     borderColor: "#DDEBE8",
     shadowColor: "#6AA8A1",
@@ -363,17 +353,17 @@ const styles = StyleSheet.create({
   },
   cardImage: {
     width: "100%",
-    height: 138,
+    height: 118,
     borderRadius: 18,
     backgroundColor: "#D9E8E6",
-    marginBottom: 14,
+    marginBottom: 10,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
     color: "#101010",
     textAlign: "center",
-    minHeight: 42,
+    minHeight: 36,
     paddingHorizontal: 4,
   },
   skeletonTitle: {
@@ -384,13 +374,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cardSubtitle: {
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 11,
+    lineHeight: 15,
     color: "#667085",
     textAlign: "center",
     minHeight: 5,
     marginTop: 0,
-    marginBottom: 10,
+    marginBottom: 8,
     paddingHorizontal: 4,
   },
   skeletonSubtitlePrimary: {
@@ -412,7 +402,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   skeletonMetaBadge: {
     flex: 1,
@@ -436,7 +426,7 @@ const styles = StyleSheet.create({
     color: "#2B6E6F",
   },
   cardButton: {
-    minHeight: 48,
+    minHeight: 42,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: "#6DA8A4",
@@ -445,8 +435,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   skeletonButton: {
-    minHeight: 48,
+    minHeight: 42,
     borderRadius: 16,
+  },
+  cardButtonDisabled: {
+    opacity: 0.8,
   },
   cardButtonConnected: {
     backgroundColor: "#2B6E6F",

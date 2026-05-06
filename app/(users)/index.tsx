@@ -1,8 +1,11 @@
 
 
 import { useGetProfileQuery, useGetUserVendorStatisticsQuery } from "@/store/api/authApiSlice";
-import { useGetOrdersQuery } from "@/store/api/orderApiSlice";
-import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonBlock } from "@/components/ui/skeleton";
+import {
+  useConnectToVendorMutation,
+  useGetExploreVendorsQuery,
+} from "@/store/api/connectionApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
 import { selectCurrentUser } from "@/store/slices/authSlice";
@@ -10,9 +13,11 @@ import { useTranslation } from "@/hooks/use-translation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Bell, Compass, QrCode, Star, TrendingUp, Zap } from "lucide-react-native";
+import { Bell, QrCode, TrendingUp, Zap } from "lucide-react-native";
 import React from "react";
 import {
+  ActivityIndicator,
+  Alert,
   BackHandler,
   Dimensions,
   Image,
@@ -31,8 +36,37 @@ const toNumber = (value: any, fallback = 0) => {
 };
 
 const formatMoney = (value: any) => `$${toNumber(value).toFixed(2)}`;
-const normalizeStatus = (value: any) => String(value || "pending").toLowerCase();
-const toTitle = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const normalizeId = (value: unknown) =>
+  value === undefined || value === null ? "" : String(value);
+const getVendorDisplayName = (vendor: any) =>
+  String(
+    vendor?.storename ||
+      vendor?.businessName ||
+      vendor?.fullName ||
+      vendor?.name ||
+      "Vendor",
+  );
+const getVendorSubtitle = (vendor: any) =>
+  String(
+    vendor?.businessDescription ||
+      vendor?.storeDescription ||
+      vendor?.address ||
+      vendor?.vendorCode ||
+      "",
+  );
+const resolveChatTargetFromVendor = (vendor: any) => ({
+  partnerId: normalizeId(vendor?.userId || vendor?.vendor?.userId),
+  vendorId: normalizeId(vendor?.id || vendor?.vendor?.id),
+  name: getVendorDisplayName(vendor),
+});
+
+const resolveConnectedVendor = (response: any, fallbackVendor: any) =>
+  response?.data?.vendor ||
+  response?.vendor ||
+  response?.connection?.vendor ||
+  response?.data?.vendorId ||
+  response?.connection?.vendorId ||
+  fallbackVendor;
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -45,10 +79,17 @@ const Dashboard: React.FC = () => {
     refetchOnFocus: true,
     refetchOnReconnect: true,
   });
-  const { data: ordersData = [] } = useGetOrdersQuery(undefined, {
+  const {
+    data: exploreData,
+    isLoading: isExploreLoading,
+    isFetching: isExploreFetching,
+  } = useGetExploreVendorsQuery(undefined, {
     refetchOnFocus: true,
     refetchOnReconnect: true,
+    refetchOnMountOrArgChange: true,
   });
+  const [connectToVendor] = useConnectToVendorMutation();
+  const [connectingVendorId, setConnectingVendorId] = React.useState("");
 
   const buyerProfile = React.useMemo(() => {
     const profileRoot = (profileData as any)?.data;
@@ -107,26 +148,66 @@ const Dashboard: React.FC = () => {
     ];
   }, [statsData, t]);
 
-  const recentOrders = React.useMemo(() => {
-    const sorted = [...ordersData].sort((a: any, b: any) => {
-      const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-    return sorted.slice(0, 3);
-  }, [ordersData]);
+  const previewVendors = React.useMemo(() => {
+    const vendors = Array.isArray(exploreData)
+      ? exploreData
+      : Array.isArray((exploreData as any)?.items)
+        ? (exploreData as any).items
+        : [];
+    return vendors.slice(0, 4);
+  }, [exploreData]);
 
-  const getStatusTheme = (statusValue: string) => {
-    const map: Record<string, { bg: string; text: string }> = {
-      pending: { bg: "#FFF3E0", text: "#E65100" },
-      processing: { bg: "#E3F2FD", text: "#0D47A1" },
-      shipped: { bg: "#E1F5FE", text: "#01579B" },
-      delivered: { bg: "#F3E5F5", text: "#4A148C" },
-      completed: { bg: "#E3F9E7", text: "#1B5E20" },
-      cancelled: { bg: "#FDEBEC", text: "#D43C49" },
-    };
-    return map[statusValue] || { bg: "#E8F0FE", text: "#3B82F6" };
-  };
+  const handleOpenVendorCategories = React.useCallback(
+    async (vendorLike: any) => {
+      const vendorCode = String(vendorLike?.vendorCode || "").trim();
+      const currentTarget = resolveChatTargetFromVendor(vendorLike);
+      const connectionKey = normalizeId(
+        vendorLike?.id || vendorLike?.vendor?.id || vendorCode,
+      );
+
+      if (!vendorCode && !currentTarget.vendorId) {
+        Alert.alert(
+          t("error", "Error"),
+          t("explore_no_vendors", "No vendors found."),
+        );
+        return;
+      }
+
+      try {
+        setConnectingVendorId(connectionKey);
+
+        let target = currentTarget;
+
+        if (!vendorLike?.isConnected && vendorCode) {
+          const response = await connectToVendor({ vendorCode }).unwrap();
+          const connectedVendor = resolveConnectedVendor(response, vendorLike);
+          target = resolveChatTargetFromVendor(connectedVendor);
+        }
+
+        if (!target.vendorId) {
+          throw new Error(t("explore_no_vendors", "No vendors found."));
+        }
+
+        router.push({
+          pathname: "/(users)/categoriesScreen",
+          params: {
+            vendorId: target.vendorId,
+          },
+        });
+      } catch (error: any) {
+        console.error("Dashboard vendor connect failed:", error);
+        Alert.alert(
+          t("error", "Error"),
+          error?.data?.message ||
+            error?.message ||
+            t("scan_failed_connect_qr", "Failed to connect via QR code"),
+        );
+      } finally {
+        setConnectingVendorId("");
+      }
+    },
+    [connectToVendor, t],
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -214,117 +295,100 @@ const Dashboard: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* How It Works Section */}
-        <View style={styles.howItWorksCard}>
-          <Text style={styles.sectionTitleWhite}>{t("how_it_works", "How It Works")}</Text>
-          <View style={styles.stepsList}>
-            <Text style={styles.stepItem}>
-              {t("how_step_1", "1. Scan a vendor s QR code or barcode")}
-            </Text>
-            <Text style={styles.stepItem}>
-              {t("how_step_2", "2. Browse their catalog and chat directly")}
-            </Text>
-            <Text style={styles.stepItem}>
-              {t("how_step_3", "3. Negotiate prices and place orders")}
-            </Text>
-            <Text style={styles.stepItem}>{t("how_step_4", "4. Track delivery in real-time")}</Text>
-          </View>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitleMain}>{t("explore", "Explore")}</Text>
+          <TouchableOpacity
+            onPress={() => router.push("/(users)/explore")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.viewAllText}>{t("view_all", "View All")}</Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.exploreButton}
-          onPress={() => router.push("/(users)/explore")}
-          activeOpacity={0.85}
-        >
-          <Compass size={22} color="#E9F7F5" />
-          <Text style={styles.exploreButtonText}>{t("explore", "Explore")}</Text>
-        </TouchableOpacity>
+        <View style={styles.previewGrid}>
+          {(isExploreLoading || isExploreFetching
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <View key={`preview-skeleton-${index}`} style={styles.previewCard}>
+                  <SkeletonBlock style={styles.previewImage} />
+                  <SkeletonBlock style={styles.previewTitle} />
+                  <SkeletonBlock style={styles.previewSubtitlePrimary} />
+                  <SkeletonBlock style={styles.previewSubtitleSecondary} />
+                  <View style={styles.previewMetaRow}>
+                    <SkeletonBlock style={styles.previewMetaBadge} />
+                    <SkeletonBlock style={styles.previewMetaBadge} />
+                  </View>
+                  <SkeletonBlock style={styles.previewButtonSkeleton} />
+                </View>
+              ))
+            : previewVendors.map((vendor: any) => {
+                const cardKey = normalizeId(vendor?.id || vendor?.vendorCode);
+                const name = getVendorDisplayName(vendor);
+                const subtitle = getVendorSubtitle(vendor);
+                const imageUri = resolveAbsoluteUrl(vendor?.logoUrl);
+                const productsCount = Number(vendor?.counts?.products || 0);
+                const categoriesCount = Number(vendor?.counts?.categories || 0);
+                const isConnecting = connectingVendorId === cardKey;
 
-        {/* Recent Order Section (Updated) */}
-        <Text style={styles.sectionTitleMain}>{t("recent_order", "Recent order")}</Text>
-
-        <View style={{ gap: 15 }}>
-          {recentOrders.length ? (
-            recentOrders.map((order: any) => {
-              const orderId = order?.id || order?._id;
-              const status = normalizeStatus(order?.status);
-              const statusTheme = getStatusTheme(status);
-              const firstItem = Array.isArray(order?.orderItems) ? order.orderItems[0] : null;
-              const coverImage =
-                firstItem?.product?.images?.[0] ||
-                firstItem?.product?.imageUrl ||
-                "https://via.placeholder.com/150";
-              const partyName =
-                order?.vendor?.fullName ||
-                order?.vendor?.storename ||
-                order?.buyer?.fullName ||
-                t("customer", "Customer");
-              const itemTitle =
-                firstItem?.product?.name ||
-                firstItem?.product?.title ||
-                `${Array.isArray(order?.orderItems) ? order.orderItems.length : 0} items`;
-              return (
-            <TouchableOpacity
-              key={orderId}
-              style={styles.orderCard}
-              onPress={() =>
-                router.push({
-                  pathname: "/(user_screen)/OrderDetails",
-                  params: { status, id: orderId },
-                })
-              }
-              activeOpacity={0.9}
-            >
-              <View style={styles.orderTopRow}>
-                <Image
-                  source={{
-                    uri: coverImage,
-                  }}
-                  style={styles.orderImage}
-                />
-                <View style={styles.orderInfoContainer}>
-                  <View style={styles.orderHeaderRow}>
-                    <Text style={styles.orderIdText} numberOfLines={1} ellipsizeMode="tail">
-                      {order?.orderNumber || `#${orderId}`}
+                return (
+                  <TouchableOpacity
+                    key={cardKey}
+                    style={styles.previewCard}
+                    activeOpacity={0.9}
+                    disabled={isConnecting}
+                    onPress={() => handleOpenVendorCategories(vendor)}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          imageUri ||
+                          "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1200&q=80",
+                      }}
+                      style={styles.previewImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.previewCardTitle} numberOfLines={2}>
+                      {name}
                     </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: statusTheme.bg }]}>
-                      <Text style={[styles.statusText, { color: statusTheme.text }]}>{toTitle(status)}</Text>
+                    <Text style={styles.previewCardSubtitle} numberOfLines={3}>
+                      {subtitle || t("explore_vendor_ready", "Ready to connect and chat")}
+                    </Text>
+                    <View style={styles.previewMetaRow}>
+                      <View style={styles.previewMetaBadgeSolid}>
+                        <Text style={styles.previewMetaText}>{productsCount} Products</Text>
+                      </View>
+                      <View style={styles.previewMetaBadgeSolid}>
+                        <Text style={styles.previewMetaText}>{categoriesCount} Categories</Text>
+                      </View>
                     </View>
-                  </View>
-
-                  <Text style={styles.orderAddress} numberOfLines={1}>
-                    {order?.shippingAddress || t("address_unavailable", "Address unavailable")}
-                  </Text>
-
-                  <View style={styles.ratingRow}>
-                    <Star color="#FFD700" size={16} fill="#FFD700" />
-                    <Text style={styles.ratingText} numberOfLines={2} ellipsizeMode="tail">
-                      {" 4.5 "}
-                      <Text style={styles.reviewCount}>({order?.buyer?.id || order?.vendor?.id || "N/A"})</Text>
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.orderBottomRow}>
-                <View>
-                  <Text style={styles.customerName}>{partyName}</Text>
-                  <Text style={styles.itemDetail}>
-                    {itemTitle}
-                  </Text>
-                </View>
-                <Text style={styles.orderPrice}>{formatMoney(order?.totalAmount || order?.totalPrice)}</Text>
-              </View>
-            </TouchableOpacity>
-              );
-            })
-          ) : (
-            <EmptyState
-              iconName="time-outline"
-              message={t("no_recent_orders_found", "No Recent Orders Found")}
-              subtitle={t("recent_orders_empty_hint", "Once you place orders, your latest activity will show up here.")}
-            />
-          )}
+                    <TouchableOpacity
+                      style={[
+                        styles.previewButton,
+                        vendor?.isConnected && styles.previewButtonConnected,
+                        isConnecting && styles.previewButtonDisabled,
+                      ]}
+                      activeOpacity={0.85}
+                      disabled={isConnecting}
+                      onPress={() => handleOpenVendorCategories(vendor)}
+                    >
+                      {isConnecting ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={vendor?.isConnected ? "#1D5F61" : "#FFFFFF"}
+                        />
+                      ) : (
+                        <Text
+                          style={[
+                            styles.previewButtonText,
+                            vendor?.isConnected && styles.previewButtonTextConnected,
+                          ]}
+                        >
+                          {t("chat_tab_categories", "Categories")}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                );
+              }))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -399,140 +463,139 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  howItWorksCard: {
-    backgroundColor: "#2D8C8C",
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 14,
-  },
-  sectionTitleWhite: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 15,
-  },
-  stepsList: { gap: 10 },
-  stepItem: { color: "#E0F2F2", fontSize: 14, lineHeight: 20 },
-  exploreButton: {
-    backgroundColor: "#2D8C8C",
-    borderRadius: 16,
-    minHeight: 58,
-    marginBottom: 25,
+  sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    shadowColor: "#1D6C6D",
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    justifyContent: "space-between",
+    marginBottom: 14,
+    marginTop: 2,
   },
-  exploreButtonText: {
-    fontSize: 18,
+  viewAllText: {
+    fontSize: 14,
     fontWeight: "700",
-    color: "#F5FFFE",
+    color: "#2D8C8C",
   },
   sectionTitleMain: {
     fontSize: 18,
     fontWeight: "700",
     color: "#2D8C8C",
-    marginBottom: 15,
   },
-
-  // New Order Card Styles
-  orderCard: {
+  previewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  previewCard: {
+    width: (width - 52) / 2,
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 15,
-    elevation: 3,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    borderRadius: 24,
+    padding: 9,
+    borderWidth: 1,
+    borderColor: "#DDEBE8",
+    shadowColor: "#6AA8A1",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  orderTopRow: {
-    flexDirection: "row",
-    marginBottom: 15,
+  previewImage: {
+    width: "100%",
+    height: 118,
+    borderRadius: 18,
+    backgroundColor: "#D9E8E6",
+    marginBottom: 10,
   },
-  orderImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-  },
-  orderInfoContainer: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: "center",
-  },
-  orderHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  orderIdText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#333",
-    flex: 1,
-    flexShrink: 1,
-    marginRight: 8,
-  },
-  statusBadge: {
-    backgroundColor: "#E8F0FE",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    flexShrink: 0,
-    alignSelf: "flex-start",
-  },
-  statusText: {
-    fontSize: 11,
-    color: "#3B82F6",
-    fontWeight: "600",
-  },
-  orderAddress: {
-    fontSize: 12,
-    color: "#888",
-    marginVertical: 4,
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#333",
-    flex: 1,
-    flexShrink: 1,
-  },
-  reviewCount: {
-    fontWeight: "400",
-    color: "#888",
-  },
-  orderBottomRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F7FBF9",
-    padding: 12,
-    borderRadius: 12,
-  },
-  customerName: {
+  previewCardTitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#2D8C8C",
+    fontWeight: "700",
+    color: "#101010",
+    textAlign: "center",
+    minHeight: 36,
+    paddingHorizontal: 4,
   },
-  itemDetail: {
+  previewCardSubtitle: {
     fontSize: 11,
-    color: "#888",
+    lineHeight: 15,
+    color: "#667085",
+    textAlign: "center",
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  previewMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 6,
+    marginBottom: 8,
+  },
+  previewMetaBadgeSolid: {
+    flex: 1,
+    minHeight: 30,
+    borderRadius: 12,
+    backgroundColor: "#F4FBFA",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+  },
+  previewMetaText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2B6E6F",
+  },
+  previewButton: {
+    minHeight: 42,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#6DA8A4",
+    backgroundColor: "#ECFBF9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  previewButtonDisabled: {
+    opacity: 0.8,
+  },
+  previewButtonConnected: {
+    backgroundColor: "#2B6E6F",
+    borderColor: "#2B6E6F",
+  },
+  previewButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2B6E6F",
+  },
+  previewButtonTextConnected: {
+    color: "#FFFFFF",
+  },
+  previewTitle: {
+    width: "76%",
+    height: 16,
+    borderRadius: 8,
+    alignSelf: "center",
     marginTop: 2,
   },
-  orderPrice: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2D8C8C",
+  previewSubtitlePrimary: {
+    width: "92%",
+    height: 12,
+    borderRadius: 6,
+    alignSelf: "center",
+    marginTop: 10,
+  },
+  previewSubtitleSecondary: {
+    width: "72%",
+    height: 12,
+    borderRadius: 6,
+    alignSelf: "center",
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  previewMetaBadge: {
+    flex: 1,
+    minHeight: 30,
+    borderRadius: 12,
+  },
+  previewButtonSkeleton: {
+    minHeight: 42,
+    borderRadius: 16,
   },
 });
 

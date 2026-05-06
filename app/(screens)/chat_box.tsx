@@ -23,6 +23,7 @@ import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as FileSystem from "expo-file-system/legacy";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -143,6 +144,7 @@ const getCouponDisabledState = (coupon: any) => {
 const imageMediaTypes = (ImagePicker as any).MediaType?.Images
   ? [(ImagePicker as any).MediaType.Images]
   : ["images"];
+const MAX_CHAT_IMAGE_DIMENSION = 1280;
 
 const getImageMimeType = (uri: string) => {
   const lower = String(uri || "").toLowerCase();
@@ -151,6 +153,37 @@ const getImageMimeType = (uri: string) => {
   if (lower.endsWith(".webp")) return "image/webp";
   if (lower.endsWith(".gif")) return "image/gif";
   return "image/jpeg";
+};
+
+const optimizeChatImageAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+  const width = Number(asset?.width || 0);
+  const height = Number(asset?.height || 0);
+
+  let resize: { width?: number; height?: number } | undefined;
+  if (width && height) {
+    if (width >= height && width > MAX_CHAT_IMAGE_DIMENSION) {
+      resize = { width: MAX_CHAT_IMAGE_DIMENSION };
+    } else if (height > width && height > MAX_CHAT_IMAGE_DIMENSION) {
+      resize = { height: MAX_CHAT_IMAGE_DIMENSION };
+    }
+  } else {
+    resize = { width: MAX_CHAT_IMAGE_DIMENSION };
+  }
+
+  const manipulated = await manipulateAsync(
+    asset.uri,
+    resize ? [{ resize }] : [],
+    {
+      compress: 0.45,
+      format: SaveFormat.JPEG,
+    },
+  );
+
+  return {
+    uri: manipulated.uri,
+    mimeType: "image/jpeg",
+    fileName: `chat-image-${Date.now()}.jpg`,
+  };
 };
 
 const mapCouponToChatCouponData = (coupon: any): CouponData => {
@@ -225,6 +258,28 @@ const resolveChatUserId = (entity: any): string =>
       entity?._id ??
       entity,
   );
+
+const resolvePartnerConversationRole = (conversation: any, partnerData?: any) => {
+  const hasVendorSignals = Boolean(
+    conversation?.vendorId ||
+      conversation?.vendor ||
+      conversation?.partner?.vendor ||
+      conversation?.participant?.vendor ||
+      partnerData?.vendorProfileId,
+  );
+  const hasBuyerSignals = Boolean(
+    conversation?.buyerId ||
+      conversation?.buyer ||
+      conversation?.partner?.buyer ||
+      conversation?.participant?.buyer ||
+      partnerData?.buyerProfileId,
+  );
+
+  if (hasVendorSignals && !hasBuyerSignals) return "vendor" as const;
+  if (hasBuyerSignals && !hasVendorSignals) return "buyer" as const;
+  return null;
+};
+
 const resolveVendorProfileId = (entity: any): string =>
   normalizeId(
     entity?.vendor?.id ??
@@ -917,7 +972,11 @@ const ChatBox: React.FC = () => {
 
   // 1. Detect role from global state & storage (strictly vendor/buyer only)
   const normalizedRoleParam = String(roleParam || "").toLowerCase();
-  const currentRole = resolveCurrentRole(user, storedRole);
+  const resolvedCurrentRole = resolveCurrentRole(user, storedRole);
+  const currentRole: "vendor" | "buyer" =
+    normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
+      ? (normalizedRoleParam as "vendor" | "buyer")
+      : resolvedCurrentRole;
   const detectedConversationRole = useMemo(
     () =>
       resolveConversationRole(
@@ -926,53 +985,35 @@ const ChatBox: React.FC = () => {
       ),
     [matchedConversation, partnerData, user],
   );
+  const partnerConversationRole = useMemo(
+    () => resolvePartnerConversationRole(matchedConversation, partnerData),
+    [matchedConversation, partnerData],
+  );
   const conversationRole: "vendor" | "buyer" =
     normalizedRoleParam === "vendor" || normalizedRoleParam === "buyer"
       ? (normalizedRoleParam as "vendor" | "buyer")
-      : detectedConversationRole || currentRole;
-  const isRoleMismatch = conversationRole !== currentRole;
-  const isVendorSide = currentRole === "vendor";
+      : detectedConversationRole || partnerConversationRole || currentRole;
+  const isSameRoleConversation =
+    !!partnerConversationRole && partnerConversationRole === currentRole;
+  const isRoleMismatch =
+    !isSameRoleConversation && conversationRole !== currentRole;
+  const isVendorSide = conversationRole === "vendor";
   const couponPrefix = t("chat_coupon_message_prefix", "Sent a coupon");
   const legacyCouponPrefix = "Sent a coupon";
 
   // 2. Define Tab Configuration dynamically - SWAPPED as per user request
-  const tabs = isVendorSide
-    ? [
-        {
-          key: "chat" as const,
-          label: t("chat_tab_chat", "Chat"),
-          action: () => setActiveTab("chat"),
-        },
-        {
-          key: "order_history" as const,
-          label: t("chat_tab_order_history", "Order History"),
-          action: () => setActiveTab("order_history"),
-        },
-      ]
-    : [
-        {
-          key: "chat" as const,
-          label: t("chat_tab_chat", "Chat"),
-          action: () => setActiveTab("chat"),
-        },
-        {
-          key: "categories" as const,
-          label: t("chat_tab_categories", "Categories"),
-          action: () =>
-            router.push({
-              pathname: "/(users)/categoriesScreen",
-              params: {
-                vendorId: buyerVendorProfileId,
-                vendorName: displayName,
-              },
-            }),
-        },
-        {
-          key: "order_history" as const,
-          label: t("chat_tab_order_history", "Order History"),
-          action: () => router.push("/(user_screen)/OrderHistoryScreen"),
-        },
-      ];
+  const tabs = [
+    {
+      key: "chat" as const,
+      label: t("chat_tab_chat", "Chat"),
+      action: () => setActiveTab("chat"),
+    },
+    {
+      key: "order_history" as const,
+      label: t("chat_tab_order_history", "Order History"),
+      action: () => setActiveTab("order_history"),
+    },
+  ];
 
   // API Queries
   const { data: messagesData, isLoading: messagesLoading } =
@@ -1024,17 +1065,17 @@ const ChatBox: React.FC = () => {
 
   // Map API coupons to component format
   const availableCoupons = React.useMemo(() => {
-    if (!vendorCouponsData || !Array.isArray(vendorCouponsData)) {
-      console.log(
-        "ChatBox - vendorCouponsData is not an array:",
-        vendorCouponsData,
-      );
-      return [];
-    }
-    return vendorCouponsData
+    const sourceCoupons =
+      isVendorSide && Array.isArray(vendorCouponsData)
+        ? vendorCouponsData
+        : Array.isArray(buyerCouponsData)
+          ? buyerCouponsData
+          : [];
+
+    return sourceCoupons
       .filter((coupon) => !getCouponDisabledState(coupon).isDisabled)
       .map(mapCouponToChatCouponData);
-  }, [vendorCouponsData]);
+  }, [buyerCouponsData, isVendorSide, vendorCouponsData]);
 
   const knownCouponsByCode = React.useMemo(() => {
     const sourceCoupons =
@@ -1197,12 +1238,14 @@ const ChatBox: React.FC = () => {
     if (!text.trim() && type === "text") return;
     const targetPartnerId = canonicalPartnerId || activePartnerId;
     if (!targetPartnerId) return;
-    if (type === "coupon" && !isVendorSide) {
-      return;
-    }
     try {
-      // If sending a coupon, assign it to the buyer first
-      if (type === "coupon" && coupon) {
+      // Vendor-sent coupons should be assigned before sending the chat message.
+      if (
+        type === "coupon" &&
+        coupon &&
+        isVendorSide &&
+        partnerConversationRole === "buyer"
+      ) {
         // Try to find the actual buyer profile ID from messages if possible
         const buyerProfileId =
           normalizeId((partnerData as any)?.buyerProfileId) ||
@@ -1280,7 +1323,58 @@ const ChatBox: React.FC = () => {
     }
   };
 
-  const handlePickPhoto = async () => {
+  const sendPickedImageAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!asset?.uri) return;
+
+    setShowOptions(false);
+    const optimizedAsset = await optimizeChatImageAsset(asset);
+    const mimeType =
+      optimizedAsset.mimeType || asset.mimeType || getImageMimeType(asset.uri);
+    const fileName =
+      optimizedAsset.fileName ||
+      asset.fileName ||
+      `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
+
+    const formData = new FormData();
+    formData.append("image", {
+      uri:
+        Platform.OS === "ios"
+          ? optimizedAsset.uri.replace("file://", "file://")
+          : optimizedAsset.uri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    let imageMessageUrl = "";
+
+    try {
+      const uploadResult = await uploadChatImage(formData).unwrap();
+      imageMessageUrl = String(uploadResult?.url || "");
+    } catch (uploadError: any) {
+      const isMissingUploadRoute =
+        uploadError?.status === 404 &&
+        String(uploadError?.data?.path || "").includes("/messages/upload-image");
+
+      if (!isMissingUploadRoute) {
+        throw uploadError;
+      }
+
+      // Fallback for deployments that support chat messages but do not expose
+      // a dedicated image-upload endpoint yet.
+      const base64Image = await FileSystem.readAsStringAsync(optimizedAsset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      imageMessageUrl = `data:${mimeType};base64,${base64Image}`;
+    }
+
+    if (!imageMessageUrl) {
+      throw new Error("Image upload failed");
+    }
+
+    await handleSendMessage(imageMessageUrl, "image");
+  };
+
+  const handlePickPhotoFromGallery = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -1298,52 +1392,71 @@ const ChatBox: React.FC = () => {
       });
 
       if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if (!asset.uri) return;
-
-      const mimeType = asset.mimeType || getImageMimeType(asset.uri);
-      const fileName =
-        asset.fileName ||
-        `chat-image-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`;
-
-      const formData = new FormData();
-      formData.append("image", {
-        uri: Platform.OS === "ios" ? asset.uri.replace("file://", "file://") : asset.uri,
-        name: fileName,
-        type: mimeType,
-      } as any);
-
-      let imageMessageUrl = "";
-
-      try {
-        const uploadResult = await uploadChatImage(formData).unwrap();
-        imageMessageUrl = String(uploadResult?.url || "");
-      } catch (uploadError: any) {
-        const isMissingUploadRoute =
-          uploadError?.status === 404 &&
-          String(uploadError?.data?.path || "").includes("/messages/upload-image");
-
-        if (!isMissingUploadRoute) {
-          throw uploadError;
-        }
-
-        // Fallback for deployments that support chat messages but do not expose
-        // a dedicated image-upload endpoint yet.
-        const base64Image = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        imageMessageUrl = `data:${mimeType};base64,${base64Image}`;
-      }
-
-      if (!imageMessageUrl) {
-        throw new Error("Image upload failed");
-      }
-
-      await handleSendMessage(imageMessageUrl, "image");
+      await sendPickedImageAsset(result.assets[0]);
     } catch (error) {
       console.error("Photo pick/send failed", error);
       Alert.alert(t("error", "Error"), t("failed_pick_image", "Failed to pick image."));
     }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          t("permission_required", "Permission Required"),
+          t("need_camera_permission", "Please grant camera permission."),
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: imageMediaTypes,
+        allowsEditing: true,
+        quality: 0.35,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+      await sendPickedImageAsset(result.assets[0]);
+    } catch (error) {
+      console.error("Camera photo/send failed", error);
+      Alert.alert(
+        t("error", "Error"),
+        t("failed_take_photo", "Failed to take photo."),
+      );
+    }
+  };
+
+  const handlePickPhoto = async () => {
+    setShowOptions(false);
+    Keyboard.dismiss();
+
+    Alert.alert(
+      t("chat_attachment_photo", "Photo"),
+      t("chat_photo_source_message", "Choose how you want to add a photo."),
+      [
+        {
+          text: t("chat_photo_take_photo", "Take Photo"),
+          onPress: () => {
+            setTimeout(() => {
+              handleTakePhoto();
+            }, 120);
+          },
+        },
+        {
+          text: t("chat_photo_choose_gallery", "Choose from Gallery"),
+          onPress: () => {
+            setTimeout(() => {
+              handlePickPhotoFromGallery();
+            }, 120);
+          },
+        },
+        {
+          text: t("cancel", "Cancel"),
+          style: "cancel",
+        },
+      ],
+    );
   };
 
   const formatTime = (dateStr: string) => {
@@ -1837,13 +1950,38 @@ const ChatBox: React.FC = () => {
     }
   };
 
+  const handleOpenCustomerProfile = () => {
+    if (shouldShowHeaderSkeleton) return;
+
+    const resolvedProfileType =
+      partnerConversationRole || (isVendorSide ? "buyer" : "vendor");
+    const resolvedProfileBadge =
+      resolvedProfileType === "vendor" ? "Vendor Profile" : "Buyer Profile";
+
+    router.push({
+      pathname: "/(screens)/customer_profile",
+      params: {
+        name: displayName || partnerData?.name || "Customer",
+        avatar: partnerAvatar || partnerData?.avatar || "",
+        partnerId: activePartnerId || canonicalPartnerId || "",
+        profileType: resolvedProfileType,
+        profileBadge: resolvedProfileBadge,
+      },
+    });
+  };
+
   const renderHeader = () => {
     return (
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#333" />
         </TouchableOpacity>
-        <View style={styles.headerPartnerContainer}>
+        <TouchableOpacity
+          style={styles.headerPartnerContainer}
+          onPress={handleOpenCustomerProfile}
+          activeOpacity={0.85}
+          disabled={shouldShowHeaderSkeleton}
+        >
           <View style={styles.avatarContainer}>
             {shouldShowHeaderSkeleton ? (
               <SkeletonBlock style={styles.headerAvatar} />
@@ -1882,7 +2020,7 @@ const ChatBox: React.FC = () => {
               </>
             )}
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -2076,13 +2214,11 @@ const ChatBox: React.FC = () => {
                     label={t("chat_attachment_photo", "Photo")}
                     onPress={handlePickPhoto}
                   />
-                  {isVendorSide && (
-                    <AttachmentBtn
-                      icon="confirmation-number"
-                      label={t("chat_attachment_coupon", "Coupon")}
-                      onPress={() => setShowCouponModal(true)}
-                    />
-                  )}
+                  <AttachmentBtn
+                    icon="confirmation-number"
+                    label={t("chat_attachment_coupon", "Coupon")}
+                    onPress={() => setShowCouponModal(true)}
+                  />
                 </View>
                 {isUploadingImage ? (
                   <View style={styles.imageUploadStatus}>
