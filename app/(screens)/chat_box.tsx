@@ -969,43 +969,18 @@ const ChatBox: React.FC = () => {
   const legacyCouponPrefix = "Sent a coupon";
 
   // 2. Define Tab Configuration dynamically - SWAPPED as per user request
-  const tabs = isVendorSide
-    ? [
-        {
-          key: "chat" as const,
-          label: t("chat_tab_chat", "Chat"),
-          action: () => setActiveTab("chat"),
-        },
-        {
-          key: "order_history" as const,
-          label: t("chat_tab_order_history", "Order History"),
-          action: () => setActiveTab("order_history"),
-        },
-      ]
-    : [
-        {
-          key: "chat" as const,
-          label: t("chat_tab_chat", "Chat"),
-          action: () => setActiveTab("chat"),
-        },
-        {
-          key: "categories" as const,
-          label: t("chat_tab_categories", "Categories"),
-          action: () =>
-            router.push({
-              pathname: "/(users)/categoriesScreen",
-              params: {
-                vendorId: buyerVendorProfileId,
-                vendorName: displayName,
-              },
-            }),
-        },
-        {
-          key: "order_history" as const,
-          label: t("chat_tab_order_history", "Order History"),
-          action: () => router.push("/(user_screen)/OrderHistoryScreen"),
-        },
-      ];
+  const tabs = [
+    {
+      key: "chat" as const,
+      label: t("chat_tab_chat", "Chat"),
+      action: () => setActiveTab("chat"),
+    },
+    {
+      key: "order_history" as const,
+      label: t("chat_tab_order_history", "Order History"),
+      action: () => setActiveTab("order_history"),
+    },
+  ];
 
   // API Queries
   const { data: messagesData, isLoading: messagesLoading } =
@@ -1057,17 +1032,17 @@ const ChatBox: React.FC = () => {
 
   // Map API coupons to component format
   const availableCoupons = React.useMemo(() => {
-    if (!vendorCouponsData || !Array.isArray(vendorCouponsData)) {
-      console.log(
-        "ChatBox - vendorCouponsData is not an array:",
-        vendorCouponsData,
-      );
-      return [];
-    }
-    return vendorCouponsData
+    const sourceCoupons =
+      isVendorSide && Array.isArray(vendorCouponsData)
+        ? vendorCouponsData
+        : Array.isArray(buyerCouponsData)
+          ? buyerCouponsData
+          : [];
+
+    return sourceCoupons
       .filter((coupon) => !getCouponDisabledState(coupon).isDisabled)
       .map(mapCouponToChatCouponData);
-  }, [vendorCouponsData]);
+  }, [buyerCouponsData, isVendorSide, vendorCouponsData]);
 
   const knownCouponsByCode = React.useMemo(() => {
     const sourceCoupons =
@@ -1230,12 +1205,9 @@ const ChatBox: React.FC = () => {
     if (!text.trim() && type === "text") return;
     const targetPartnerId = canonicalPartnerId || activePartnerId;
     if (!targetPartnerId) return;
-    if (type === "coupon" && !isVendorSide) {
-      return;
-    }
     try {
-      // If sending a coupon, assign it to the buyer first
-      if (type === "coupon" && coupon) {
+      // Vendor-sent coupons should be assigned before sending the chat message.
+      if (type === "coupon" && coupon && isVendorSide) {
         // Try to find the actual buyer profile ID from messages if possible
         const buyerProfileId =
           normalizeId((partnerData as any)?.buyerProfileId) ||
@@ -2199,13 +2171,11 @@ const ChatBox: React.FC = () => {
                     label={t("chat_attachment_photo", "Photo")}
                     onPress={handlePickPhoto}
                   />
-                  {isVendorSide && (
-                    <AttachmentBtn
-                      icon="confirmation-number"
-                      label={t("chat_attachment_coupon", "Coupon")}
-                      onPress={() => setShowCouponModal(true)}
-                    />
-                  )}
+                  <AttachmentBtn
+                    icon="confirmation-number"
+                    label={t("chat_attachment_coupon", "Coupon")}
+                    onPress={() => setShowCouponModal(true)}
+                  />
                 </View>
                 {isUploadingImage ? (
                   <View style={styles.imageUploadStatus}>
