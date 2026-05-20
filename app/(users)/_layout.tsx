@@ -1,3 +1,4 @@
+import { useUnreadChatCount } from "@/hooks/use-unread-chat-count";
 import { Tabs } from "expo-router";
 import {
   Home,
@@ -17,6 +18,7 @@ export default function UsersLayout() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const user = useSelector((state: RootState) => state.auth.user as any);
+  const unreadChatCount = useUnreadChatCount();
   const profileImageUri =
     user?.buyer?.profilePhotoUrl ||
     user?.buyer?.avatar ||
@@ -25,6 +27,8 @@ export default function UsersLayout() {
     user?.logo ||
     user?.profilePhotoUrl ||
     "";
+  const chatBadgeValue =
+    unreadChatCount > 99 ? "99+" : unreadChatCount > 0 ? unreadChatCount : undefined;
 
   return (
     <Tabs
@@ -62,6 +66,16 @@ export default function UsersLayout() {
         name="chat"
         options={{
           title: t("tab_chat", "Chat"),
+          tabBarBadge: chatBadgeValue,
+          tabBarBadgeStyle: {
+            backgroundColor: "#E74C3C",
+            color: "#FFFFFF",
+            fontSize: 10,
+            fontWeight: "700",
+            minWidth: 18,
+            height: 18,
+            lineHeight: 12,
+          },
           tabBarIcon: ({ color }) => <MessageCircle size={24} color={color} />,
         }}
       />

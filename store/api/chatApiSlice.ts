@@ -213,8 +213,10 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                         dispatch(apiSlice.util.invalidateTags(['Chat']));
                     };
                     socket.on('new_message', listener);
+                    socket.on('message_read', listener);
                     await cacheEntryRemoved;
                     socket.off('new_message', listener);
+                    socket.off('message_read', listener);
                 } catch {
                 }
             },
@@ -434,6 +436,7 @@ export const chatApiSlice = apiSlice.injectEndpoints({
                 if (result.error) return { error: result.error as any };
                 return { data: null };
             },
+            invalidatesTags: ['Chat'],
         }),
     }),
 });
