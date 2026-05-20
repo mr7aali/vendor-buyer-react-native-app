@@ -11,6 +11,19 @@ import { router } from "expo-router";
 import React from "react";
 import { ActivityIndicator, View } from "react-native";
 
+const parseJsonResponse = async (response: Response) => {
+  const text = await response.text();
+  if (!text.trim()) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+};
+
+const extractAuthPayload = (payload: any) => payload?.data ?? payload;
+
 const resolveRouteFromRole = (role: unknown) => {
   const normalizedRole = String(role || "").toLowerCase();
 
@@ -61,6 +74,34 @@ export default function AppIndex() {
 
         const profileUrl = buildApiUrl("/auth/me?profile=true");
         const canValidateSession = /^https?:\/\//i.test(profileUrl);
+        const fetchProfile = (accessToken: string) =>
+          fetch(profileUrl, {
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+        const tryRefreshSession = async (refreshToken: string) => {
+          const refreshUrl = buildApiUrl("/auth/refresh");
+          if (!/^https?:\/\//i.test(refreshUrl)) {
+            return null;
+          }
+
+          const refreshResponse = await fetch(refreshUrl, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (!refreshResponse.ok) {
+            return null;
+          }
+
+          return extractAuthPayload(await parseJsonResponse(refreshResponse));
+        };
 
         if (!canValidateSession) {
           if (isMounted) {
@@ -69,12 +110,30 @@ export default function AppIndex() {
           return;
         }
 
-        const response = await fetch(profileUrl, {
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${persistedAuth.accessToken}`,
-          },
-        });
+        let activeAccessToken = persistedAuth.accessToken;
+        let activeRefreshToken = persistedAuth.refreshToken || null;
+        let response = await fetchProfile(activeAccessToken);
+
+        if (!response.ok && activeRefreshToken) {
+          const refreshedSession = await tryRefreshSession(activeRefreshToken);
+
+          if (refreshedSession?.accessToken) {
+            activeAccessToken = refreshedSession.accessToken;
+            activeRefreshToken =
+              refreshedSession.refreshToken || activeRefreshToken;
+
+            dispatch(
+              setCredentials({
+                user: null,
+                accessToken: activeAccessToken,
+                refreshToken: activeRefreshToken,
+                availableProfiles: persistedAuth.availableProfiles,
+              }),
+            );
+
+            response = await fetchProfile(activeAccessToken);
+          }
+        }
 
         if (!response.ok) {
           await clearPersistedAuthState();
@@ -94,15 +153,15 @@ export default function AppIndex() {
         dispatch(
           setCredentials({
             user: profile,
-            accessToken: persistedAuth.accessToken,
-            refreshToken: persistedAuth.refreshToken || "",
+            accessToken: activeAccessToken,
+            refreshToken: activeRefreshToken,
             availableProfiles: persistedAuth.availableProfiles,
           }),
         );
 
         await persistAuthState({
-          accessToken: persistedAuth.accessToken,
-          refreshToken: persistedAuth.refreshToken,
+          accessToken: activeAccessToken,
+          refreshToken: activeRefreshToken,
           user: profile,
           availableProfiles: persistedAuth.availableProfiles,
         });

@@ -122,15 +122,19 @@ const ChangePasswordScreen = () => {
                         elevation: 3,
                     }}
                     onPress={async () => {
+                        if (!currentPassword || !newPassword || !confirmPassword) {
+                            Alert.alert(t("error", "Error"), t("cp_fill_all_fields", "Please fill in all password fields"));
+                            return;
+                        }
                         if (newPassword !== confirmPassword) {
                             Alert.alert(t("error", "Error"), t("cp_passwords_not_match", "New passwords do not match"));
                             return;
                         }
                         try {
-                            // Using the dedicated change-password endpoint
                             await changePassword({
-                                oldPassword: currentPassword,
-                                newPassword: newPassword
+                                currentPassword,
+                                newPassword,
+                                confirmPassword,
                             }).unwrap();
                             Alert.alert(t("success", "Success"), t("cp_updated_successfully", "Password updated successfully"), [
                                 { text: t("ok", "OK"), onPress: () => router.back() }

@@ -81,8 +81,8 @@ export default function LoginScreen() {
       return {
         welcomeBack: "ברוך שובך",
         loginToAccount: "התחבר לחשבון שלך",
-        enterEmail: "הזן אימייל או טלפון",
-        emailAddress: "כתובת אימייל או טלפון",
+        enterEmail: "הזן אימייל",
+        emailAddress: "כתובת אימייל",
         password: "סיסמה",
         rememberMe: "זכור אותי",
         forgotPassword: "שכחת סיסמה?",
@@ -108,7 +108,7 @@ export default function LoginScreen() {
         biometricCancelled: "האימות הביומטרי בוטל.",
         credentialsMissing:
           "פרטי ההתחברות הביומטריים השמורים אינם זמינים. התחבר שוב ידנית.",
-        fillCredentials: "אנא הזן גם אימייל או טלפון וגם סיסמה.",
+        fillCredentials: "אנא הזן גם אימייל וגם סיסמה.",
       };
     }
 
@@ -116,8 +116,8 @@ export default function LoginScreen() {
       return {
         welcomeBack: "वापसी पर स्वागत है",
         loginToAccount: "अपने अकाउंट में लॉगिन करें",
-        enterEmail: "अपना ईमेल या फोन दर्ज करें",
-        emailAddress: "ईमेल पता या फोन",
+        enterEmail: "अपना ईमेल दर्ज करें",
+        emailAddress: "ईमेल पता",
         password: "पासवर्ड",
         rememberMe: "मुझे याद रखें",
         forgotPassword: "पासवर्ड भूल गए?",
@@ -145,15 +145,15 @@ export default function LoginScreen() {
         biometricCancelled: "बायोमेट्रिक ऑथेंटिकेशन रद्द कर दिया गया।",
         credentialsMissing:
           "सेव किए गए बायोमेट्रिक क्रेडेंशियल्स उपलब्ध नहीं हैं। कृपया फिर से मैन्युअली लॉगिन करें।",
-        fillCredentials: "कृपया ईमेल या फोन और पासवर्ड दोनों दर्ज करें।",
+        fillCredentials: "कृपया ईमेल और पासवर्ड दोनों दर्ज करें।",
       };
     }
 
     return {
       welcomeBack: "Welcome Back",
       loginToAccount: "Login to your account",
-      enterEmail: "Enter your e-mail or phone",
-      emailAddress: "E-mail address or phone",
+      enterEmail: "Enter your e-mail",
+      emailAddress: "E-mail address",
       password: "Password",
       rememberMe: "Remember me",
       forgotPassword: "Forgot password?",
@@ -179,7 +179,7 @@ export default function LoginScreen() {
       biometricCancelled: "Biometric authentication was cancelled.",
       credentialsMissing:
         "Saved biometric credentials are unavailable. Please log in manually again.",
-      fillCredentials: "Please enter both your e-mail/phone and password.",
+      fillCredentials: "Please enter both your e-mail and password.",
     };
   }, [language]);
 

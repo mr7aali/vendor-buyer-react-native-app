@@ -6,6 +6,7 @@ import { clearPersistedAuthState } from '../../services/authStorage';
 import { logOut, setCredentials } from '../slices/authSlice';
 
 const mutex = new Mutex();
+const extractAuthPayload = (payload: any) => payload?.data ?? payload;
 
 if (!apiBaseUrl) {
     console.error('EXPO_PUBLIC_API_URL is missing. Auth requests will fail until it is set.');
@@ -63,7 +64,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
 
                 const refreshResult = await baseQuery(
                     {
-                        url: '/auth/refresh-token',
+                        url: '/auth/refresh',
                         method: 'POST',
                         body: { refreshToken },
                     },
@@ -72,7 +73,7 @@ const baseQueryWithReauth = async (args: any, api: any, extraOptions: any) => {
                 );
 
                 if (refreshResult.data) {
-                    const data = refreshResult.data as any;
+                    const data = extractAuthPayload(refreshResult.data);
                     const user = (api.getState() as any).auth.user;
 
                     // Sync with AsyncStorage for persistence

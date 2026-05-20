@@ -1,5 +1,6 @@
 import { SkeletonBlock } from "@/components/ui/skeleton";
-import { persistAuthState } from "@/services/authStorage";
+import { clearPersistedAuthState, persistAuthState } from "@/services/authStorage";
+import { buildApiUrl } from "@/services/apiConfig";
 import {
   clearRememberedLogin,
   disableBiometricLogin,
@@ -150,15 +151,33 @@ const ProfileScreen = () => {
   const onLogout = async () => {
     setShowLogoutModal(false);
     try {
-      const accessToken = await AsyncStorage.getItem("accessToken");
+      const [[, accessToken], [, refreshToken]] = await AsyncStorage.multiGet([
+        "accessToken",
+        "refreshToken",
+      ]);
       await unregisterPushTokenFromBackend(accessToken);
 
-      await AsyncStorage.removeItem("accessToken");
-      await AsyncStorage.removeItem("refreshToken");
-      await AsyncStorage.removeItem("user");
-      await AsyncStorage.removeItem("userRole");
+      const logoutUrl = buildApiUrl("/auth/logout");
+      if (/^https?:\/\//i.test(logoutUrl) && accessToken) {
+        try {
+          await fetch(logoutUrl, {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              refreshToken: refreshToken || undefined,
+            }),
+          });
+        } catch (logoutError) {
+          console.warn("Remote logout failed; continuing local sign-out.", logoutError);
+        }
+      }
+
+      await clearPersistedAuthState();
       await AsyncStorage.removeItem("userType");
-      await AsyncStorage.removeItem("availableProfiles");
       await clearRememberedLogin();
 
       dispatch(logOut());

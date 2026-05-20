@@ -148,6 +148,9 @@ export const authApiSlice = apiSlice.injectEndpoints({
             query: () => '/auth/me?profile=true',
             providesTags: ['User'],
         }),
+        getPartnerProfile: builder.query({
+            query: (partnerUserId: string) => `/auth/partner/${partnerUserId}`,
+        }),
         getUserVendorStatistics: builder.query({
             query: (_userId?: string) => '/auth/user-vendor-statistics',
             transformResponse: (response: any) => response?.data || response,
@@ -160,7 +163,19 @@ export const authApiSlice = apiSlice.injectEndpoints({
             }),
             invalidatesTags: ['User'],
         }),
-        changePassword: builder.mutation(createJsonMutationWithFallback('/auth/change-password', 'POST', true)),
+        changePassword: builder.mutation(
+            createJsonMutationWithFallback(
+                '/auth/change-password',
+                'PATCH',
+                true,
+                undefined,
+                (data: any) => ({
+                    currentPassword: data?.currentPassword || data?.oldPassword || '',
+                    newPassword: data?.newPassword || '',
+                    confirmPassword: data?.confirmPassword || data?.newPassword || '',
+                }),
+            ),
+        ),
         switchProfile: builder.mutation(
             createJsonMutationWithFallback(
                 '/auth/switch-profile',
@@ -185,6 +200,7 @@ export const {
     useOTPVerificationMutation,
     useSetNewPasswordScreenMutation,
     useGetProfileQuery,
+    useGetPartnerProfileQuery,
     useGetUserVendorStatisticsQuery,
     useUpdateProfileMutation,
     useChangePasswordMutation,

@@ -1,7 +1,9 @@
-import { Feather, Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { useGetPartnerProfileQuery } from "@/store/api/authApiSlice";
 import React from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StatusBar,
@@ -15,48 +17,40 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const DEFAULT_AVATAR =
   "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80";
 
-const BUYER_PROFILE = {
-  status: "Online now",
-  accent: "#2D8C86",
-  surface: "#EEF7F4",
-  stats: [
-    {
-      icon: "bag-handle-outline" as const,
-      title: "Order Frequency",
-      value: "High",
-      subtitle: "Recent order #ORD-2025",
-    },
-    {
-      icon: "wallet-outline" as const,
-      title: "Lifetime Spend",
-      value: "$2,450",
-      subtitle: "Average basket $110",
-    },
-  ],
-  details: [
-    { icon: "calendar", label: "Joined", value: "March 2023" },
-    { icon: "activity", label: "Status", value: "Active customer" },
-    { icon: "mail", label: "Email", value: "rokey.mahmud@email.com" },
-    { icon: "phone", label: "Phone", value: "+1 555-010-9876" },
-    { icon: "map-pin", label: "Address", value: "6381 Elgin St, Celina, Delaware 19299" },
-  ],
-  actions: ["Offer Discount"],
+const PROFILE_THEME = {
+  buyer: {
+    accent: "#2D8C86",
+    surface: "#EEF7F4",
+    badge: "Buyer Profile",
+  },
+  vendor: {
+    accent: "#1F7A8C",
+    surface: "#EEF5FB",
+    badge: "Vendor Profile",
+  },
 };
 
-const VENDOR_PROFILE = {
-  accent: "#1F7A8C",
-  surface: "#EEF5FB",
+const formatMonthYear = (value?: string | null) => {
+  if (!value) return "N/A";
 
-  details: [
-    { icon: "calendar", label: "Joined", value: "January 2022" },
-    { icon: "activity", label: "Status", value: "Active" },
-    { icon: "mail", label: "Email", value: "support@techhubelectronics.com" },
-    { icon: "phone", label: "Phone", value: "+1 555-019-2244" },
-    { icon: "map-pin", label: "Address", value: "245 Market Street, Wilmington, Delaware 19801" },
-  ],
-  actions: ["Order History"],
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 };
 
+const getRealProfileType = (paramsProfileType?: string, backendUserType?: string) => {
+  const resolvedType = String(backendUserType || paramsProfileType || "").toLowerCase();
+  return resolvedType === "vendor" ? "vendor" : "buyer";
+};
+
+const getFallbackValue = (value?: string | null) => {
+  const trimmed = String(value || "").trim();
+  return trimmed || "N/A";
+};
 
 const DetailRow = ({
   icon,
@@ -84,17 +78,75 @@ export default function CustomerProfileScreen() {
     profileBadge?: string;
   }>();
 
-  const profileType = String(params.profileType || "").toLowerCase() === "vendor" ? "vendor" : "buyer";
-  const profile = profileType === "vendor" ? VENDOR_PROFILE : BUYER_PROFILE;
-  const displayName = params.name || (profileType === "vendor" ? "TechHub Electronics" : "Rokey Mahmud");
-  const avatar = params.avatar || DEFAULT_AVATAR;
-  const badge =
-    params.profileBadge || (profileType === "vendor" ? "Vendor Profile" : "Buyer Profile");
+  const partnerId = String(params.partnerId || "").trim();
+  const {
+    data: partnerProfileResponse,
+    isLoading,
+    isFetching,
+    error,
+  } = useGetPartnerProfileQuery(partnerId, {
+    skip: !partnerId,
+  });
+
+  const partnerProfile = partnerProfileResponse?.data || partnerProfileResponse;
+  const profileType = getRealProfileType(params.profileType, partnerProfile?.userType);
+  const profileTheme = PROFILE_THEME[profileType];
+  const buyer = partnerProfile?.buyer;
+  const vendor = partnerProfile?.vendor;
+  const displayName =
+    vendor?.storename ||
+    vendor?.businessName ||
+    vendor?.fullName ||
+    buyer?.fullName ||
+    partnerProfile?.displayName ||
+    params.name ||
+    "Profile";
+  const avatar =
+    vendor?.logoUrl ||
+    buyer?.profilePhotoUrl ||
+    partnerProfile?.avatarUrl ||
+    params.avatar ||
+    DEFAULT_AVATAR;
+  const badge = params.profileBadge || profileTheme.badge;
+  const joinedAt =
+    vendor?.createdAt ||
+    buyer?.createdAt ||
+    partnerProfile?.createdAt ||
+    null;
+  const statusText = partnerProfile?.connection?.isActive
+    ? "Connected"
+    : isLoading || isFetching
+      ? "Loading profile"
+      : "Profile unavailable";
+  const details = profileType === "vendor"
+    ? [
+      { icon: "calendar" as const, label: "Joined", value: formatMonthYear(joinedAt) },
+      { icon: "activity" as const, label: "Status", value: statusText },
+      { icon: "mail" as const, label: "Email", value: getFallbackValue(partnerProfile?.email) },
+      { icon: "phone" as const, label: "Phone", value: getFallbackValue(vendor?.phone) },
+      {
+        icon: "map-pin" as const,
+        label: "Address",
+        value: getFallbackValue(vendor?.address || vendor?.country),
+      },
+    ]
+    : [
+      { icon: "calendar" as const, label: "Joined", value: formatMonthYear(joinedAt) },
+      { icon: "activity" as const, label: "Status", value: statusText },
+      { icon: "mail" as const, label: "Email", value: getFallbackValue(partnerProfile?.email) },
+      { icon: "phone" as const, label: "Phone", value: getFallbackValue(buyer?.phone) },
+      {
+        icon: "map-pin" as const,
+        label: "Address",
+        value: getFallbackValue(partnerProfile?.evanAddress || buyer?.country),
+      },
+    ];
+  const hasProfileError = !!error || (!partnerId && !partnerProfile);
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={profile.surface} />
-      <View style={[styles.topBar, { backgroundColor: profile.surface }]}>
+      <StatusBar barStyle="dark-content" backgroundColor={profileTheme.surface} />
+      <View style={[styles.topBar, { backgroundColor: profileTheme.surface }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <MaterialIcons name="arrow-back-ios-new" size={20} color="#213233" />
         </TouchableOpacity>
@@ -103,7 +155,7 @@ export default function CustomerProfileScreen() {
       </View>
 
       <ScrollView
-        style={[styles.scrollView, { backgroundColor: profile.surface }]}
+        style={[styles.scrollView, { backgroundColor: profileTheme.surface }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -112,27 +164,35 @@ export default function CustomerProfileScreen() {
 
           <View style={styles.avatarWrap}>
             <Image source={{ uri: avatar }} style={styles.avatar} />
-            <View style={[styles.onlineDot, { backgroundColor: profile.accent }]} />
+            <View style={[styles.onlineDot, { backgroundColor: profileTheme.accent }]} />
           </View>
 
-          <View style={[styles.badgePill, { backgroundColor: `${profile.accent}14` }]}>
-            <Text style={[styles.badgeText, { color: profile.accent }]}>{badge}</Text>
+          <View style={[styles.badgePill, { backgroundColor: `${profileTheme.accent}14` }]}>
+            <Text style={[styles.badgeText, { color: profileTheme.accent }]}>{badge}</Text>
           </View>
 
           <Text style={styles.name}>{displayName}</Text>
+          <Text style={[styles.status, { color: profileTheme.accent }]}>{statusText}</Text>
 
+          {isLoading || isFetching ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color={profileTheme.accent} />
+              <Text style={styles.loadingText}>Loading profile details...</Text>
+            </View>
+          ) : null}
 
+          {hasProfileError ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>
+                We couldn{"'"}t load the latest profile details right now.
+              </Text>
+            </View>
+          ) : null}
 
           <View style={styles.detailsCard}>
-            {profile.details.map((item) => (
+            {details.map((item) => (
               <DetailRow key={item.label} icon={item.icon} label={item.label} value={item.value} />
             ))}
-          </View>
-
-          <View style={styles.actions}>
-            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: profile.accent }]} activeOpacity={0.9}>
-              <Text style={styles.primaryButtonText}>{profile.actions[0]}</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -238,6 +298,34 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  loadingWrap: {
+    marginTop: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#4B5E5F",
+    fontWeight: "500",
+  },
+  errorCard: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "#FFF3F0",
+    borderWidth: 1,
+    borderColor: "#FFD7CF",
+  },
+  errorText: {
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#8A3F2E",
     fontWeight: "600",
   },
   statsGrid: {
