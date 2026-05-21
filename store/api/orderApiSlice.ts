@@ -19,6 +19,10 @@ export const orderApiSlice = apiSlice.injectEndpoints({
                 method: 'POST',
                 body: orderData,
             }),
+            transformResponse: (response: any) => {
+                const payload = response?.data || response;
+                return normalizeOrder(payload);
+            },
             invalidatesTags: [{ type: 'Order', id: 'LIST' }, { type: 'Cart', id: 'LIST' }],
         }),
         getOrderById: builder.query({

@@ -82,6 +82,12 @@ const OrderDetails = () => {
   const shipping = toNumber(order?.shippingCost, 0);
   const discount = toNumber(order?.discountAmount);
   const total = toNumber(order?.totalAmount);
+  const paymentStatus = String(order?.payment?.status || "").toLowerCase();
+  const isPaid =
+    paymentStatus === 'succeeded' ||
+    ['processing', 'shipped', 'delivered', 'completed'].includes(status);
+  const showTax = tax > 0;
+  const showShipping = shipping > 0;
   const productReviews = productReviewsData?.data?.reviews || [];
   const apiAverageRating = toNumber((productReviewsData as any)?.data?.averageRating, NaN);
   const totalProductReviews = toNumber(productReviewsData?.data?.meta?.total, productReviews.length);
@@ -236,15 +242,45 @@ const OrderDetails = () => {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('order_details_delivery_notes', 'Delivery & notes')}</Text>
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailBlockLabel}>{t('order_details_shipping_address', 'Shipping address')}</Text>
+            <Text style={styles.detailBlockText}>
+              {order?.shippingAddress || t('order_details_address_unavailable', 'Address unavailable')}
+            </Text>
+          </View>
+          {order?.customerNote ? (
+            <View style={styles.detailBlock}>
+              <Text style={styles.detailBlockLabel}>{t('info_vendor_note', 'Note for this vendor')}</Text>
+              <Text style={styles.detailBlockText}>{order.customerNote}</Text>
+            </View>
+          ) : null}
+          <View style={styles.detailBlock}>
+            <Text style={styles.detailBlockLabel}>{t('order_details_terms_status', 'Terms status')}</Text>
+            <Text style={styles.detailBlockText}>
+              {order?.termsAccepted
+                ? t('order_details_terms_accepted', 'Accepted during checkout')
+                : t('order_details_terms_missing', 'Not recorded')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t('order_details_payment_details', 'Payment details')}</Text>
           <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_subtotal', 'Subtotal')}</Text><Text style={styles.paymentValue}>{formatMoney(subtotal)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_tax', 'Tax(7.5%)')}</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_shipping', 'Shipping')}</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
+          {showTax ? (
+            <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_tax', 'Tax(7.5%)')}</Text><Text style={styles.paymentValue}>{formatMoney(tax)}</Text></View>
+          ) : null}
+          {showShipping ? (
+            <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_shipping', 'Shipping')}</Text><Text style={styles.paymentValue}>{formatMoney(shipping)}</Text></View>
+          ) : null}
           <View style={styles.dashed} />
-          <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_discount', 'Discount')}</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
+          {discount > 0 ? (
+            <View style={styles.paymentRow}><Text style={styles.paymentLabel}>{t('order_details_discount', 'Discount')}</Text><Text style={styles.paymentValue}>{formatMoney(discount)}</Text></View>
+          ) : null}
           <View style={styles.paymentRow}><Text style={styles.totalLabel}>{t('chat_total_label', 'Total')}</Text><Text style={styles.totalValue}>{formatMoney(total)}</Text></View>
           <View style={styles.paidBadge}>
-            <Text style={styles.paidTag}>{status === 'pending' ? t('order_details_unpaid', 'Unpaid') : t('order_details_paid', 'Paid')}</Text>
+            <Text style={styles.paidTag}>{isPaid ? t('order_details_paid', 'Paid') : t('order_details_unpaid', 'Unpaid')}</Text>
             <Text style={styles.paidText}>{t('order_details_via', 'Via')} {order?.payment?.paymentMethod || t('order_details_card_ending', 'Card ending 4242')}</Text>
           </View>
         </View>
@@ -359,6 +395,9 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: 13, fontWeight: '700', color: '#1F2A30' },
   itemDesc: { fontSize: 11, color: '#7C8991', marginTop: 2, marginRight: 30 },
   itemQty: { textAlign: I18nManager.isRTL ? 'left' : 'right', fontSize: 11, color: '#6D7A83', marginTop: 2 },
+  detailBlock: { marginBottom: 12 },
+  detailBlockLabel: { fontSize: 12, fontWeight: '700', color: '#5C6B73', marginBottom: 4 },
+  detailBlockText: { fontSize: 13, color: '#1F2A30', lineHeight: 19 },
   paymentRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   paymentLabel: { fontSize: 13, color: '#6D7A83' },
   paymentValue: { fontSize: 13, color: '#1F2A30', fontWeight: '600' },
