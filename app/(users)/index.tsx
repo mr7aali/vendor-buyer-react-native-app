@@ -8,7 +8,10 @@ import {
 } from "@/store/api/connectionApiSlice";
 import { useAppSelector } from "@/store/hooks";
 import { resolveAbsoluteUrl } from "@/services/apiConfig";
-import { selectCurrentUser } from "@/store/slices/authSlice";
+import {
+  selectCurrentAccessToken,
+  selectCurrentUser,
+} from "@/store/slices/authSlice";
 import { useTranslation } from "@/hooks/use-translation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -71,6 +74,7 @@ const resolveConnectedVendor = (response: any, fallbackVendor: any) =>
 const Dashboard: React.FC = () => {
   const { t } = useTranslation();
   const user = useAppSelector(selectCurrentUser);
+  const accessToken = useAppSelector(selectCurrentAccessToken);
   const { data: statsData } = useGetUserVendorStatisticsQuery(undefined, {
     refetchOnFocus: true,
     refetchOnReconnect: true,
@@ -84,6 +88,7 @@ const Dashboard: React.FC = () => {
     isLoading: isExploreLoading,
     isFetching: isExploreFetching,
   } = useGetExploreVendorsQuery(undefined, {
+    skip: !accessToken,
     refetchOnFocus: true,
     refetchOnReconnect: true,
     refetchOnMountOrArgChange: true,
@@ -156,6 +161,9 @@ const Dashboard: React.FC = () => {
         : [];
     return vendors.slice(0, 4);
   }, [exploreData]);
+
+  const showExploreSkeletons =
+    previewVendors.length === 0 && (isExploreLoading || isExploreFetching);
 
   const handleOpenVendorCategories = React.useCallback(
     async (vendorLike: any) => {
@@ -306,7 +314,7 @@ const Dashboard: React.FC = () => {
         </View>
 
         <View style={styles.previewGrid}>
-          {(isExploreLoading || isExploreFetching
+          {(showExploreSkeletons
             ? Array.from({ length: 4 }).map((_, index) => (
                 <View key={`preview-skeleton-${index}`} style={styles.previewCard}>
                   <SkeletonBlock style={styles.previewImage} />
