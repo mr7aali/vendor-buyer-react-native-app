@@ -12,9 +12,30 @@ const normalizePath = (value: string) => {
   return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
 };
 
-const rawConfiguredApiUrl = normalizeBaseUrl(
-  process.env.EXPO_PUBLIC_API_URL ?? "",
-);
+const getEmbeddedApiUrl = () => {
+  const expoConfigValue = (Constants.expoConfig?.extra as { apiUrl?: unknown } | undefined)?.apiUrl;
+  if (typeof expoConfigValue === "string" && expoConfigValue.trim()) {
+    return expoConfigValue;
+  }
+
+  const legacyManifestValue = (Constants as any)?.manifest?.extra?.apiUrl;
+  if (typeof legacyManifestValue === "string" && legacyManifestValue.trim()) {
+    return legacyManifestValue;
+  }
+
+  return "";
+};
+
+const getConfiguredApiUrl = () => {
+  const envValue = String(process.env.EXPO_PUBLIC_API_URL ?? "").trim();
+  if (envValue) {
+    return envValue;
+  }
+
+  return String(getEmbeddedApiUrl() || "").trim();
+};
+
+const rawConfiguredApiUrl = normalizeBaseUrl(getConfiguredApiUrl());
 
 const shouldUseLocalDevFallbacks = () =>
   __DEV__ && (!rawConfiguredApiUrl || isLoopbackUrl(rawConfiguredApiUrl));

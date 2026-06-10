@@ -25,6 +25,7 @@
         "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/logo.png"
       },
+      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.soriful420.yozietranceApp",
